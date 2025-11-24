@@ -1,0 +1,16 @@
+# Dependencias (son muy pesadas, se instalan en el servidor)
+node_modules/
+*/node_modules/
+
+# Variables de Entorno (Secretos, NO subir nunca)
+.env
+*/.env
+
+# Archivos de compilación
+dist/
+build/
+
+# Logs y sistema
+.DS_Store
+logs/
+*.log
