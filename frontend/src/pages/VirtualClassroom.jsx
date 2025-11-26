@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import ReactPlayer from 'react-player'; // ✅ IMPORTANTE: Usamos el reproductor inteligente
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 
@@ -77,22 +76,27 @@ function VirtualClassroom() {
         
         {/* --- SECCIÓN IZQUIERDA (VIDEO + TABS) --- */}
         <div className="video-section">
-            {/* Reproductor Estilo Cine */}
+            {/* Reproductor Estilo Cine (IFRAME NATIVO PARA EVITAR BLOQUEOS) */}
             <div className="video-frame-container">
                 {activeLesson ? (
-                    /* ✅ REPRODUCTOR INTELIGENTE (Soporta YouTube, Vimeo, MP4, etc.) */
-                    <ReactPlayer
-                        url={activeLesson.url_video}
-                        width="100%"
-                        height="100%"
-                        controls={true} // Muestra controles nativos
-                        playing={false} // No auto-play para no molestar
-                        config={{
-                            youtube: {
-                                playerVars: { showinfo: 1 }
-                            }
-                        }}
-                    />
+                    activeLesson.url_video && activeLesson.url_video.includes('youtu') ? (
+                        // REPRODUCTOR YOUTUBE (IFRAME)
+                        <iframe 
+                            src={activeLesson.url_video.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")} 
+                            title={activeLesson.titulo}
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowFullScreen
+                        ></iframe>
+                    ) : (
+                        // REPRODUCTOR GENÉRICO (MP4 DIRECTO)
+                        <video controls width="100%" height="100%" key={activeLesson.url_video}>
+                            <source src={activeLesson.url_video} type="video/mp4" />
+                            Tu navegador no soporta videos HTML5.
+                        </video>
+                    )
                 ) : (
                     <h3 style={{color:'white'}}>Selecciona una lección</h3>
                 )}
