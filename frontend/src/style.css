@@ -479,3 +479,92 @@ body {
   .auth-card { padding: 20px; }
   .settings-grid { grid-template-columns: 1fr; }
 }
+/* =========================================
+   📱 CORRECCIONES PARA MÓVILES (RESPONSIVE)
+   ========================================= */
+
+@media (max-width: 768px) {
+    /* 1. Navbar: Apilar Logo y Menú */
+    .navbar {
+        flex-direction: column;
+        padding: 15px;
+        gap: 15px;
+        height: auto;
+    }
+    
+    .nav-links {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    /* Ocultar buscador del header en móvil para ganar espacio */
+    .navbar .search-container {
+        display: none;
+    }
+
+    /* 2. Dashboards y Perfil: Columna única (Sidebar arriba) */
+    .instructor-dashboard, 
+    .profile-page-container,
+    .content-management-layout {
+        flex-direction: column;
+    }
+
+    .dashboard-sidebar, 
+    .profile-sidebar,
+    .curriculum-display {
+        width: 100% !important;
+        height: auto;
+        position: relative;
+        top: 0;
+        margin-bottom: 20px;
+    }
+
+    .dashboard-content, 
+    .profile-main-content,
+    .add-lesson-form-container {
+        padding: 20px 10px;
+        width: 100%;
+    }
+
+    /* 3. Tablas: Permitir scroll horizontal para que no rompan la pantalla */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    /* 4. Login/Registro: Ajustar espaciado */
+    .auth-form-side {
+        padding: 20px;
+    }
+    .auth-form-container {
+        width: 100%;
+    }
+
+    /* 5. Home: Ajustar textos gigantes */
+    .hero h1 {
+        font-size: 2rem;
+    }
+    .search-box input {
+        width: 100% !important; /* Que no se salga de la pantalla */
+    }
+    .search-box .search-results-dropdown {
+        width: 100% !important;
+    }
+
+    /* 6. Aula Virtual */
+    .classroom-player-wrapper {
+        flex-direction: column;
+    }
+    .video-frame-container {
+        height: 250px; /* Altura fija para video en móvil */
+    }
+    .curriculum-sidebar {
+        width: 100%;
+        height: auto;
+        border-left: none;
+        border-top: 1px solid #333;
+    }
+}
