@@ -7,19 +7,17 @@ import Footer from '../components/Footer';
 
 function CreateCourse() {
   const navigate = useNavigate();
-  const { token } = useAuth(); // Necesitamos el token para que el backend sepa quién crea el curso
+  const { token } = useAuth(); 
   
-  // Estado para guardar los datos del formulario
   const [formData, setFormData] = useState({
     titulo: '',
     descripcion_larga: '',
-    categoria: 'diseno', // Valor por defecto
+    categoria: 'diseno',
     precio: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // URL del Backend (desde .env)
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
   const handleChange = (e) => {
@@ -35,15 +33,14 @@ function CreateCourse() {
     setError('');
 
     try {
-      // Petición POST al backend
       await axios.post(
         `${API_URL}/cursos`, 
         formData,
-        { headers: { Authorization: `Bearer ${token}` } } // Importante: Enviar el Token
+        { headers: { Authorization: `Bearer ${token}` } } 
       );
 
       alert('¡Curso creado con éxito!');
-      navigate('/panel-instructor'); // Redirigir al panel para verlo
+      navigate('/panel-instructor'); 
     } catch (err) {
       console.error(err);
       setError('Error al crear el curso. Verifica que todos los campos estén llenos.');
@@ -87,6 +84,7 @@ function CreateCourse() {
               ></textarea>
             </div>
             
+            {/* LISTA DE CATEGORÍAS ACTUALIZADA */}
             <div className="form-group">
               <label>Categoría</label>
               <select name="categoria" value={formData.categoria} onChange={handleChange} style={{padding: '10px', borderRadius: '5px', border: '1px solid #ccc', width: '100%'}}>
@@ -104,15 +102,17 @@ function CreateCourse() {
                   <option value="otros">Otros / General</option>
               </select>
             </div>
+
+            {/* PRECIO EN GUARANÍES */}
             <div className="form-group">
-              <label>Precio (USD)</label>
+              <label>Precio (Guaraníes)</label>
               <input 
                 type="number" 
                 name="precio" 
-                step="0.01" 
+                step="1000" 
                 value={formData.precio} 
                 onChange={handleChange} 
-                placeholder="0.00"
+                placeholder="Ej: 150000"
                 required 
               />
             </div>

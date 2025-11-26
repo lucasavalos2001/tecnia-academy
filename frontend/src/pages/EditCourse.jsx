@@ -23,8 +23,7 @@ function EditCourse() {
   useEffect(() => {
     const fetchCurso = async () => {
       try {
-        // Reusamos el endpoint de detalle público o creamos uno específico
-        // Por ahora usamos el público que ya tenemos
+        // Reusamos el endpoint de detalle público
         const res = await axios.get(`${API_URL}/cursos/${id}/detalle`);
         const c = res.data;
         setFormData({
@@ -77,6 +76,8 @@ function EditCourse() {
               <label>Descripción</label>
               <textarea name="descripcion_larga" rows="4" value={formData.descripcion_larga} onChange={handleChange} required></textarea>
             </div>
+            
+            {/* LISTA DE CATEGORÍAS ACTUALIZADA */}
             <div className="form-group">
               <label>Categoría</label>
               <select name="categoria" value={formData.categoria} onChange={handleChange} style={{padding: '10px', borderRadius: '5px', border: '1px solid #ccc', width: '100%'}}>
@@ -94,10 +95,21 @@ function EditCourse() {
                   <option value="otros">Otros / General</option>
               </select>
             </div>
+
+            {/* PRECIO EN GUARANÍES */}
             <div className="form-group">
-              <label>Precio (USD)</label>
-              <input type="number" name="precio" step="0.01" value={formData.precio} onChange={handleChange} required />
+              <label>Precio (Guaraníes)</label>
+              <input 
+                type="number" 
+                name="precio" 
+                step="1000" 
+                value={formData.precio} 
+                onChange={handleChange} 
+                placeholder="150000"
+                required 
+              />
             </div>
+            
             <button type="submit" className="btn-submit-course">Guardar Cambios</button>
           </form>
         </div>

@@ -14,7 +14,6 @@ function ManageContent() {
   const [modulos, setModulos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Formularios de creación
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState('');
   const [newLesson, setNewLesson] = useState({ titulo: '', url_video: '' });
@@ -38,7 +37,7 @@ function ManageContent() {
     fetchCurriculum();
   }, [id]);
 
-  // --- FUNCIONES DE CREACIÓN ---
+  // --- CREACIÓN ---
   const handleAddModule = async (e) => {
     e.preventDefault();
     if (!newModuleTitle) return;
@@ -59,9 +58,7 @@ function ManageContent() {
     } catch (error) { alert("Error al crear lección"); }
   };
 
-  // --- ✅ FUNCIONES DE EDICIÓN Y BORRADO (NUEVAS) ---
-
-  // 1. Borrar Módulo
+  // --- EDICIÓN Y BORRADO ---
   const handleDeleteModule = async (moduleId) => {
     if(!confirm("¿Borrar este módulo y todas sus lecciones?")) return;
     try {
@@ -70,7 +67,6 @@ function ManageContent() {
     } catch (error) { alert("Error al borrar módulo"); }
   };
 
-  // 2. Editar Módulo
   const handleEditModule = async (modulo) => {
     const newTitle = prompt("Nuevo nombre del módulo:", modulo.titulo);
     if (newTitle && newTitle !== modulo.titulo) {
@@ -81,7 +77,6 @@ function ManageContent() {
     }
   };
 
-  // 3. Borrar Lección
   const handleDeleteLesson = async (lessonId) => {
     if(!confirm("¿Borrar esta lección?")) return;
     try {
@@ -90,7 +85,6 @@ function ManageContent() {
     } catch (error) { alert("Error al borrar lección"); }
   };
 
-  // 4. Editar Lección (Título y URL)
   const handleEditLesson = async (leccion) => {
     const newTitle = prompt("Nuevo título:", leccion.titulo);
     const newUrl = prompt("Nueva URL de video:", leccion.url_video);
@@ -106,7 +100,6 @@ function ManageContent() {
     }
   };
 
-
   if (loading) return <div>Cargando gestor...</div>;
 
   return (
@@ -119,7 +112,7 @@ function ManageContent() {
 
         <div className="content-management-layout">
             
-            {/* COLUMNA IZQUIERDA: TEMARIO VISUAL CON ACCIONES */}
+            {/* COLUMNA IZQUIERDA */}
             <div className="curriculum-display">
                 <h3>Temario Actual</h3>
                 {modulos.length === 0 ? <p>No hay módulos todavía.</p> : null}
@@ -129,7 +122,6 @@ function ManageContent() {
                         <div className="module-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <strong>{mod.titulo}</strong>
                             <div>
-                                {/* Botones Módulo */}
                                 <button onClick={() => handleEditModule(mod)} style={iconBtnStyle} title="Editar nombre"><i className="fas fa-edit"></i></button>
                                 <button onClick={() => handleDeleteModule(mod.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar módulo"><i className="fas fa-trash"></i></button>
                             </div>
@@ -142,7 +134,6 @@ function ManageContent() {
                                         {lec.titulo}
                                     </div>
                                     <div>
-                                        {/* Botones Lección */}
                                         <button onClick={() => handleEditLesson(lec)} style={iconBtnStyle} title="Editar lección"><i className="fas fa-pencil-alt"></i></button>
                                         <button onClick={() => handleDeleteLesson(lec.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar lección"><i className="fas fa-times"></i></button>
                                     </div>
@@ -153,7 +144,7 @@ function ManageContent() {
                 ))}
             </div>
 
-            {/* COLUMNA DERECHA: FORMULARIOS */}
+            {/* COLUMNA DERECHA */}
             <div className="add-lesson-form-container">
                 <div style={{marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px'}}>
                     <h3>1. Crear Nuevo Módulo</h3>
@@ -176,10 +167,21 @@ function ManageContent() {
                             </select>
                         </div>
                         <div className="form-group">
-                            <input type="text" placeholder="Título de la lección" value={newLesson.titulo} onChange={e => setNewLesson({...newLesson, titulo: e.target.value})} />
+                            <label>Título de la Lección:</label>
+                            <input type="text" value={newLesson.titulo} onChange={e => setNewLesson({...newLesson, titulo: e.target.value})} />
                         </div>
+                        {/* ✅ INPUT DE VIDEO MEJORADO */}
                         <div className="form-group">
-                            <input type="text" placeholder="URL del Video" value={newLesson.url_video} onChange={e => setNewLesson({...newLesson, url_video: e.target.value})} />
+                            <label>Video de la clase:</label>
+                            <input 
+                                type="text" 
+                                placeholder="Pega aquí el enlace (YouTube, Vimeo, Drive)" 
+                                value={newLesson.url_video} 
+                                onChange={e => setNewLesson({...newLesson, url_video: e.target.value})} 
+                            />
+                            <small style={{display:'block', marginTop:'5px', color:'#666', fontSize:'0.8rem'}}>
+                                <i className="fas fa-info-circle"></i> Recomendamos subir tu video a <strong>YouTube (No listado)</strong> o <strong>Vimeo</strong> y pegar el link aquí para mejor velocidad.
+                            </small>
                         </div>
                         <button className="btn-submit-course">Guardar Lección</button>
                     </form>

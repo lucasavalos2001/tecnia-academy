@@ -2,15 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext'; 
+import { formatCurrency } from '../utils/formatCurrency'; // ✅ Importamos el formateador
 
 function InstructorPanel() {
   const { user, logout, token } = useAuth();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
   
-  // Estado de Pestañas
-  const [activeTab, setActiveTab] = useState('cursos'); // 'cursos' o 'analiticas'
-
-  // Estados de Datos
+  const [activeTab, setActiveTab] = useState('cursos');
   const [cursos, setCursos] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,14 +17,11 @@ function InstructorPanel() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Cargar Cursos
         const resCursos = await axios.get(`${API_URL}/cursos/instructor`, { headers: { Authorization: `Bearer ${token}` } });
         setCursos(resCursos.data.cursos);
 
-        // 2. Cargar Estadísticas
         const resStats = await axios.get(`${API_URL}/cursos/instructor/stats`, { headers: { Authorization: `Bearer ${token}` } });
         setStats(resStats.data);
-        
       } catch (error) {
         console.error("Error datos instructor:", error);
       } finally {
@@ -86,10 +81,13 @@ function InstructorPanel() {
                         {loading ? <p>Cargando...</p> : cursos.length === 0 ? <p>No tienes cursos aún.</p> : (
                             cursos.map((curso) => (
                                 <div className="course-item" key={curso.id}>
-                                    <img src={curso.imagen_url || "https://placehold.co/150x90/9b59b6/ffffff?text=Curso"} alt="Miniatura" />
+                                    <img src={curso.imagen_url || `https://placehold.co/150x90/9b59b6/ffffff?text=${curso.categoria}`} alt="Miniatura" />
                                     <div className="course-info">
                                         <h3>{curso.titulo}</h3>
-                                        <p className="course-status published">Precio: ${curso.precio}</p>
+                                        
+                                        {/* ✅ PRECIO EN GUARANÍES */}
+                                        <p className="course-status published">Precio: {formatCurrency(curso.precio)}</p>
+                                        
                                         <div className="stats">
                                             <span>{curso.categoria}</span>
                                         </div>
@@ -112,7 +110,10 @@ function InstructorPanel() {
                     <header className="content-header"><h2>Rendimiento</h2></header>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px'}}>
                         <StatBox title="Total Estudiantes" value={stats.totalEstudiantes} icon="fa-users" color="#3498db" />
-                        <StatBox title="Ingresos Totales" value={`$${stats.totalIngresos}`} icon="fa-dollar-sign" color="#27ae60" />
+                        
+                        {/* ✅ INGRESOS EN GUARANÍES */}
+                        <StatBox title="Ingresos Totales" value={formatCurrency(stats.totalIngresos)} icon="fa-dollar-sign" color="#27ae60" />
+                        
                         <StatBox title="Cursos Activos" value={stats.totalCursos} icon="fa-book" color="#9b59b6" />
                     </div>
                     
@@ -131,7 +132,8 @@ function InstructorPanel() {
                                     <tr key={i} style={{borderBottom:'1px solid #eee'}}>
                                         <td style={{padding:'10px'}}>{d.titulo}</td>
                                         <td style={{padding:'10px'}}>{d.alumnos}</td>
-                                        <td style={{padding:'10px', color:'#27ae60', fontWeight:'bold'}}>${d.ingresos}</td>
+                                        {/* ✅ DESGLOSE EN GUARANÍES */}
+                                        <td style={{padding:'10px', color:'#27ae60', fontWeight:'bold'}}>{formatCurrency(d.ingresos)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -144,7 +146,6 @@ function InstructorPanel() {
   );
 }
 
-// Componentes Estilizados Simples
 const navBtnStyle = { background: 'none', border: 'none', color: 'white', width: '100%', textAlign: 'left', padding: '15px', cursor: 'pointer', fontSize: '1em', display:'flex', gap:'10px', alignItems:'center' };
 const StatBox = ({ title, value, icon, color }) => (
     <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', textAlign:'center'}}>

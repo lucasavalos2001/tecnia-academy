@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useLocation, useNavigate } from 'react-router-dom'; // ✅ Importamos useNavigate
+import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+// Asegúrate de tener este archivo creado en src/utils/formatCurrency.js
+import { formatCurrency } from '../utils/formatCurrency'; 
 
 function CourseLibrary() {
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  const navigate = useNavigate(); // ✅ Inicializamos el hook de navegación
+  const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
   
-  // Leer parámetros de la URL (ej: ?q=react)
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const searchQuery = queryParams.get('q');
 
-  // Cargar cursos
   useEffect(() => {
     const fetchCursos = async () => {
       setLoading(true);
@@ -53,17 +53,28 @@ function CourseLibrary() {
             ) : (
                 cursos.map((curso) => (
                     <div className="curso-card" key={curso.id}>
-                        <img 
-                            src={curso.imagen_url || `https://placehold.co/300x180/00d4d4/ffffff?text=${curso.categoria}`} 
-                            alt={curso.titulo} 
-                        />
+                        {/* Wrapper para imagen con zoom */}
+                        <div className="card-image-wrapper">
+                             <span className="category-badge">
+                                {curso.categoria}
+                            </span>
+                            <img 
+                                src={curso.imagen_url || `https://placehold.co/300x180/00d4d4/ffffff?text=${curso.categoria}`} 
+                                alt={curso.titulo} 
+                            />
+                        </div>
+
                         <div className="card-content">
                             <h3>{curso.titulo}</h3>
                             <p>{curso.descripcion_larga.substring(0, 100)}...</p>
-                            <p style={{fontWeight: 'bold', color: '#0b3d91'}}>USD {curso.precio}</p>
+                            
+                            {/* ✅ CORRECCIÓN DE PRECIO A GUARANÍES */}
+                            <p style={{fontWeight: 'bold', color: '#0b3d91', fontSize: '1.1rem'}}>
+                                {formatCurrency(curso.precio)}
+                            </p>
+                            
                             <p style={{fontSize:'0.8em', color:'#666'}}>Por: {curso.instructor?.nombre_completo}</p>
                             
-                            {/* ✅ BOTÓN ACTUALIZADO: Lleva a los detalles */}
                             <button 
                                 className="btn-inscribirse"
                                 onClick={() => navigate(`/curso/${curso.id}`)}

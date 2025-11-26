@@ -4,6 +4,8 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+// ✅ IMPORTANTE: Importar el formateador
+import { formatCurrency } from '../utils/formatCurrency';
 
 function CourseDetailPublic() {
   const { id } = useParams();
@@ -33,7 +35,11 @@ function CourseDetailPublic() {
         navigate('/login');
         return;
     }
-    if (confirm(`¿Quieres inscribirte en "${curso.titulo}" por $${curso.precio}?`)) {
+    
+    // ✅ PRECIO FORMATEADO EN LA ALERTA
+    const precioFormateado = formatCurrency(curso.precio);
+    
+    if (confirm(`¿Quieres inscribirte en "${curso.titulo}" por ${precioFormateado}?`)) {
         try {
             await axios.post(`${API_URL}/cursos/${curso.id}/inscribirse`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -108,22 +114,13 @@ function CourseDetailPublic() {
                   </div>
               </div>
 
-              {/* ✅ NUEVA SECCIÓN: TU INSTRUCTOR (Biografía Completa) */}
+              {/* TU INSTRUCTOR */}
               <div style={{marginTop: '40px', borderTop:'1px solid #eee', paddingTop:'30px'}}>
                   <h3 style={{fontSize: '1.5rem', marginBottom:'20px'}}>Tu Instructor</h3>
-                  
                   <div style={{display:'flex', gap:'20px', alignItems:'flex-start'}}>
-                      {/* Avatar Grande con Iniciales */}
-                      <div style={{
-                          width:'100px', height:'100px', 
-                          background:'#00d4d4', color:'white', 
-                          borderRadius:'50%', display:'flex', 
-                          alignItems:'center', justifyContent:'center', 
-                          fontSize:'2.5rem', fontWeight:'bold', flexShrink: 0
-                      }}>
+                      <div style={{width:'100px', height:'100px', background:'#00d4d4', color:'white', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', fontWeight:'bold', flexShrink: 0}}>
                           {curso.instructor?.nombre_completo.charAt(0).toUpperCase()}
                       </div>
-
                       <div>
                           <h4 style={{margin:'0 0 5px 0', color:'#0b3d91', fontSize:'1.3rem', textDecoration:'underline'}}>
                               {curso.instructor?.nombre_completo}
@@ -131,19 +128,12 @@ function CourseDetailPublic() {
                           <p style={{margin:0, color:'#666', fontSize:'0.9rem', fontStyle:'italic', marginBottom:'15px'}}>
                               Instructor Experto en Tecnia Academy
                           </p>
-                          
-                          {/* Biografía Dinámica */}
                           <div style={{lineHeight:'1.6', color:'#333', fontSize:'0.95rem'}}>
-                              {curso.instructor?.biografia ? (
-                                  curso.instructor.biografia
-                              ) : (
-                                  "Este instructor es un apasionado de la enseñanza pero aún no ha agregado su biografía personalizada."
-                              )}
+                              {curso.instructor?.biografia || "Este instructor es un apasionado de la enseñanza pero aún no ha agregado su biografía personalizada."}
                           </div>
                       </div>
                   </div>
               </div>
-
           </div>
 
           {/* COLUMNA DERECHA: TARJETA FLOTANTE */}
@@ -168,7 +158,10 @@ function CourseDetailPublic() {
                   </div>
                   
                   <div style={{padding: '20px'}}>
-                      <h2 style={{fontSize:'2rem', margin:'0 0 10px 0', fontWeight:'800'}}>${curso.precio}</h2>
+                      {/* ✅ PRECIO EN GUARANÍES */}
+                      <h2 style={{fontSize:'2rem', margin:'0 0 10px 0', fontWeight:'800'}}>
+                          {formatCurrency(curso.precio)}
+                      </h2>
                       
                       <button 
                         onClick={handleEnroll}
