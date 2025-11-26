@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import ReactPlayer from 'react-player'; // ✅ IMPORTANTE: Usamos el reproductor inteligente
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 
@@ -9,27 +10,27 @@ function VirtualClassroom() {
   const { token } = useAuth();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
-  // Estados
+  // Estados de datos
   const [curso, setCurso] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
   const [completedLessons, setCompletedLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Estados de UI (Interfaz)
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Para colapsar menú
-  const [activeTab, setActiveTab] = useState('descripcion'); // Pestañas
+  // Estados de UI
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState('descripcion');
 
   // Cargar datos
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Obtener curso
+        // 1. Obtener estructura del curso
         const resCurso = await axios.get(`${API_URL}/cursos/${id}/curriculum`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setCurso(resCurso.data);
 
-        // 2. Obtener progreso
+        // 2. Obtener mi progreso
         const resProgreso = await axios.get(`${API_URL}/cursos/mis-cursos`, {
             headers: { Authorization: `Bearer ${token}` }
         });
@@ -38,7 +39,7 @@ function VirtualClassroom() {
             setCompletedLessons(miInscripcion.lecciones_completadas || []);
         }
 
-        // Poner la primera lección activa si no hay una seleccionada
+        // Poner la primera lección activa por defecto
         if (resCurso.data.modulos?.[0]?.lecciones?.[0]) {
             setActiveLesson(resCurso.data.modulos[0].lecciones[0]);
         }
@@ -66,17 +67,11 @@ function VirtualClassroom() {
     }
   };
 
-  // Función para cambiar automáticamente al siguiente video (Opcional)
-  const handleVideoEnd = () => {
-     // Aquí podrías buscar la siguiente lección en el array y setearla
-     alert("¡Lección terminada! No olvides marcarla como completada.");
-  };
-
   if (loading) return <div style={{color:'white', background:'#1c1d1f', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>Cargando aula...</div>;
 
   return (
     <div className="classroom-container">
-      <Navbar /> {/* Navbar arriba, como siempre */}
+      <Navbar /> 
 
       <div className="classroom-player-wrapper">
         
@@ -85,13 +80,19 @@ function VirtualClassroom() {
             {/* Reproductor Estilo Cine */}
             <div className="video-frame-container">
                 {activeLesson ? (
-                    <iframe 
-                        src={activeLesson.url_video?.replace("watch?v=", "embed/")} 
-                        title={activeLesson.titulo}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                        allowFullScreen
-                    ></iframe>
+                    /* ✅ REPRODUCTOR INTELIGENTE (Soporta YouTube, Vimeo, MP4, etc.) */
+                    <ReactPlayer
+                        url={activeLesson.url_video}
+                        width="100%"
+                        height="100%"
+                        controls={true} // Muestra controles nativos
+                        playing={false} // No auto-play para no molestar
+                        config={{
+                            youtube: {
+                                playerVars: { showinfo: 1 }
+                            }
+                        }}
+                    />
                 ) : (
                     <h3 style={{color:'white'}}>Selecciona una lección</h3>
                 )}
@@ -125,7 +126,7 @@ function VirtualClassroom() {
                         <div>
                             <h2>{activeLesson?.titulo}</h2>
                             <p style={{lineHeight:'1.6', color:'#333'}}>
-                                {activeLesson?.contenido_texto || "En esta lección aprenderemos los fundamentos clave para dominar este tema. Asegúrate de tomar notas y revisar los recursos adjuntos."}
+                                {activeLesson?.contenido_texto || "En esta lección aprenderemos los conceptos clave. Asegúrate de tomar notas."}
                             </p>
                             
                             <div style={{marginTop: '20px', padding: '20px', background:'#f7f9fa', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -144,7 +145,7 @@ function VirtualClassroom() {
                     {activeTab === 'preguntas' && (
                         <div>
                             <h3>Foro del Curso</h3>
-                            <p>Aquí podrás preguntar tus dudas al instructor (Próximamente).</p>
+                            <p>Próximamente podrás dejar tus dudas aquí.</p>
                             <textarea style={{width:'100%', padding:'10px', marginTop:'10px'}} placeholder="Escribe tu pregunta..."></textarea>
                             <button className="btn-auth" style={{width:'auto', marginTop:'10px'}}>Enviar Pregunta</button>
                         </div>
