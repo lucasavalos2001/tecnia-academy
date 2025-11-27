@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,9 @@ function ManageContent() {
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Referencia para cancelar la subida
+  const abortControllerRef = useRef(null);
 
   // --- CARGAR DATOS ---
   const fetchCurriculum = async () => {
@@ -43,7 +46,7 @@ function ManageContent() {
     fetchCurriculum();
   }, [id]);
 
-  // --- CREAR MÓDULO ---
+  // --- MÓDULOS ---
   const handleAddModule = async (e) => {
     e.preventDefault();
     if (!newModuleTitle) return;
@@ -54,7 +57,27 @@ function ManageContent() {
     } catch (error) { alert("Error al crear módulo"); }
   };
 
-  // --- ✅ SUBIDA DE VIDEO A BUNNY.NET (CORREGIDO) ---
+  // --- ✅ FUNCIONES NUEVAS: CONTROL DE ARCHIVO ---
+  
+  // Quitar archivo seleccionado (Botón X)
+  const removeSelectedFile = () => {
+      setVideoFile(null);
+      // Limpiar el input file invisible
+      const fileInput = document.getElementById('videoInput');
+      if(fileInput) fileInput.value = "";
+  };
+
+  // Cancelar subida en progreso
+  const cancelUpload = () => {
+      if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+          setUploading(false);
+          setUploadProgress(0);
+          alert("Subida cancelada por el usuario.");
+      }
+  };
+
+  // --- SUBIDA DE VIDEO A BUNNY.NET ---
   const handleAddLesson = async (e) => {
     e.preventDefault();
     
@@ -70,8 +93,11 @@ function ManageContent() {
     setUploading(true);
     setUploadProgress(0);
 
+    // Crear controlador de cancelación
+    abortControllerRef.current = new AbortController();
+
     try {
-        // PASO 1: Pedir al Backend que cree el "hueco" para el video
+        // 1. Pedir permiso al Backend
         const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
             { title: lessonTitle }, 
             { headers: { Authorization: `Bearer ${token}` } }
@@ -79,8 +105,7 @@ function ManageContent() {
 
         const { uploadUrl, embedUrl } = signRes.data;
 
-        // PASO 2: Subir el archivo a Bunny.net
-        // ⚠️ USAMOS LA API KEY DIRECTA PARA EVITAR EL ERROR 401
+        // 2. Subir a Bunny con la API Key directa (Solución al error 401)
         await axios.put(uploadUrl, videoFile, {
             headers: {
                 'AccessKey': 'f1d8a002-fe51-475d-9853052bac34-5727-429f', // Tu clave real
@@ -89,69 +114,39 @@ function ManageContent() {
             onUploadProgress: (progressEvent) => {
                 const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                 setUploadProgress(percent);
-            }
+            },
+            signal: abortControllerRef.current.signal // Conectar señal de cancelación
         });
 
-        // PASO 3: Guardar la lección en TU base de datos
+        // 3. Guardar la lección en base de datos
         await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, 
-            { 
-                titulo: lessonTitle, 
-                url_video: embedUrl 
-            }, 
+            { titulo: lessonTitle, url_video: embedUrl }, 
             { headers: { Authorization: `Bearer ${token}` } }
         );
 
-        // Limpiar formulario
         setLessonTitle('');
-        setVideoFile(null);
+        removeSelectedFile();
         setUploadProgress(0);
         alert("¡Video subido exitosamente!");
         fetchCurriculum();
 
     } catch (error) {
-        console.error("Error subida:", error);
-        alert("Error al subir el video. Revisa la consola para detalles.");
+        if (axios.isCancel(error)) {
+            console.log('Subida cancelada');
+        } else {
+            console.error("Error subida:", error);
+            alert("Error al subir el video.");
+        }
     } finally {
         setUploading(false);
     }
   };
 
-  // --- EDICIÓN Y BORRADO ---
-  const handleDeleteModule = async (moduleId) => {
-    if(!confirm("¿Borrar este módulo y sus lecciones?")) return;
-    try {
-        await axios.delete(`${API_URL}/cursos/modules/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } });
-        fetchCurriculum();
-    } catch (error) { alert("Error al borrar"); }
-  };
-
-  const handleEditModule = async (modulo) => {
-    const newTitle = prompt("Nuevo nombre:", modulo.titulo);
-    if (newTitle && newTitle !== modulo.titulo) {
-        try {
-            await axios.put(`${API_URL}/cursos/modules/${modulo.id}`, { titulo: newTitle }, { headers: { Authorization: `Bearer ${token}` } });
-            fetchCurriculum();
-        } catch (error) { alert("Error al editar"); }
-    }
-  };
-
-  const handleDeleteLesson = async (lessonId) => {
-    if(!confirm("¿Borrar esta lección?")) return;
-    try {
-        await axios.delete(`${API_URL}/cursos/lessons/${lessonId}`, { headers: { Authorization: `Bearer ${token}` } });
-        fetchCurriculum();
-    } catch (error) { alert("Error al borrar"); }
-  };
-
-  const handleEditLesson = async (leccion) => {
-    const newTitle = prompt("Nuevo título:", leccion.titulo);
-    if (newTitle && newTitle !== leccion.titulo) {
-        try {
-            await axios.put(`${API_URL}/cursos/lessons/${leccion.id}`, { titulo: newTitle, url_video: leccion.url_video }, { headers: { Authorization: `Bearer ${token}` } });
-            fetchCurriculum();
-        } catch (error) { alert("Error al editar"); }
-    }
-  };
+  // ... (Funciones de edición y borrado se mantienen igual) ...
+  const handleDeleteModule = async (moduleId) => { if(!confirm("¿Borrar este módulo?")) return; try { await axios.delete(`${API_URL}/cursos/modules/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } }); fetchCurriculum(); } catch (e) { alert("Error"); } };
+  const handleEditModule = async (mod) => { const t = prompt("Nombre:", mod.titulo); if(t && t!==mod.titulo) try { await axios.put(`${API_URL}/cursos/modules/${mod.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); } catch(e){alert("Error");} };
+  const handleDeleteLesson = async (id) => { if(!confirm("¿Borrar lección?")) return; try { await axios.delete(`${API_URL}/cursos/lessons/${id}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); } catch(e){alert("Error");} };
+  const handleEditLesson = async (lec) => { const t = prompt("Título:", lec.titulo); if(t && t!==lec.titulo) try { await axios.put(`${API_URL}/cursos/lessons/${lec.id}`, {titulo:t, url_video:lec.url_video}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); } catch(e){alert("Error");} };
 
   if (loading) return <div>Cargando gestor...</div>;
 
@@ -159,20 +154,13 @@ function ManageContent() {
     <>
       <Navbar />
       <main className="dashboard-content">
-        <header className="content-header">
-          <h2>Gestionar Contenido: {curso?.titulo}</h2>
-        </header>
-
+        <header className="content-header"><h2>Gestionar: {curso?.titulo}</h2></header>
+        
         <div className="content-management-layout">
-            
-            {/* COLUMNA IZQUIERDA: TEMARIO */}
             <div className="curriculum-display">
-                <h3>Temario Actual</h3>
-                {modulos.length === 0 ? <p>No hay módulos todavía.</p> : null}
-                
-                {modulos.map((mod) => (
+                {modulos.map(mod => (
                     <div key={mod.id} className="module-container">
-                        <div className="module-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <div className="module-header" style={{display:'flex', justifyContent:'space-between'}}>
                             <strong>{mod.titulo}</strong>
                             <div>
                                 <button onClick={() => handleEditModule(mod)} style={iconBtnStyle}><i className="fas fa-edit"></i></button>
@@ -180,11 +168,10 @@ function ManageContent() {
                             </div>
                         </div>
                         <ul className="lessons-list-in-module">
-                            {mod.lecciones && mod.lecciones.map((lec) => (
+                            {mod.lecciones?.map(lec => (
                                 <li key={lec.id} style={{justifyContent:'space-between'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                                        <i className="fas fa-film" style={{color: '#00d4d4'}}></i> 
-                                        {lec.titulo}
+                                    <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                                        <i className="fas fa-film" style={{color: '#00d4d4'}}></i> {lec.titulo}
                                     </div>
                                     <div>
                                         <button onClick={() => handleEditLesson(lec)} style={iconBtnStyle}><i className="fas fa-pencil-alt"></i></button>
@@ -197,63 +184,73 @@ function ManageContent() {
                 ))}
             </div>
 
-            {/* COLUMNA DERECHA: FORMULARIOS */}
             <div className="add-lesson-form-container">
-                <div style={{marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px'}}>
-                    <h3>1. Crear Nuevo Módulo</h3>
+                <div style={{marginBottom:'20px'}}>
+                    <h3>Nuevo Módulo</h3>
                     <form onSubmit={handleAddModule}>
-                        <div className="form-group">
-                            <input type="text" placeholder="Ej: Introducción" value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} />
-                        </div>
-                        <button className="btn-create-course" style={{width: '100%', justifyContent:'center'}}>Agregar Módulo</button>
+                        <input type="text" placeholder="Nombre" value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} style={{width:'100%', padding:'10px'}} />
+                        <button className="btn-create-course" style={{marginTop:'10px', width:'100%'}}>Agregar</button>
                     </form>
                 </div>
 
                 <div>
-                    <h3>2. Subir Video (Bunny.net)</h3>
+                    <h3>Subir Video</h3>
                     <form onSubmit={handleAddLesson}>
-                        <div className="form-group">
-                            <label>Módulo:</label>
-                            <select value={selectedModuleId} onChange={e => setSelectedModuleId(e.target.value)} style={{width: '100%', padding: '10px'}}>
-                                <option value="">-- Seleccionar --</option>
-                                {modulos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
-                            </select>
-                        </div>
+                        <select value={selectedModuleId} onChange={e => setSelectedModuleId(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px'}}>
+                            <option value="">-- Seleccionar Módulo --</option>
+                            {modulos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
+                        </select>
+                        <input type="text" placeholder="Título del Video" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={{width:'100%', padding:'10px', marginBottom:'10px'}} />
                         
-                        <div className="form-group">
-                            <label>Título de la Lección:</label>
-                            <input type="text" placeholder="Título del video" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} />
-                        </div>
-                        
-                        <div className="form-group">
-                            <label className="file-upload-label" style={{display:'block', border:'2px dashed #ccc', padding:'20px', textAlign:'center', cursor:'pointer', background: videoFile ? '#e8f8f5' : 'white'}}>
+                        {/* INPUT DE ARCHIVO MEJORADO CON "X" */}
+                        {!videoFile ? (
+                            <label className="file-upload-label" style={{display:'block', border:'2px dashed #ccc', padding:'20px', textAlign:'center', cursor:'pointer', background: 'white'}}>
                                 <i className="fas fa-cloud-upload-alt" style={{fontSize:'2rem', color:'#00d4d4'}}></i>
-                                <p style={{margin:'10px 0'}}>{videoFile ? videoFile.name : "Haz clic para seleccionar video"}</p>
+                                <p style={{margin:'10px 0'}}>Clic para seleccionar video (MP4)</p>
                                 <input 
+                                    id="videoInput"
                                     type="file" 
                                     accept="video/*"
                                     onChange={e => setVideoFile(e.target.files[0])}
                                     style={{display:'none'}}
                                 />
                             </label>
-                        </div>
-
-                        {uploading && (
-                            <div style={{marginBottom:'15px'}}>
-                                <div style={{height:'10px', width:'100%', background:'#eee', borderRadius:'5px', overflow:'hidden'}}>
-                                    <div style={{height:'100%', width:`${uploadProgress}%`, background:'#00d4d4', transition:'width 0.2s'}}></div>
-                                </div>
-                                <p style={{fontSize:'0.8rem', textAlign:'center', margin:'5px 0'}}>Subiendo... {uploadProgress}%</p>
+                        ) : (
+                            <div style={{padding:'15px', background:'#e8f8f5', borderRadius:'5px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <span style={{fontSize:'0.9rem', fontWeight:'bold', color:'#0b3d91'}}>
+                                    <i className="fas fa-file-video"></i> {videoFile.name}
+                                </span>
+                                {/* ✅ BOTÓN X PARA QUITAR ARCHIVO */}
+                                <button type="button" onClick={removeSelectedFile} style={{background:'none', border:'none', color:'#e74c3c', cursor:'pointer', fontSize:'1.2rem'}} title="Quitar archivo">
+                                    <i className="fas fa-times-circle"></i>
+                                </button>
                             </div>
                         )}
 
-                        <button className="btn-submit-course" disabled={uploading}>
-                            {uploading ? 'Subiendo...' : 'Subir Video'}
-                        </button>
+                        {/* BARRA DE PROGRESO CON BOTÓN CANCELAR */}
+                        {uploading && (
+                            <div style={{marginTop:'15px'}}>
+                                <div style={{height:'10px', width:'100%', background:'#eee', borderRadius:'5px', overflow:'hidden'}}>
+                                    <div style={{height:'100%', width:`${uploadProgress}%`, background:'#00d4d4', transition:'width 0.2s'}}></div>
+                                </div>
+                                <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px'}}>
+                                    <span style={{fontSize:'0.8rem'}}>Subiendo... {uploadProgress}%</span>
+                                    {/* ✅ BOTÓN CANCELAR SUBIDA */}
+                                    <button type="button" onClick={cancelUpload} style={{background:'none', border:'none', color:'#e74c3c', fontSize:'0.8rem', cursor:'pointer', textDecoration:'underline'}}>
+                                        Cancelar Subida
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {!uploading && (
+                            <button className="btn-submit-course" style={{marginTop:'15px', width:'100%'}} disabled={!videoFile}>
+                                Subir y Guardar
+                            </button>
+                        )}
                     </form>
                 </div>
             </div>
-
         </div>
       </main>
       <Footer />

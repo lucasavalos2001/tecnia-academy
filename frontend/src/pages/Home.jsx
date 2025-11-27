@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { formatCurrency } from '../utils/formatCurrency'; // ✅ IMPORTAR FORMATEADOR
 
 function Home() {
   const { user } = useAuth();
@@ -11,7 +12,6 @@ function Home() {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-  // Estado para cursos destacados
   const [cursosDestacados, setCursosDestacados] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +19,7 @@ function Home() {
   const API_URL = import.meta.env.VITE_API_BASE_URL;
   const searchRef = useRef(null);
 
-  // 1. CARGAR CURSOS DESTACADOS (Los 3 más recientes)
+  // 1. CARGAR CURSOS DESTACADOS
   useEffect(() => {
     const fetchDestacados = async () => {
         try {
@@ -35,7 +35,6 @@ function Home() {
     fetchDestacados();
   }, []);
 
-  // ... (Lógica del buscador que ya tenías, mantenla igual) ...
   // Lógica de búsqueda en vivo
   useEffect(() => {
     if (searchTerm.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
@@ -49,7 +48,6 @@ function Home() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchTerm]);
 
-  // Cerrar al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (searchRef.current && !searchRef.current.contains(event.target)) { setShowSuggestions(false); }
@@ -70,7 +68,6 @@ function Home() {
     <>
       <Navbar />
       <main>
-        {/* SECCIÓN HERO (FONDO GRADIENTE) */}
         <section className="hero">
           <div className="hero-content">
             <h1>
@@ -82,7 +79,6 @@ function Home() {
               Explora cientos de cursos técnicos y profesionales creados por expertos.
             </p>
             
-            {/* BUSCADOR CENTRAL */}
             <div className="search-box">
                 <div className="search-container" ref={searchRef} style={{width: '100%'}}>
                     <form onSubmit={handleSearchSubmit} style={{display:'flex', gap:'10px', justifyContent:'center'}}>
@@ -99,7 +95,6 @@ function Home() {
                         </button>
                     </form>
 
-                    {/* DROPDOWN RESULTADOS */}
                     {showSuggestions && suggestions.length > 0 && (
                         <div className="search-results-dropdown" style={{width: '400px', margin:'0 auto', textAlign: 'left', borderRadius:'0 0 15px 15px'}}> 
                             {suggestions.slice(0, 5).map((curso) => (
@@ -121,7 +116,7 @@ function Home() {
           </div>
         </section>
 
-        {/* ✅ NUEVA SECCIÓN: CURSOS DESTACADOS */}
+        {/* SECCIÓN: CURSOS DESTACADOS */}
         <section style={{maxWidth: '1200px', margin: '60px auto', padding: '0 20px'}}>
             <h2 style={{color: '#0b3d91', borderBottom: '2px solid #00d4d4', display: 'inline-block', paddingBottom: '10px', marginBottom: '30px'}}>
                 Últimos Cursos Publicados
@@ -135,15 +130,12 @@ function Home() {
                 ) : (
                     cursosDestacados.map((curso) => (
                         <div className="curso-card" key={curso.id} style={{cursor:'pointer'}} onClick={() => navigate(`/curso/${curso.id}`)}>
-                            <div style={{position:'relative'}}>
+                            <div className="card-image-wrapper">
+                                <span className="category-badge">{curso.categoria}</span>
                                 <img 
                                     src={curso.imagen_url || `https://placehold.co/300x180/00d4d4/ffffff?text=${curso.categoria}`} 
                                     alt={curso.titulo} 
-                                    style={{width:'100%', height:'180px', objectFit:'cover'}}
                                 />
-                                <span style={{position:'absolute', top:'10px', right:'10px', background:'#f1c40f', color:'black', padding:'2px 8px', fontSize:'0.8rem', fontWeight:'bold', borderRadius:'4px'}}>
-                                    NUEVO
-                                </span>
                             </div>
                             <div className="card-content">
                                 <h3 style={{fontSize:'1.1rem', marginBottom:'10px'}}>{curso.titulo}</h3>
@@ -154,8 +146,9 @@ function Home() {
                                     <span style={{color:'#666', fontSize:'0.8rem'}}>
                                         <i className="fas fa-user-tie"></i> {curso.instructor?.nombre_completo}
                                     </span>
+                                    {/* ✅ PRECIO EN GUARANÍES */}
                                     <span style={{fontWeight:'bold', color:'#0b3d91', fontSize:'1.1rem'}}>
-                                        ${curso.precio}
+                                        {formatCurrency(curso.precio)}
                                     </span>
                                 </div>
                             </div>
@@ -174,7 +167,7 @@ function Home() {
             </div>
         </section>
 
-        {/* SECCIÓN DE CARACTERÍSTICAS (Relleno visual profesional) */}
+        {/* SECCIÓN DE CARACTERÍSTICAS */}
         <section style={{background:'#f7f9fa', padding:'60px 20px', textAlign:'center'}}>
             <div style={{maxWidth:'1000px', margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'30px'}}>
                 <div>
