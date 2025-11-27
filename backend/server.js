@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes'); // <--- ✅ NUEVO: Rutas de Admin
+const uploadRoutes = require('./routes/uploadRoutes'); // <--- NUEVO
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);     // Login y Registro
 app.use('/api/cursos', courseRoutes); // Cursos y Lecciones
 app.use('/api/usuario', userRoutes);  // Perfil y Certificados
 app.use('/api/admin', adminRoutes);   // <--- ✅ NUEVO: Panel de Control Total
+app.use('/api/upload', uploadRoutes); // <--- NUEVO
 
 // Ruta de prueba básica
 app.get('/', (req, res) => {

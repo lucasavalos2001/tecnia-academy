@@ -14,9 +14,15 @@ function ManageContent() {
   const [modulos, setModulos] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Formularios
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState('');
-  const [newLesson, setNewLesson] = useState({ titulo: '', url_video: '' });
+  
+  // --- ESTADOS PARA LA SUBIDA DE VIDEO ---
+  const [lessonTitle, setLessonTitle] = useState('');
+  const [videoFile, setVideoFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // --- CARGAR DATOS ---
   const fetchCurriculum = async () => {
@@ -37,7 +43,7 @@ function ManageContent() {
     fetchCurriculum();
   }, [id]);
 
-  // --- CREACIÓN ---
+  // --- CREAR MÓDULO ---
   const handleAddModule = async (e) => {
     e.preventDefault();
     if (!newModuleTitle) return;
@@ -48,32 +54,84 @@ function ManageContent() {
     } catch (error) { alert("Error al crear módulo"); }
   };
 
+  // --- ✅ SUBIDA DE VIDEO A BUNNY.NET (CORREGIDO) ---
   const handleAddLesson = async (e) => {
     e.preventDefault();
-    if (!selectedModuleId || !newLesson.titulo) { alert("Selecciona módulo y escribe título"); return; }
+    
+    if (!selectedModuleId || !lessonTitle) { 
+        alert("Por favor selecciona un módulo y escribe un título."); 
+        return; 
+    }
+    if (!videoFile) { 
+        alert("Por favor selecciona un archivo de video."); 
+        return; 
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
     try {
-      await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, newLesson, { headers: { Authorization: `Bearer ${token}` } });
-      setNewLesson({ titulo: '', url_video: '' });
-      fetchCurriculum();
-    } catch (error) { alert("Error al crear lección"); }
+        // PASO 1: Pedir al Backend que cree el "hueco" para el video
+        const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
+            { title: lessonTitle }, 
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const { uploadUrl, embedUrl } = signRes.data;
+
+        // PASO 2: Subir el archivo a Bunny.net
+        // ⚠️ USAMOS LA API KEY DIRECTA PARA EVITAR EL ERROR 401
+        await axios.put(uploadUrl, videoFile, {
+            headers: {
+                'AccessKey': 'f1d8a002-fe51-475d-9853052bac34-5727-429f', // Tu clave real
+                'Content-Type': 'application/octet-stream'
+            },
+            onUploadProgress: (progressEvent) => {
+                const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(percent);
+            }
+        });
+
+        // PASO 3: Guardar la lección en TU base de datos
+        await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, 
+            { 
+                titulo: lessonTitle, 
+                url_video: embedUrl 
+            }, 
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        // Limpiar formulario
+        setLessonTitle('');
+        setVideoFile(null);
+        setUploadProgress(0);
+        alert("¡Video subido exitosamente!");
+        fetchCurriculum();
+
+    } catch (error) {
+        console.error("Error subida:", error);
+        alert("Error al subir el video. Revisa la consola para detalles.");
+    } finally {
+        setUploading(false);
+    }
   };
 
   // --- EDICIÓN Y BORRADO ---
   const handleDeleteModule = async (moduleId) => {
-    if(!confirm("¿Borrar este módulo y todas sus lecciones?")) return;
+    if(!confirm("¿Borrar este módulo y sus lecciones?")) return;
     try {
         await axios.delete(`${API_URL}/cursos/modules/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } });
         fetchCurriculum();
-    } catch (error) { alert("Error al borrar módulo"); }
+    } catch (error) { alert("Error al borrar"); }
   };
 
   const handleEditModule = async (modulo) => {
-    const newTitle = prompt("Nuevo nombre del módulo:", modulo.titulo);
+    const newTitle = prompt("Nuevo nombre:", modulo.titulo);
     if (newTitle && newTitle !== modulo.titulo) {
         try {
             await axios.put(`${API_URL}/cursos/modules/${modulo.id}`, { titulo: newTitle }, { headers: { Authorization: `Bearer ${token}` } });
             fetchCurriculum();
-        } catch (error) { alert("Error al editar módulo"); }
+        } catch (error) { alert("Error al editar"); }
     }
   };
 
@@ -82,21 +140,16 @@ function ManageContent() {
     try {
         await axios.delete(`${API_URL}/cursos/lessons/${lessonId}`, { headers: { Authorization: `Bearer ${token}` } });
         fetchCurriculum();
-    } catch (error) { alert("Error al borrar lección"); }
+    } catch (error) { alert("Error al borrar"); }
   };
 
   const handleEditLesson = async (leccion) => {
     const newTitle = prompt("Nuevo título:", leccion.titulo);
-    const newUrl = prompt("Nueva URL de video:", leccion.url_video);
-    
-    if ((newTitle && newTitle !== leccion.titulo) || (newUrl && newUrl !== leccion.url_video)) {
+    if (newTitle && newTitle !== leccion.titulo) {
         try {
-            await axios.put(`${API_URL}/cursos/lessons/${leccion.id}`, 
-                { titulo: newTitle || leccion.titulo, url_video: newUrl || leccion.url_video }, 
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            await axios.put(`${API_URL}/cursos/lessons/${leccion.id}`, { titulo: newTitle, url_video: leccion.url_video }, { headers: { Authorization: `Bearer ${token}` } });
             fetchCurriculum();
-        } catch (error) { alert("Error al editar lección"); }
+        } catch (error) { alert("Error al editar"); }
     }
   };
 
@@ -112,7 +165,7 @@ function ManageContent() {
 
         <div className="content-management-layout">
             
-            {/* COLUMNA IZQUIERDA */}
+            {/* COLUMNA IZQUIERDA: TEMARIO */}
             <div className="curriculum-display">
                 <h3>Temario Actual</h3>
                 {modulos.length === 0 ? <p>No hay módulos todavía.</p> : null}
@@ -122,20 +175,20 @@ function ManageContent() {
                         <div className="module-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <strong>{mod.titulo}</strong>
                             <div>
-                                <button onClick={() => handleEditModule(mod)} style={iconBtnStyle} title="Editar nombre"><i className="fas fa-edit"></i></button>
-                                <button onClick={() => handleDeleteModule(mod.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar módulo"><i className="fas fa-trash"></i></button>
+                                <button onClick={() => handleEditModule(mod)} style={iconBtnStyle}><i className="fas fa-edit"></i></button>
+                                <button onClick={() => handleDeleteModule(mod.id)} style={{...iconBtnStyle, color:'#e74c3c'}}><i className="fas fa-trash"></i></button>
                             </div>
                         </div>
                         <ul className="lessons-list-in-module">
                             {mod.lecciones && mod.lecciones.map((lec) => (
                                 <li key={lec.id} style={{justifyContent:'space-between'}}>
                                     <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                                        <i className="fas fa-play-circle" style={{color:'#00d4d4'}}></i> 
+                                        <i className="fas fa-film" style={{color: '#00d4d4'}}></i> 
                                         {lec.titulo}
                                     </div>
                                     <div>
-                                        <button onClick={() => handleEditLesson(lec)} style={iconBtnStyle} title="Editar lección"><i className="fas fa-pencil-alt"></i></button>
-                                        <button onClick={() => handleDeleteLesson(lec.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar lección"><i className="fas fa-times"></i></button>
+                                        <button onClick={() => handleEditLesson(lec)} style={iconBtnStyle}><i className="fas fa-pencil-alt"></i></button>
+                                        <button onClick={() => handleDeleteLesson(lec.id)} style={{...iconBtnStyle, color:'#e74c3c'}}><i className="fas fa-times"></i></button>
                                     </div>
                                 </li>
                             ))}
@@ -144,7 +197,7 @@ function ManageContent() {
                 ))}
             </div>
 
-            {/* COLUMNA DERECHA */}
+            {/* COLUMNA DERECHA: FORMULARIOS */}
             <div className="add-lesson-form-container">
                 <div style={{marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px'}}>
                     <h3>1. Crear Nuevo Módulo</h3>
@@ -157,33 +210,46 @@ function ManageContent() {
                 </div>
 
                 <div>
-                    <h3>2. Agregar Lección a Módulo</h3>
+                    <h3>2. Subir Video (Bunny.net)</h3>
                     <form onSubmit={handleAddLesson}>
                         <div className="form-group">
-                            <label>Selecciona el Módulo:</label>
+                            <label>Módulo:</label>
                             <select value={selectedModuleId} onChange={e => setSelectedModuleId(e.target.value)} style={{width: '100%', padding: '10px'}}>
                                 <option value="">-- Seleccionar --</option>
                                 {modulos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
                             </select>
                         </div>
+                        
                         <div className="form-group">
                             <label>Título de la Lección:</label>
-                            <input type="text" value={newLesson.titulo} onChange={e => setNewLesson({...newLesson, titulo: e.target.value})} />
+                            <input type="text" placeholder="Título del video" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} />
                         </div>
-                        {/* ✅ INPUT DE VIDEO MEJORADO */}
+                        
                         <div className="form-group">
-                            <label>Video de la clase:</label>
-                            <input 
-                                type="text" 
-                                placeholder="Pega aquí el enlace (YouTube, Vimeo, Drive)" 
-                                value={newLesson.url_video} 
-                                onChange={e => setNewLesson({...newLesson, url_video: e.target.value})} 
-                            />
-                            <small style={{display:'block', marginTop:'5px', color:'#666', fontSize:'0.8rem'}}>
-                                <i className="fas fa-info-circle"></i> Recomendamos subir tu video a <strong>YouTube (No listado)</strong> o <strong>Vimeo</strong> y pegar el link aquí para mejor velocidad.
-                            </small>
+                            <label className="file-upload-label" style={{display:'block', border:'2px dashed #ccc', padding:'20px', textAlign:'center', cursor:'pointer', background: videoFile ? '#e8f8f5' : 'white'}}>
+                                <i className="fas fa-cloud-upload-alt" style={{fontSize:'2rem', color:'#00d4d4'}}></i>
+                                <p style={{margin:'10px 0'}}>{videoFile ? videoFile.name : "Haz clic para seleccionar video"}</p>
+                                <input 
+                                    type="file" 
+                                    accept="video/*"
+                                    onChange={e => setVideoFile(e.target.files[0])}
+                                    style={{display:'none'}}
+                                />
+                            </label>
                         </div>
-                        <button className="btn-submit-course">Guardar Lección</button>
+
+                        {uploading && (
+                            <div style={{marginBottom:'15px'}}>
+                                <div style={{height:'10px', width:'100%', background:'#eee', borderRadius:'5px', overflow:'hidden'}}>
+                                    <div style={{height:'100%', width:`${uploadProgress}%`, background:'#00d4d4', transition:'width 0.2s'}}></div>
+                                </div>
+                                <p style={{fontSize:'0.8rem', textAlign:'center', margin:'5px 0'}}>Subiendo... {uploadProgress}%</p>
+                            </div>
+                        )}
+
+                        <button className="btn-submit-course" disabled={uploading}>
+                            {uploading ? 'Subiendo...' : 'Subir Video'}
+                        </button>
                     </form>
                 </div>
             </div>
@@ -195,13 +261,6 @@ function ManageContent() {
   );
 }
 
-const iconBtnStyle = {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    marginLeft: '8px',
-    fontSize: '1rem',
-    color: '#666'
-};
+const iconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px', fontSize: '1rem', color: '#666' };
 
 export default ManageContent;
