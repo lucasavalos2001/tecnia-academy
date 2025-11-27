@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import ReactPlayer from 'react-player'; 
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 
@@ -38,7 +39,7 @@ function VirtualClassroom() {
             setCompletedLessons(miInscripcion.lecciones_completadas || []);
         }
 
-        // Poner la primera lección activa por defecto
+        // Poner la primera lección activa por defecto si no hay una seleccionada
         if (resCurso.data.modulos?.[0]?.lecciones?.[0]) {
             setActiveLesson(resCurso.data.modulos[0].lecciones[0]);
         }
@@ -66,6 +67,54 @@ function VirtualClassroom() {
     }
   };
 
+  // --- RENDERIZADOR DE VIDEO INTELIGENTE ---
+  const renderPlayer = () => {
+      if (!activeLesson) return <h3 style={{color:'white'}}>Selecciona una lección</h3>;
+      const url = activeLesson.url_video || "";
+
+      // A. BUNNY.NET (Prioridad: Tu código de embed optimizado)
+      // Detecta enlaces como: https://iframe.mediadelivery.net/... o video.bunnycdn...
+      if (url.includes('bunny') || url.includes('mediadelivery')) {
+          return (
+            <div style={{position:'relative', paddingTop:'56.25%', width: '100%'}}>
+              <iframe 
+                  src={url} 
+                  loading="lazy" 
+                  style={{border:0, position:'absolute', top:0, height:'100%', width:'100%'}} 
+                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" 
+                  allowFullScreen={true}
+              ></iframe>
+            </div>
+          );
+      }
+
+      // B. YOUTUBE (Soporte Legacy con ReactPlayer)
+      if (url.includes('youtu')) {
+          return (
+            <ReactPlayer
+                url={url} 
+                width="100%" 
+                height="100%" 
+                controls={true} 
+                playing={false}
+                config={{ 
+                    youtube: { 
+                        playerVars: { showinfo: 0, modestbranding: 1 } 
+                    } 
+                }}
+            />
+          );
+      }
+
+      // C. OTROS (MP4 Directo como respaldo)
+      return (
+        <video controls width="100%" height="100%" key={url}>
+            <source src={url} type="video/mp4" />
+            Tu navegador no soporta videos HTML5.
+        </video>
+      );
+  };
+
   if (loading) return <div style={{color:'white', background:'#1c1d1f', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>Cargando aula...</div>;
 
   return (
@@ -76,30 +125,10 @@ function VirtualClassroom() {
         
         {/* --- SECCIÓN IZQUIERDA (VIDEO + TABS) --- */}
         <div className="video-section">
-            {/* Reproductor Estilo Cine (IFRAME NATIVO PARA EVITAR BLOQUEOS) */}
-            <div className="video-frame-container">
-                {activeLesson ? (
-                    activeLesson.url_video && activeLesson.url_video.includes('youtu') ? (
-                        // REPRODUCTOR YOUTUBE (IFRAME)
-                        <iframe 
-                            src={activeLesson.url_video.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")} 
-                            title={activeLesson.titulo}
-                            width="100%"
-                            height="100%"
-                            frameBorder="0"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowFullScreen
-                        ></iframe>
-                    ) : (
-                        // REPRODUCTOR GENÉRICO (MP4 DIRECTO)
-                        <video controls width="100%" height="100%" key={activeLesson.url_video}>
-                            <source src={activeLesson.url_video} type="video/mp4" />
-                            Tu navegador no soporta videos HTML5.
-                        </video>
-                    )
-                ) : (
-                    <h3 style={{color:'white'}}>Selecciona una lección</h3>
-                )}
+            {/* Contenedor del Video con fondo negro */}
+            <div className="video-frame-container" style={{background: '#000', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                {/* Aquí se inyecta el reproductor correcto */}
+                {renderPlayer()}
             </div>
 
             {/* Área de Pestañas debajo del video */}
@@ -174,7 +203,7 @@ function VirtualClassroom() {
         {/* --- SECCIÓN DERECHA (SIDEBAR TEMARIO) --- */}
         <div className={`curriculum-sidebar ${!sidebarOpen ? 'collapsed' : ''}`}>
             <div className="sidebar-header">
-                <span>Contenido del curso</span>
+                <span>Contenido</span>
                 <button onClick={() => setSidebarOpen(false)} style={{background:'none', border:'none', cursor:'pointer'}}>
                     <i className="fas fa-times"></i>
                 </button>
@@ -206,7 +235,12 @@ function VirtualClassroom() {
                                     <div style={{flex:1}}>
                                         {i + 1}. {leccion.titulo}
                                         <div style={{fontSize:'0.8em', color:'#6a6f73', marginTop:'4px'}}>
-                                            <i className="fas fa-play-circle"></i> Video
+                                            {/* Icono Dinámico según tipo de video */}
+                                            {leccion.url_video?.includes('bunny') || leccion.url_video?.includes('media') ? (
+                                                <span><i className="fas fa-film"></i> HD Video</span>
+                                            ) : (
+                                                <span><i className="fab fa-youtube"></i> YouTube</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
