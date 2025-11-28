@@ -19,7 +19,6 @@ function MyCourses() {
         const res = await axios.get(`${API_URL}/cursos/mis-cursos`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        // El backend devuelve un array de inscripciones, cada una tiene dentro el objeto 'curso'
         setInscripciones(res.data.cursos);
       } catch (error) {
         console.error("Error cargando mis cursos", error);
@@ -48,32 +47,43 @@ function MyCourses() {
                     <Link to="/biblioteca" className="btn-inscribirse">Ir a la Biblioteca</Link>
                 </div>
             ) : (
-                inscripciones.map((inscripcion) => (
+                // ✅ FILTRO DE SEGURIDAD: Solo mostramos si 'inscripcion.curso' existe
+                inscripciones
+                .filter(inscripcion => inscripcion.curso !== null) 
+                .map((inscripcion) => (
                     <div className="curso-card" key={inscripcion.id}>
-                        <img 
-                            src={inscripcion.curso.imagen_url || `https://placehold.co/300x180/9b59b6/ffffff?text=${inscripcion.curso.categoria}`} 
-                            alt={inscripcion.curso.titulo} 
-                        />
+                        
+                        <div className="card-image-wrapper">
+                            <span className="category-badge">
+                                {inscripcion.curso.categoria || 'General'}
+                            </span>
+                            <img 
+                                src={inscripcion.curso.imagen_url || `https://placehold.co/300x180/9b59b6/ffffff?text=${inscripcion.curso.categoria}`} 
+                                alt={inscripcion.curso.titulo} 
+                            />
+                        </div>
+
                         <div className="card-content">
                             <h3>{inscripcion.curso.titulo}</h3>
                             
                             <div className="progress-info">
                                 <div className="progress-bar-container">
-                                    {/* Usamos el progreso guardado en la base de datos */}
                                     <div 
                                         className="progress-bar" 
                                         style={{width: `${inscripcion.progreso_porcentaje || 0}%`}}
                                     ></div>
                                 </div>
-                                <span>{inscripcion.progreso_porcentaje || 0}% completado</span>
+                                <span style={{fontWeight:'bold', color: '#0b3d91', fontSize: '0.9rem'}}>
+                                    {inscripcion.progreso_porcentaje || 0}% completado
+                                </span>
                             </div>
 
-                            {/* Botón para ir al Aula Virtual */}
                             <Link 
                                 to={`/aula-virtual/${inscripcion.curso.id}`} 
                                 className="btn-inscribirse btn-continuar"
+                                style={{textAlign:'center', display:'block'}}
                             >
-                                Continuar curso
+                                {inscripcion.progreso_porcentaje === 100 ? '¡Ver Certificado!' : 'Continuar curso'}
                             </Link>
                         </div>
                     </div>

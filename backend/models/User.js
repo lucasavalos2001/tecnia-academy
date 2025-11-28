@@ -34,6 +34,10 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: true, // Puede estar vacío si no quieren mostrarlo
     },
+    foto_perfil: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        },
     fecha_registro: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
