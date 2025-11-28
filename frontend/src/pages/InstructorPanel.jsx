@@ -53,11 +53,25 @@ function InstructorPanel() {
                 </div>
             </Link>
             <div className="instructor-profile">
-                <div style={{width:'60px', height:'60px', background:'#00d4d4', borderRadius:'50%', margin:'0 auto 10px', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5em', color:'white'}}>
-                    {user?.nombre_completo.charAt(0).toUpperCase()}
+                {/* LÓGICA DE FOTO: Si tiene foto la muestra, si no, muestra iniciales */}
+                <div style={{
+                    width:'80px', height:'80px', 
+                    borderRadius:'50%', 
+                    margin:'0 auto 10px', 
+                    overflow:'hidden', // Para recortar la imagen en círculo
+                    background: user?.foto_perfil ? 'transparent' : '#00d4d4', // Solo color si no hay foto
+                    display:'flex', alignItems:'center', justifyContent:'center', 
+                    fontSize:'2em', color:'white', fontWeight:'bold'
+                }}>
+                    {user?.foto_perfil ? (
+                        <img src={user.foto_perfil} alt="Perfil" style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                    ) : (
+                        user?.nombre_completo?.charAt(0).toUpperCase()
+                    )}
                 </div>
-                <h4>{user?.nombre_completo}</h4>
-                <p style={{fontSize:'0.8rem', color:'rgba(255,255,255,0.7)'}}>Instructor</p>
+                
+                <h4 style={{margin:'0'}}>{user?.nombre_completo}</h4>
+                <p style={{fontSize:'0.8rem', color:'rgba(255,255,255,0.7)', marginTop:'5px'}}>Instructor</p>
             </div>
             <nav className="dashboard-nav">
                 <ul>

@@ -264,7 +264,7 @@ const getCourseDetail = async (req, res) => {
         const curso = await Course.findByPk(id, {
             include: [
                 // ✅ INCLUYE BIOGRAFÍA DEL INSTRUCTOR
-                { model: User, as: 'instructor', attributes: ['nombre_completo', 'biografia'] },
+                { model: User, as: 'instructor', attributes: ['nombre_completo', 'biografia', 'foto_perfil'] },
                 { model: Module, as: 'modulos', include: ['lecciones'] }
             ]
         });

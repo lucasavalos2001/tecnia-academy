@@ -114,13 +114,27 @@ function CourseDetailPublic() {
                   </div>
               </div>
 
-              {/* TU INSTRUCTOR */}
+              {/* ✅ SECCIÓN: TU INSTRUCTOR */}
               <div style={{marginTop: '40px', borderTop:'1px solid #eee', paddingTop:'30px'}}>
                   <h3 style={{fontSize: '1.5rem', marginBottom:'20px'}}>Tu Instructor</h3>
+                  
                   <div style={{display:'flex', gap:'20px', alignItems:'flex-start'}}>
-                      <div style={{width:'100px', height:'100px', background:'#00d4d4', color:'white', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2.5rem', fontWeight:'bold', flexShrink: 0}}>
-                          {curso.instructor?.nombre_completo.charAt(0).toUpperCase()}
+                      {/* Avatar con Foto o Iniciales */}
+                      <div style={{
+                          width:'100px', height:'100px', 
+                          background: curso.instructor?.foto_perfil ? 'transparent' : '#00d4d4', 
+                          color:'white', 
+                          borderRadius:'50%', overflow:'hidden', 
+                          display:'flex', alignItems:'center', justifyContent:'center', 
+                          fontSize:'2.5rem', fontWeight:'bold', flexShrink: 0
+                      }}>
+                          {curso.instructor?.foto_perfil ? (
+                              <img src={curso.instructor.foto_perfil} alt="Instructor" style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                          ) : (
+                              curso.instructor?.nombre_completo.charAt(0).toUpperCase()
+                          )}
                       </div>
+
                       <div>
                           <h4 style={{margin:'0 0 5px 0', color:'#0b3d91', fontSize:'1.3rem', textDecoration:'underline'}}>
                               {curso.instructor?.nombre_completo}
