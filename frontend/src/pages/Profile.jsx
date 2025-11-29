@@ -17,7 +17,7 @@ function Profile() {
     contactEmail: '' 
   });
   
-  // ✅ ESTADO PARA LA FOTO
+  // Estados para la foto
   const [fotoFile, setFotoFile] = useState(null); 
   const [fotoActual, setFotoActual] = useState(null); 
   const [uploading, setUploading] = useState(false);
@@ -38,7 +38,7 @@ function Profile() {
                 biografia: resPerfil.data.biografia || '',
                 contactEmail: resPerfil.data.email_contacto || ''
             });
-            setFotoActual(resPerfil.data.foto_perfil); // Guardar foto actual para mostrarla
+            setFotoActual(resPerfil.data.foto_perfil); 
         } catch (error) { console.error(error); }
     };
     if (token) fetchData();
@@ -53,7 +53,6 @@ function Profile() {
     } catch (error) { alert("Error."); }
   };
 
-  // ✅ FUNCIÓN DE ACTUALIZAR PERFIL (CON FOTO)
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setUploading(true);
@@ -64,15 +63,14 @@ function Profile() {
         data.append('biografia', formData.biografia);
         data.append('email_contacto', formData.contactEmail);
         
-        // Solo si seleccionó una foto nueva
         if (fotoFile) {
-            data.append('foto', fotoFile); // 'foto' debe coincidir con upload.single('foto') en backend
+            data.append('foto', fotoFile); 
         }
 
         await axios.put(`${API_URL}/usuario/actualizar`, data, { 
             headers: { 
                 Authorization: `Bearer ${token}`, 
-                'Content-Type': 'multipart/form-data' // Vital para enviar archivos
+                'Content-Type': 'multipart/form-data' 
             } 
         });
         
@@ -94,8 +92,8 @@ function Profile() {
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
                 <div>
                     <h2 style={{margin:0, color: '#0b3d91'}}>{user?.nombre_completo}</h2>
-                    <p style={{color: '#666', margin:'5px 0'}}><i className="fas fa-envelope"></i> {user?.email} (Cuenta)</p>
-                    {formData.contactEmail && <p style={{color: '#00d4d4', fontWeight: 'bold', margin:'5px 0'}}><i className="fas fa-paper-plane"></i> {formData.contactEmail} (Consultas)</p>}
+                    <p style={{color: '#666', margin:'5px 0'}}><i className="fas fa-envelope"></i> {user?.email}</p>
+                    {formData.contactEmail && <p style={{color: '#00d4d4', fontWeight: 'bold', margin:'5px 0'}}><i className="fas fa-paper-plane"></i> {formData.contactEmail}</p>}
                     <span style={{background: user?.rol === 'admin' ? '#e74c3c' : '#00d4d4', color: 'white', padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 'bold'}}>{user?.rol}</span>
                 </div>
             </div>
@@ -106,23 +104,33 @@ function Profile() {
             {user?.rol === 'student' && <div style={{marginTop: '30px', textAlign: 'center'}}><button onClick={handleBecomeInstructor} style={{backgroundColor: '#f39c12', color: 'white', padding: '12px 25px', border: 'none', borderRadius: '30px', cursor: 'pointer', fontWeight: 'bold'}}>¡Quiero ser Instructor!</button></div>}
           </div>
         );
+
       case 'profile-certificates':
+        // Filtramos los certificados válidos antes de mostrar
+        const certificadosValidos = certificados.filter(cert => cert.curso !== null);
+
         return (
           <div className="certificates-list">
-            {certificados.length === 0 ? <p>Aún no tienes certificados.</p> : certificados.map((cert) => (
-                <div className="certificate-card" key={cert.id}>
-                    <div className="certificate-thumbnail"><i className="fas fa-trophy"></i></div>
-                    <div className="certificate-info"><h4>{cert.curso.titulo}</h4><p>{new Date(cert.updatedAt).toLocaleDateString()}</p></div>
-                    <button className="btn-view-certificate" onClick={() => navigate(`/certificado/${cert.id}`, { state: { certificado: cert, usuario: user.nombre_completo } })}>Ver</button>
-                </div>
-            ))}
+            {certificadosValidos.length === 0 ? (
+                <p>Aún no tienes certificados. ¡Completa un curso al 100% para obtener uno!</p>
+            ) : (
+                certificadosValidos.map((cert) => (
+                    <div className="certificate-card" key={cert.id}>
+                        <div className="certificate-thumbnail"><i className="fas fa-trophy"></i></div>
+                        <div className="certificate-info">
+                            <h4>{cert.curso.titulo}</h4>
+                            <p>Completado el: {new Date(cert.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                        <button className="btn-view-certificate" onClick={() => navigate(`/certificado/${cert.id}`, { state: { certificado: cert, usuario: user.nombre_completo } })}>Ver</button>
+                    </div>
+                ))
+            )}
           </div>
         );
+
       case 'profile-settings':
         return (
              <form onSubmit={handleUpdateProfile}>
-                
-                {/* SECCIÓN FOTO */}
                 <div className="settings-section">
                     <h3><i className="fas fa-camera"></i> Foto de Perfil</h3>
                     <div className="form-group">
@@ -137,7 +145,6 @@ function Profile() {
                     </div>
                 </div>
 
-                {/* SECCIÓN DATOS */}
                 <div className="settings-section">
                     <h3><i className="fas fa-globe"></i> Información Pública</h3>
                     <div className="settings-grid">
@@ -162,7 +169,6 @@ function Profile() {
       <main className="main-content">
         <div className="profile-page-container">
             <aside className="profile-sidebar">
-                {/* AVATAR DINÁMICO (FOTO O LETRA) */}
                 <div className="profile-avatar-container" style={{overflow:'hidden', background: fotoActual ? 'transparent' : 'var(--color-secundario)', border: fotoActual ? '2px solid var(--color-primario)' : 'none'}}>
                     {fotoActual ? (
                         <img src={fotoActual} alt="Perfil" style={{width:'100%', height:'100%', objectFit:'cover'}} />
@@ -170,9 +176,7 @@ function Profile() {
                         user?.nombre_completo?.charAt(0).toUpperCase()
                     )}
                 </div>
-                
                 <div className="profile-info"><h3>{user?.nombre_completo}</h3><p>{user?.email}</p></div>
-                
                 <nav className="profile-tabs">
                     <button className={`profile-tab-button ${activeTab==='profile-overview'?'active':''}`} onClick={()=>setActiveTab('profile-overview')}><i className="fas fa-user"></i> Mi Perfil</button>
                     <button className={`profile-tab-button ${activeTab==='profile-certificates'?'active':''}`} onClick={()=>setActiveTab('profile-certificates')}><i className="fas fa-certificate"></i> Mis Certificados</button>

@@ -554,17 +554,103 @@ body {
         width: 100% !important;
     }
 
-    /* 6. Aula Virtual */
-    .classroom-player-wrapper {
+    /* =========================================
+   📱 ESTILOS PARA CELULARES (RESPONSIVE)
+   ========================================= */
+
+@media (max-width: 768px) {
+    
+    /* 1. NAVBAR: Apilar elementos */
+    .navbar {
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .nav-links {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px;
+    }
+
+    .search-bar {
+        width: 100% !important; /* Barra de búsqueda ancho completo */
+    }
+
+    /* 2. PANELES (Instructor / Perfil): Columna única */
+    .instructor-dashboard, 
+    .profile-page-container,
+    .content-management-layout {
         flex-direction: column;
     }
-    .video-frame-container {
-        height: 250px; /* Altura fija para video en móvil */
+
+    .dashboard-sidebar, 
+    .profile-sidebar, 
+    .curriculum-display {
+        width: 100% !important;
+        margin-bottom: 20px;
+        border-right: none;
+        border-bottom: 1px solid #eee;
     }
-    .curriculum-sidebar {
-        width: 100%;
+
+    /* 3. TABLAS (Admin / Listas): Scroll horizontal si no caben */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    /* 4. AULA VIRTUAL (Lo más importante) */
+    .classroom-container {
+        height: auto; /* Permitir scroll en toda la página */
+        overflow: auto;
+    }
+    
+    .classroom-player-wrapper {
+        flex-direction: column; /* Video arriba, lista abajo */
         height: auto;
+    }
+
+    .video-section {
+        height: auto;
+        min-height: auto;
+    }
+
+    .video-frame-container {
+        height: auto;
+        aspect-ratio: 16/9; /* Mantener formato de TV */
+    }
+
+    .curriculum-sidebar {
+        width: 100% !important;
+        height: auto;
+        max-height: 400px; /* Limitar altura de la lista */
         border-left: none;
         border-top: 1px solid #333;
     }
+
+    /* 5. FORMULARIOS DE CONFIGURACIÓN */
+    .settings-grid {
+        grid-template-columns: 1fr; /* Una sola columna */
+    }
+
+    /* 6. HOME HERO */
+    .hero h1 {
+        font-size: 2rem; /* Texto más pequeño */
+    }
+    .hero-content {
+        padding: 0 10px;
+    }
+    .search-box input {
+        width: 100% !important;
+        min-width: 0;
+    }
+    .search-box form {
+        flex-direction: column; /* Buscador y botón apilados */
+        width: 100%;
+    }
+    .search-box button {
+        width: 100%;
+    }
+}
 }
