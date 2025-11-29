@@ -7,17 +7,12 @@ const uploadToBunny = async (file) => {
     try {
         const STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
         const ACCESS_KEY = process.env.BUNNY_STORAGE_PASSWORD;
-        const PULL_ZONE = process.env.BUNNY_PULL_ZONE; // Ej: https://tecnia-assets.b-cdn.net
-        // Región vacía para Alemania (default) o 'ny.' / 'la.' para otras
+        const PULL_ZONE = process.env.BUNNY_PULL_ZONE; 
         const REGION = process.env.BUNNY_STORAGE_REGION ? `${process.env.BUNNY_STORAGE_REGION}.` : ''; 
 
-        // Limpiamos el nombre del archivo y agregamos timestamp para que sea único
         const filename = `${Date.now()}_${file.originalname.replace(/\s+/g, '-')}`;
-        
-        // URL de la API de almacenamiento de Bunny
         const bunnyUrl = `https://${REGION}storage.bunnycdn.com/${STORAGE_NAME}/${filename}`;
 
-        // Subimos el archivo usando PUT
         await axios.put(bunnyUrl, file.buffer, {
             headers: { 
                 AccessKey: ACCESS_KEY,
@@ -25,7 +20,6 @@ const uploadToBunny = async (file) => {
             }
         });
 
-        // Retornamos la URL pública (CDN) para guardarla en la BD
         return `${PULL_ZONE}/${filename}`;
 
     } catch (error) {
@@ -44,11 +38,9 @@ const createCourse = async (req, res) => {
         const { titulo, descripcion_larga, categoria, precio } = req.body;
         let imagen_url = null;
 
-        // ✅ LÓGICA DE IMAGEN: Si subió archivo, lo mandamos a Bunny
         if (req.file) {
             imagen_url = await uploadToBunny(req.file);
         } else {
-            // Imagen por defecto si no sube nada
             imagen_url = `https://placehold.co/600x400/00d4d4/ffffff?text=${categoria}`;
         }
 
@@ -77,7 +69,6 @@ const updateCourse = async (req, res) => {
         const curso = await Course.findOne({ where: { id, instructorId } });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
 
-        // ✅ LÓGICA DE IMAGEN: Si sube nueva, actualizamos. Si no, mantenemos la anterior.
         let nueva_imagen_url = curso.imagen_url;
         if (req.file) {
             nueva_imagen_url = await uploadToBunny(req.file);
@@ -200,13 +191,24 @@ const updateModule = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al actualizar módulo" }); }
 };
 
+// ✅ [ACTUALIZADO] Función addLesson con soporte para Quizzes
 const addLesson = async (req, res) => {
     try {
         const { moduleId } = req.params;
-        const { titulo, url_video, contenido_texto } = req.body;
-        const nuevaLeccion = await Lesson.create({ titulo, url_video, contenido_texto, moduleId });
+        const { titulo, url_video, contenido_texto, contenido_quiz } = req.body;
+        
+        const nuevaLeccion = await Lesson.create({ 
+            titulo, 
+            url_video, 
+            contenido_texto, 
+            contenido_quiz, // Guardamos el quiz
+            moduleId 
+        });
         res.status(201).json(nuevaLeccion);
-    } catch (error) { res.status(500).json({ message: "Error al crear lección" }); }
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ message: "Error al crear lección" }); 
+    }
 };
 
 const deleteLesson = async (req, res) => {
@@ -217,13 +219,24 @@ const deleteLesson = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al eliminar lección" }); }
 };
 
+// ✅ [ACTUALIZADO] Función updateLesson con soporte para Quizzes
 const updateLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        const { titulo, url_video, contenido_texto } = req.body;
-        await Lesson.update({ titulo, url_video, contenido_texto }, { where: { id } });
+        const { titulo, url_video, contenido_texto, contenido_quiz } = req.body;
+        
+        await Lesson.update({ 
+            titulo, 
+            url_video, 
+            contenido_texto, 
+            contenido_quiz // Actualizamos el quiz
+        }, { where: { id } });
+        
         res.json({ message: "Lección actualizada" });
-    } catch (error) { res.status(500).json({ message: "Error al actualizar lección" }); }
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ message: "Error al actualizar lección" }); 
+    }
 };
 
 // ==========================================
@@ -235,7 +248,6 @@ const getAllCourses = async (req, res) => {
         const { search } = req.query;
         let whereCondition = { estado: 'publicado' };
 
-        // ✅ BUSCADOR INTELIGENTE
         if (search) {
             whereCondition = {
                 ...whereCondition,
@@ -263,7 +275,6 @@ const getCourseDetail = async (req, res) => {
         const { id } = req.params;
         const curso = await Course.findByPk(id, {
             include: [
-                // ✅ INCLUYE BIOGRAFÍA DEL INSTRUCTOR
                 { model: User, as: 'instructor', attributes: ['nombre_completo', 'biografia', 'foto_perfil'] },
                 { model: Module, as: 'modulos', include: ['lecciones'] }
             ]

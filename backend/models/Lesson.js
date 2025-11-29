@@ -11,23 +11,29 @@ const Lesson = sequelize.define('Lesson', {
         type: DataTypes.STRING,
         allowNull: false,
     },
+    // video, texto, quiz (o mixto)
     tipo_contenido: {
-        type: DataTypes.ENUM('video', 'texto', 'quiz'),
+        type: DataTypes.ENUM('video', 'quiz', 'mixto'), 
         defaultValue: 'video',
     },
-    url_video: { // Aquí guardaremos el link de YouTube/Vimeo
+    url_video: { 
         type: DataTypes.STRING,
         allowNull: true,
     },
-    contenido_texto: { // Por si es una lección escrita
+    contenido_texto: { 
         type: DataTypes.TEXT,
+        allowNull: true,
+    },
+    // ✅ NUEVO CAMPO: AQUÍ GUARDAMOS LAS PREGUNTAS
+    // Estructura: [{ pregunta: "...", opciones: ["A", "B"], correcta: 0 }]
+    contenido_quiz: {
+        type: DataTypes.JSON, 
         allowNull: true,
     },
     orden: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
     }
-    // moduleId se agrega automáticamente
 }, {
     tableName: 'lessons',
 });

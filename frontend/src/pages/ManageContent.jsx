@@ -14,20 +14,27 @@ function ManageContent() {
   const [modulos, setModulos] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Formularios
+  // Formularios Generales
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState('');
   
-  // --- ESTADOS PARA LA LECCIÓN (Video + Descripción) ---
+  // --- ESTADOS LECCIÓN (Video + Desc) ---
   const [lessonTitle, setLessonTitle] = useState('');
-  const [lessonDescription, setLessonDescription] = useState(''); // ✅ NUEVO ESTADO
+  const [lessonDescription, setLessonDescription] = useState('');
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   
-  // Estado para saber si estamos editando
-  const [editingLessonId, setEditingLessonId] = useState(null);
+  // --- ESTADOS QUIZ (Cuestionario) ---
+  const [showQuizBuilder, setShowQuizBuilder] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  // Estado temporal para la pregunta que se está creando
+  const [tempQuestion, setTempQuestion] = useState({ 
+      pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 
+  });
 
+  // Edición y Control
+  const [editingLessonId, setEditingLessonId] = useState(null);
   const abortControllerRef = useRef(null);
 
   // --- CARGAR DATOS ---
@@ -45,9 +52,7 @@ function ManageContent() {
     }
   };
 
-  useEffect(() => {
-    fetchCurriculum();
-  }, [id]);
+  useEffect(() => { fetchCurriculum(); }, [id]);
 
   // --- MÓDULOS ---
   const handleAddModule = async (e) => {
@@ -60,7 +65,43 @@ function ManageContent() {
     } catch (error) { alert("Error al crear módulo"); }
   };
 
-  // --- FUNCIONES DE ARCHIVO ---
+  // --- FUNCIONES QUIZ ---
+  const addQuestionToQuiz = () => {
+      // Validar que haya pregunta y al menos 2 opciones
+      if(!tempQuestion.pregunta.trim() || !tempQuestion.opcion1.trim() || !tempQuestion.opcion2.trim()) {
+          alert("Por favor, completa la pregunta y al menos las opciones A y B.");
+          return;
+      }
+      
+      // Crear el array de opciones filtrando las vacías
+      const opcionesLimon = [tempQuestion.opcion1, tempQuestion.opcion2, tempQuestion.opcion3]
+          .map(o => o.trim())
+          .filter(o => o !== '');
+
+      const nuevaPregunta = {
+          pregunta: tempQuestion.pregunta.trim(),
+          opciones: opcionesLimon,
+          correcta: parseInt(tempQuestion.correcta)
+      };
+
+      // Validar que el índice de correcta sea válido para la cantidad de opciones
+      if(nuevaPregunta.correcta >= nuevaPregunta.opciones.length) {
+          alert("La respuesta correcta seleccionada no es válida para las opciones ingresadas.");
+          return;
+      }
+
+      setQuizQuestions([...quizQuestions, nuevaPregunta]);
+      // Resetear formulario temporal
+      setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
+  };
+
+  const removeQuestion = (index) => {
+      const newQuestions = [...quizQuestions];
+      newQuestions.splice(index, 1);
+      setQuizQuestions(newQuestions);
+  };
+
+  // --- FUNCIONES VIDEO ---
   const removeSelectedFile = () => {
       setVideoFile(null);
       const fileInput = document.getElementById('videoInput');
@@ -72,7 +113,7 @@ function ManageContent() {
           abortControllerRef.current.abort();
           setUploading(false);
           setUploadProgress(0);
-          alert("Subida cancelada.");
+          alert("Cancelado.");
       }
   };
 
@@ -80,9 +121,20 @@ function ManageContent() {
   const startEditingLesson = (leccion, moduleId) => {
     setEditingLessonId(leccion.id);
     setLessonTitle(leccion.titulo);
-    // Si la lección tiene descripción, la cargamos (asegúrate de que el backend la devuelva)
-    setLessonDescription(leccion.contenido_texto || ''); 
+    setLessonDescription(leccion.contenido_texto || '');
     setSelectedModuleId(moduleId);
+    
+    // Cargar Quiz si existe
+    if (leccion.contenido_quiz && leccion.contenido_quiz.length > 0) {
+        setQuizQuestions(leccion.contenido_quiz);
+        setShowQuizBuilder(true);
+    } else {
+        setQuizQuestions([]);
+        setShowQuizBuilder(false);
+    }
+    // Resetear formulario temporal de pregunta al editar
+    setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
+
     setVideoFile(null); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -92,19 +144,24 @@ function ManageContent() {
     setLessonTitle('');
     setLessonDescription('');
     setVideoFile(null);
+    setQuizQuestions([]);
+    setShowQuizBuilder(false);
     setSelectedModuleId('');
+    setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
   };
 
-  // --- GESTIÓN DE LECCIONES (CREAR O ACTUALIZAR) ---
+  // --- GUARDAR TODO (VIDEO O QUIZ) ---
   const handleSaveLesson = async (e) => {
     e.preventDefault();
     
-    if (!selectedModuleId || !lessonTitle) { 
-        alert("Faltan datos obligatorios."); 
-        return; 
-    }
-    if (!editingLessonId && !videoFile) { 
-        alert("Selecciona un video."); 
+    if (!selectedModuleId || !lessonTitle) { alert("Faltan datos (Módulo o Título)."); return; }
+    
+    // Validación principal: Debe haber contenido (Video O Quiz)
+    const hasVideo = !!videoFile || (editingLessonId && !videoFile); // Si edito, puede que ya tenga video y no suba uno nuevo
+    const hasQuiz = quizQuestions.length > 0;
+
+    if (!hasVideo && !hasQuiz) { 
+        alert("Debes subir un video O agregar al menos una pregunta al cuestionario."); 
         return; 
     }
 
@@ -115,7 +172,7 @@ function ManageContent() {
     try {
         let finalEmbedUrl = null;
 
-        // SI HAY ARCHIVO NUEVO -> SUBIR A BUNNY
+        // 1. Subir Video (Solo si se seleccionó un archivo nuevo)
         if (videoFile) {
             const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
                 { title: lessonTitle }, 
@@ -128,67 +185,55 @@ function ManageContent() {
                     'AuthorizationSignature': authHeader,
                     'AuthorizationExpire': expiration,
                     'Content-Type': 'application/octet-stream',
-                    'AccessKey': 'f1d8a002-fe51-475d-9853052bac34-5727-429f' // Tu API Key
+                    'AccessKey': 'f1d8a002-fe51-475d-9853052bac34-5727-429f'
                 },
-                onUploadProgress: (progressEvent) => {
-                    const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                    setUploadProgress(percent);
-                },
+                onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / p.total)),
                 signal: abortControllerRef.current.signal
             });
             finalEmbedUrl = embedUrl;
         }
 
+        // 2. Preparar Datos para el Backend
         const leccionData = { 
             titulo: lessonTitle, 
-            contenido_texto: lessonDescription // ✅ ENVIAMOS LA DESCRIPCIÓN
+            contenido_texto: lessonDescription,
+            // Si hay preguntas, enviamos el array. Si no, enviamos null para limpiar si antes había.
+            contenido_quiz: quizQuestions.length > 0 ? quizQuestions : null 
         };
-        if (finalEmbedUrl) leccionData.url_video = finalEmbedUrl;
+        
+        // Solo añadimos url_video si se subió uno nuevo. Si se está editando y no se subió nada, el backend mantiene el anterior.
+        if (finalEmbedUrl) {
+            leccionData.url_video = finalEmbedUrl;
+        }
 
+        // 3. Guardar en BD
         if (editingLessonId) {
-            // EDITAR
-            await axios.put(`${API_URL}/cursos/lessons/${editingLessonId}`, leccionData, { 
-                headers: { Authorization: `Bearer ${token}` } 
-            });
-            alert("Lección actualizada.");
+            await axios.put(`${API_URL}/cursos/lessons/${editingLessonId}`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
+            alert("Lección actualizada correctamente.");
         } else {
-            // CREAR
-            await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, 
-                leccionData, 
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
             alert("Lección creada exitosamente.");
         }
 
-        cancelEditing(); // Limpia todo
+        cancelEditing();
         fetchCurriculum();
 
     } catch (error) {
         if (!axios.isCancel(error)) {
             console.error("Error:", error);
-            alert("Error al guardar.");
+            alert("Error al guardar la lección. Revisa la consola.");
         }
     } finally {
         setUploading(false);
     }
   };
 
-  // --- BORRAR ---
-  const handleDeleteLesson = async (lessonId) => {
-    if(!confirm("¿Borrar lección?")) return;
-    try { await axios.delete(`${API_URL}/cursos/lessons/${lessonId}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); } catch(e){alert("Error");}
-  };
+  // --- BORRAR / EDITAR AUXILIARES ---
+  const handleDeleteModule = async (mid) => { if(!confirm("¿Borrar módulo y sus lecciones?"))return; try{ await axios.delete(`${API_URL}/cursos/modules/${mid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar módulo");} };
+  const handleEditModule = async (mod) => { const t = prompt("Nuevo nombre del módulo:", mod.titulo); if(t && t.trim() !== "") try{ await axios.put(`${API_URL}/cursos/modules/${mod.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al editar módulo");} };
+  const handleDeleteLesson = async (lid) => { if(!confirm("¿Borrar esta lección?"))return; try{ await axios.delete(`${API_URL}/cursos/lessons/${lid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar lección");} };
 
-  const handleDeleteModule = async (moduleId) => {
-    if(!confirm("¿Borrar módulo?")) return;
-    try { await axios.delete(`${API_URL}/cursos/modules/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } }); fetchCurriculum(); } catch (e) { alert("Error"); }
-  };
-
-  const handleEditModule = async (modulo) => {
-    const t = prompt("Nombre:", modulo.titulo); if(t && t!==modulo.titulo) try { await axios.put(`${API_URL}/cursos/modules/${modulo.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); } catch(e){alert("Error");}
-  };
-
-  if (loading) return <div>Cargando...</div>;
+  if (loading) return <div style={{padding:'20px', textAlign:'center'}}>Cargando contenido...</div>;
 
   return (
     <>
@@ -198,104 +243,194 @@ function ManageContent() {
         
         <div className="content-management-layout">
             
-            {/* COLUMNA IZQUIERDA */}
+            {/* IZQUIERDA: TEMARIO */}
             <div className="curriculum-display">
                 {modulos.map(mod => (
                     <div key={mod.id} className="module-container">
-                        <div className="module-header" style={{display:'flex', justifyContent:'space-between'}}>
+                        <div className="module-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <strong>{mod.titulo}</strong>
                             <div>
-                                <button onClick={() => handleEditModule(mod)} style={iconBtnStyle}><i className="fas fa-edit"></i></button>
-                                <button onClick={() => handleDeleteModule(mod.id)} style={{...iconBtnStyle, color:'#e74c3c'}}><i className="fas fa-trash"></i></button>
+                                <button onClick={() => handleEditModule(mod)} style={iconBtnStyle} title="Editar Módulo"><i className="fas fa-edit"></i></button>
+                                <button onClick={() => handleDeleteModule(mod.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar Módulo"><i className="fas fa-trash-alt"></i></button>
                             </div>
                         </div>
                         <ul className="lessons-list-in-module">
                             {mod.lecciones?.map(lec => (
                                 <li key={lec.id} style={{justifyContent:'space-between'}}>
                                     <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
-                                        <i className="fas fa-film" style={{color: '#00d4d4'}}></i> {lec.titulo}
+                                        {lec.contenido_quiz && lec.contenido_quiz.length > 0 ? (
+                                            <i className="fas fa-tasks" style={{color: '#f39c12'}} title="Cuestionario"></i>
+                                        ) : (
+                                            <i className="fas fa-film" style={{color: '#00d4d4'}} title="Video"></i>
+                                        )}
+                                        {lec.titulo}
                                     </div>
                                     <div>
-                                        <button onClick={() => startEditingLesson(lec, mod.id)} style={iconBtnStyle}><i className="fas fa-pencil-alt"></i></button>
-                                        <button onClick={() => handleDeleteLesson(lec.id)} style={{...iconBtnStyle, color:'#e74c3c'}}><i className="fas fa-times"></i></button>
+                                        <button onClick={() => startEditingLesson(lec, mod.id)} style={iconBtnStyle} title="Editar Lección"><i className="fas fa-pencil-alt"></i></button>
+                                        <button onClick={() => handleDeleteLesson(lec.id)} style={{...iconBtnStyle, color:'#e74c3c'}} title="Borrar Lección"><i className="fas fa-times"></i></button>
                                     </div>
                                 </li>
                             ))}
+                            {mod.lecciones?.length === 0 && <li style={{color:'#999', fontStyle:'italic'}}>Sin lecciones</li>}
                         </ul>
                     </div>
                 ))}
+                {modulos.length === 0 && <p style={{textAlign:'center', color:'#777'}}>Comienza creando un módulo.</p>}
             </div>
 
-            {/* COLUMNA DERECHA */}
+            {/* DERECHA: FORMULARIOS */}
             <div className="add-lesson-form-container">
-                <div style={{marginBottom:'20px'}}>
-                    <h3>Nuevo Módulo</h3>
-                    <form onSubmit={handleAddModule}>
-                        <input type="text" placeholder="Nombre" value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} style={{width:'100%', padding:'10px'}} />
-                        <button className="btn-create-course" style={{marginTop:'10px', width:'100%'}}>Agregar</button>
+                
+                {/* FORMULARIO NUEVO MÓDULO */}
+                <div style={{marginBottom:'25px', background:'#fff', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                    <h3 style={{marginTop:0}}>Nuevo Módulo</h3>
+                    <form onSubmit={handleAddModule} style={{display:'flex', gap:'10px'}}>
+                        <input type="text" placeholder="Ej: Introducción, Módulo 1..." value={newModuleTitle} onChange={e => setNewModuleTitle(e.target.value)} style={{flex:1, padding:'10px', border:'1px solid #ddd', borderRadius:'4px'}} />
+                        <button className="btn-create-course" style={{whiteSpace:'nowrap', padding:'10px 20px'}}>
+                            <i className="fas fa-plus"></i> Agregar
+                        </button>
                     </form>
                 </div>
 
-                <div>
-                    <h3 style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        {editingLessonId ? 'Editar Lección' : 'Subir Video'}
-                        {editingLessonId && <button onClick={cancelEditing} style={{fontSize:'0.8rem', color:'red', border:'none', background:'none', cursor:'pointer'}}>Cancelar</button>}
+                {/* FORMULARIO LECCIÓN (VIDEO / QUIZ) */}
+                <div style={{background:'#fff', padding:'25px', borderRadius:'8px', boxShadow:'0 4px 10px rgba(0,0,0,0.08)'}}>
+                    <h3 style={{display:'flex', justifyContent:'space-between', marginTop:0, color:'var(--color-primario)'}}>
+                        {editingLessonId ? <span><i className="fas fa-edit"></i> Editar Lección</span> : <span><i className="fas fa-plus-circle"></i> Nueva Lección</span>}
+                        {editingLessonId && <button onClick={cancelEditing} style={{color:'#e74c3c', border:'none', background:'none', cursor:'pointer', fontSize:'0.9rem'}}><i className="fas fa-times"></i> Cancelar Edición</button>}
                     </h3>
 
                     <form onSubmit={handleSaveLesson}>
                         <div className="form-group">
-                            <label>Módulo:</label>
-                            <select value={selectedModuleId} onChange={e => setSelectedModuleId(e.target.value)} style={{width:'100%', padding:'10px'}} disabled={!!editingLessonId}>
-                                <option value="">-- Seleccionar --</option>
+                            <label style={labelStyle}>Módulo al que pertenece:</label>
+                            <select value={selectedModuleId} onChange={e => setSelectedModuleId(e.target.value)} style={inputStyle} disabled={!!editingLessonId} required>
+                                <option value="">-- Seleccionar Módulo --</option>
                                 {modulos.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
                             </select>
                         </div>
                         
                         <div className="form-group">
-                            <input type="text" placeholder="Título de la lección" value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} />
+                             <label style={labelStyle}>Título de la Lección:</label>
+                            <input type="text" placeholder="Ej: Clase 1: Fundamentos..." value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inputStyle} required />
                         </div>
 
-                        {/* ✅ NUEVO CAMPO: DESCRIPCIÓN */}
                         <div className="form-group">
-                            <textarea 
-                                rows="3" 
-                                placeholder="Descripción / Notas de la clase..." 
-                                value={lessonDescription} 
-                                onChange={e => setLessonDescription(e.target.value)}
-                                style={{width:'100%', padding:'10px', border:'1px solid #ccc', borderRadius:'5px'}}
-                            ></textarea>
+                            <label style={labelStyle}>Descripción / Notas (Opcional):</label>
+                            <textarea rows="3" placeholder="Información adicional para el estudiante..." value={lessonDescription} onChange={e => setLessonDescription(e.target.value)} style={{...inputStyle, resize:'vertical'}}></textarea>
                         </div>
                         
-                        <div className="form-group">
-                            <label className="file-upload-label" style={{display:'block', border:'2px dashed #ccc', padding:'20px', textAlign:'center', cursor:'pointer', background: videoFile ? '#e8f8f5' : 'white'}}>
-                                <p style={{margin:'0', fontWeight:'bold'}}>
-                                    {videoFile ? videoFile.name : (editingLessonId ? "Cambiar video (opcional)" : "Clic para seleccionar video")}
-                                </p>
-                                <input 
-                                    id="videoInput"
-                                    type="file" 
-                                    accept="video/*"
-                                    onChange={e => setVideoFile(e.target.files[0])}
-                                    style={{display:'none'}}
-                                />
+                        {/* SECCIÓN DE VIDEO */}
+                        <div className="form-group" style={{marginTop:'20px'}}>
+                            <label style={labelStyle}><i className="fas fa-video"></i> Contenido de Video (Opcional si hay Quiz):</label>
+                            <label className="file-upload-label" style={fileUploadStyle(videoFile)}>
+                                <div style={{textAlign:'center'}}>
+                                    <i className="fas fa-cloud-upload-alt" style={{fontSize:'2rem', color: videoFile ? '#2ecc71' : '#ccc', marginBottom:'10px'}}></i>
+                                    <p style={{margin:'0', fontWeight:'500', color:'#555'}}>{videoFile ? videoFile.name : "Clic para seleccionar archivo de video (MP4, MOV...)"}</p>
+                                </div>
+                                <input id="videoInput" type="file" accept="video/*" onChange={e => setVideoFile(e.target.files[0])} style={{display:'none'}} />
                             </label>
-                            {videoFile && <button type="button" onClick={removeSelectedFile} style={{color:'red', border:'none', background:'none', marginTop:'5px', cursor:'pointer'}}>Quitar video</button>}
+                            {videoFile && (
+                                <button type="button" onClick={removeSelectedFile} style={{color:'#e74c3c', border:'none', background:'none', marginTop:'8px', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <i className="fas fa-trash"></i> Quitar video seleccionado
+                                </button>
+                            )}
                         </div>
 
-                        {uploading && (
-                            <div style={{marginBottom:'15px'}}>
-                                <div style={{height:'10px', width:'100%', background:'#eee', borderRadius:'5px', overflow:'hidden'}}>
-                                    <div style={{height:'100%', width:`${uploadProgress}%`, background:'#00d4d4', transition:'width 0.2s'}}></div>
+                        {/* --- SECCIÓN CREADOR DE CUESTIONARIOS (MEJORADA) --- */}
+                        <div className="form-group" style={{marginTop:'25px', borderTop:'1px solid #eee', paddingTop:'20px'}}>
+                            <button type="button" onClick={() => setShowQuizBuilder(!showQuizBuilder)} style={toggleQuizBtnStyle(showQuizBuilder)}>
+                                <i className={`fas ${showQuizBuilder ? 'fa-chevron-up' : 'fa-tasks'}`}></i> {showQuizBuilder ? 'Ocultar Creador de Cuestionario' : 'Agregar Cuestionario / Quiz'}
+                            </button>
+                        </div>
+
+                        {showQuizBuilder && (
+                            <div className="quiz-builder-container" style={quizStyles.container}>
+                                <h4 style={quizStyles.header}>
+                                    <i className="fas fa-list-ol"></i> Preguntas del Cuestionario ({quizQuestions.length})
+                                </h4>
+                                
+                                {/* LISTA DE PREGUNTAS EXISTENTES */}
+                                {quizQuestions.length > 0 ? (
+                                    <div style={quizStyles.questionList}>
+                                        {quizQuestions.map((q, idx) => (
+                                            <div key={idx} style={quizStyles.questionItem}>
+                                                <div style={{flex: 1}}>
+                                                    <div style={{fontWeight:'bold', marginBottom:'5px'}}>{idx + 1}. {q.pregunta}</div>
+                                                    <div style={quizStyles.optionsPreview}>
+                                                        {q.opciones.map((op, i) => (
+                                                            <span key={i} style={{...quizStyles.optionBadge, background: i === q.correcta ? '#d4edda' : '#f1f3f5', color: i === q.correcta ? '#155724' : '#495057', border: i === q.correcta ? '1px solid #c3e6cb' : '1px solid #e9ecef'}}>
+                                                                {op} {i === q.correcta && <i className="fas fa-check-circle" style={{marginLeft:'4px'}}></i>}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button type="button" onClick={() => removeQuestion(idx)} style={quizStyles.deleteBtn} title="Eliminar esta pregunta">
+                                                    <i className="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p style={{color:'#777', fontStyle:'italic', marginBottom:'20px'}}>Aún no has agregado preguntas.</p>
+                                )}
+
+                                {/* FORMULARIO PARA AGREGAR NUEVA PREGUNTA */}
+                                <div style={quizStyles.addFormContainer}>
+                                    <h5 style={{margin:'0 0 15px 0', color:'var(--color-primario)', borderBottom:'1px solid #eee', paddingBottom:'10px'}}>Nueva Pregunta</h5>
+                                    
+                                    <div className="form-group">
+                                        <label style={quizStyles.labelSmall}>Texto de la Pregunta:</label>
+                                        <input type="text" placeholder="Ej: ¿Cuál es el resultado de 2+2?" value={tempQuestion.pregunta} onChange={e => setTempQuestion({...tempQuestion, pregunta: e.target.value})} style={inputStyle} />
+                                    </div>
+
+                                    <div style={quizStyles.optionsGrid}>
+                                        <div style={{flex:1}}>
+                                            <label style={quizStyles.labelSmall}>Opción A (Obligatoria):</label>
+                                            <input type="text" placeholder="Respuesta..." value={tempQuestion.opcion1} onChange={e => setTempQuestion({...tempQuestion, opcion1: e.target.value})} style={inputStyle} />
+                                        </div>
+                                        <div style={{flex:1}}>
+                                            <label style={quizStyles.labelSmall}>Opción B (Obligatoria):</label>
+                                            <input type="text" placeholder="Respuesta..." value={tempQuestion.opcion2} onChange={e => setTempQuestion({...tempQuestion, opcion2: e.target.value})} style={inputStyle} />
+                                        </div>
+                                        <div style={{flex:1}}>
+                                            <label style={quizStyles.labelSmall}>Opción C (Opcional):</label>
+                                            <input type="text" placeholder="Respuesta..." value={tempQuestion.opcion3} onChange={e => setTempQuestion({...tempQuestion, opcion3: e.target.value})} style={inputStyle} />
+                                        </div>
+                                    </div>
+
+                                    <div style={quizStyles.footerActions}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'10px', background:'#fff', padding:'10px', borderRadius:'5px', border:'1px solid #eee'}}>
+                                            <label style={{fontWeight:'bold', color:'#555', margin:0}}>Respuesta Correcta:</label>
+                                            <select value={tempQuestion.correcta} onChange={e => setTempQuestion({...tempQuestion, correcta: e.target.value})} style={{...inputStyle, marginBottom:0, width:'auto', padding:'8px'}}>
+                                                <option value="0">Opción A</option>
+                                                <option value="1">Opción B</option>
+                                                {tempQuestion.opcion3 && <option value="2">Opción C</option>}
+                                            </select>
+                                        </div>
+                                        <button type="button" onClick={addQuestionToQuiz} style={quizStyles.addButton}>
+                                            <i className="fas fa-plus-circle"></i> Agregar Pregunta al Cuestionario
+                                        </button>
+                                    </div>
                                 </div>
-                                <div style={{display:'flex', justifyContent:'space-between'}}>
-                                    <span style={{fontSize:'0.8rem'}}>Subiendo... {uploadProgress}%</span>
-                                    <button type="button" onClick={cancelUpload} style={{color:'red', border:'none', background:'none', cursor:'pointer', fontSize:'0.8rem'}}>Cancelar</button>
+                            </div>
+                        )}
+                        {/* ------------------------------------------- */}
+
+
+                        {uploading && (
+                            <div style={{marginTop:'20px', background:'#eafaf1', padding:'15px', borderRadius:'5px', border:'1px solid #d5f5e3'}}>
+                                <p style={{fontWeight:'bold', color:'#27ae60', margin:'0 0 10px 0'}}><i className="fas fa-spinner fa-spin"></i> Subiendo video...</p>
+                                <div style={{height:'10px', width:'100%', background:'#ccc', borderRadius:'5px', overflow:'hidden'}}>
+                                    <div style={{height:'100%', width:`${uploadProgress}%`, background:'#2ecc71', transition:'width 0.3s'}}></div>
+                                </div>
+                                <div style={{display:'flex', justifyContent:'space-between', marginTop:'5px', fontSize:'0.9rem'}}>
+                                    <span>{uploadProgress}% Completado</span>
+                                    <button type="button" onClick={cancelUpload} style={{color:'#e74c3c', border:'none', background:'none', cursor:'pointer', fontWeight:'bold'}}>Cancelar Subida</button>
                                 </div>
                             </div>
                         )}
 
-                        <button className="btn-submit-course" disabled={uploading} style={{marginTop:'15px', width:'100%'}}>
-                            {uploading ? 'Procesando...' : (editingLessonId ? 'Guardar Cambios' : 'Subir y Guardar')}
+                        <button className="btn-submit-course" disabled={uploading} style={{marginTop:'25px', width:'100%', padding:'15px', fontSize:'1.1rem', display:'flex', justifyContent:'center', alignItems:'center', gap:'10px'}}>
+                            {uploading ? <><i className="fas fa-circle-notch fa-spin"></i> Procesando...</> : <><i className="fas fa-save"></i> {editingLessonId ? 'Guardar Cambios' : 'Crear Lección'}</>}
                         </button>
                     </form>
                 </div>
@@ -307,6 +442,51 @@ function ManageContent() {
   );
 }
 
-const iconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px', fontSize: '1rem', color: '#666' };
+// --- ESTILOS ---
+const iconBtnStyle = { background: 'none', border: 'none', cursor: 'pointer', marginLeft: '8px', fontSize: '1.1rem', color: '#666', padding:'5px' };
+const inputStyle = { width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '5px', fontSize: '1rem', outline:'none', transition:'border 0.2s' };
+const labelStyle = { display: 'block', marginBottom: '8px', fontWeight: '600', color: '#444' };
+
+const fileUploadStyle = (file) => ({
+    display: 'block',
+    border: `2px dashed ${file ? '#2ecc71' : '#ccc'}`,
+    padding: '30px 20px',
+    cursor: 'pointer',
+    background: file ? '#f0fdf4' : '#f9f9f9',
+    borderRadius: '8px',
+    transition: 'all 0.3s'
+});
+
+const toggleQuizBtnStyle = (active) => ({
+    background: active ? 'var(--color-primario)' : 'none',
+    border: `2px solid var(--color-primario)`,
+    color: active ? 'white' : 'var(--color-primario)',
+    padding: '10px 20px',
+    borderRadius: '30px',
+    cursor: 'pointer',
+    width: '100%',
+    fontWeight: '600',
+    fontSize: '1rem',
+    display: 'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+    transition: 'all 0.2s'
+});
+
+const quizStyles = {
+    container: {
+        background: '#fff', padding: '25px', borderRadius: '10px', marginTop: '20px',
+        border: '1px solid #e1e4e8', boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+    },
+    header: { marginTop: 0, marginBottom: '20px', color: 'var(--color-primario)', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem' },
+    questionList: { maxHeight: '350px', overflowY: 'auto', marginBottom: '25px', border: '1px solid #eee', borderRadius: '8px', background:'#fbfbfb' },
+    questionItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '15px', borderBottom: '1px solid #eee', background: '#fff' },
+    optionsPreview: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' },
+    optionBadge: { fontSize: '0.85rem', padding: '4px 10px', borderRadius: '15px' },
+    deleteBtn: { background: '#fff5f5', border: '1px solid #ffc9c9', color: '#e74c3c', cursor: 'pointer', padding: '8px 12px', fontSize: '1rem', marginLeft: '15px', borderRadius:'5px', transition:'background 0.2s' },
+    addFormContainer: { background: '#f8f9fa', padding: '20px', borderRadius: '10px', border: '1px solid #eee' },
+    optionsGrid: { display: 'flex', gap: '15px', marginBottom: '15px', flexWrap: 'wrap' },
+    labelSmall: { display: 'block', fontSize: '0.9rem', color: '#666', marginBottom: '6px', fontWeight:'500' },
+    footerActions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginTop:'20px' },
+    addButton: { background: '#2ecc71', color: 'white', border: 'none', padding: '12px 25px', borderRadius: '30px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', fontSize:'1rem', boxShadow:'0 2px 5px rgba(46, 204, 113, 0.3)' }
+};
 
 export default ManageContent;

@@ -356,10 +356,35 @@ body {
 .course-actions .delete { background-color: transparent; color: #c0392b; }
 .course-actions .delete:hover { background-color: #c0392b; color: var(--color-blanco); }
 
-/* ---- PERFIL DE USUARIO ---- */
-.profile-page-container { max-width: 1200px; margin: 40px auto; display: flex; gap: 30px; align-items: flex-start; }
-.profile-sidebar { width: 280px; flex-shrink: 0; background-color: var(--color-blanco); border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm); padding: 30px 20px; position: sticky; top: 30px; }
-.profile-avatar-container { width: 120px; height: 120px; background-color: var(--color-secundario); color: var(--color-primario); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 3em; font-weight: 600; margin: 0 auto 15px auto; border: 4px solid var(--color-primario); }
+/* ✅ CORRECCIÓN: PERFIL DE USUARIO (FOTO FLOTANTE BIEN HECHA) */
+.profile-page-container { max-width: 1200px; margin: 40px auto; display: flex; gap: 30px; align-items: flex-start; padding: 0 20px; }
+
+.profile-sidebar {
+    width: 280px; flex-shrink: 0; background-color: var(--color-blanco);
+    border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm);
+    padding: 20px; 
+    /* Aseguramos espacio arriba y permitimos que elementos (la foto) sobresalgan */
+    padding-top: 60px; 
+    margin-top: 60px; /* Bajar la tarjeta entera para que la foto quepa arriba */
+    position: sticky; top: 30px; text-align: center;
+    border: 1px solid #f0f0f0;
+    overflow: visible; /* CRÍTICO: Permite que la foto "flote" fuera de la tarjeta */
+}
+
+.profile-avatar-container {
+    width: 120px; height: 120px;
+    background-color: var(--color-secundario); color: var(--color-primario);
+    border-radius: 50%;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 3em; font-weight: 600;
+    /* Margen negativo para subir la foto por encima del borde superior */
+    margin: -100px auto 15px auto; 
+    border: 6px solid var(--color-blanco); /* Borde grueso blanco para separar */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: relative; z-index: 10;
+    overflow: hidden;
+}
+
 .profile-info { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
 .profile-info h3 { margin: 0 0 5px 0; font-size: 1.4em; color: var(--color-primario); }
 .profile-info p { margin: 0; font-size: 0.9em; color: #6a6f73; }
@@ -451,206 +476,30 @@ body {
 }
 .btn-save-settings:hover { background-color: #08327a; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 
-/* --- RESPONSIVE --- */
-@media (max-width: 992px) {
-  .profile-page-container { flex-direction: column; }
-  .profile-sidebar { width: 100%; position: static; }
-  .profile-tabs { flex-direction: row; overflow-x: auto; gap: 10px; padding-bottom: 10px; }
-  .classroom-player-wrapper { flex-direction: column; }
-  .curriculum-sidebar { width: 100%; height: 40vh; border-left: none; border-top: 1px solid #ccc; }
-}
-
+/* --- RESPONSIVE (MÓVIL) --- */
 @media (max-width: 768px) {
-  .navbar { padding: 15px 20px; flex-wrap: nowrap; }
-  .nav-links { gap: 10px; }
+  .navbar { padding: 15px 20px; flex-direction: column; height: auto; gap: 15px; }
+  .nav-links { flex-direction: column; width: 100%; gap: 10px; }
   .search-container { display: none; }
   .nav-links a { font-size: 0.8rem; }
   .btn-registrarse { padding: 6px 12px; font-size: 0.8rem; }
   .auth-card, .create-course-card { padding: 25px; }
   .instructor-dashboard { flex-direction: column; }
-  .dashboard-sidebar { width: 100%; height: auto; }
-  
+  .dashboard-sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #eee; }
   .auth-split-screen { flex-direction: column; }
   .auth-banner-side { display: none; height: 200px; }
+  .profile-page-container { flex-direction: column; padding: 0 15px; }
+  .profile-sidebar { width: 100%; position: relative; top: 0; margin-top: 0; padding-top: 40px; margin-bottom: 20px; }
+  .profile-avatar-container { margin: -20px auto 15px auto; /* Menos agresivo en móvil */ }
+  .classroom-player-wrapper { flex-direction: column; height: auto; }
+  .video-frame-container { height: auto; aspect-ratio: 16/9; }
+  .curriculum-sidebar { width: 100%; height: auto; max-height: 400px; border-left: none; border-top: 1px solid #333; }
+  .content-management-layout { flex-direction: column; }
+  .curriculum-display, .add-lesson-form-container { width: 100%; min-width: 0; }
+  .settings-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 576px) {
   .navbar { padding: 10px 15px; }
   .auth-card { padding: 20px; }
-  .settings-grid { grid-template-columns: 1fr; }
-}
-/* =========================================
-   📱 CORRECCIONES PARA MÓVILES (RESPONSIVE)
-   ========================================= */
-
-@media (max-width: 768px) {
-    /* 1. Navbar: Apilar Logo y Menú */
-    .navbar {
-        flex-direction: column;
-        padding: 15px;
-        gap: 15px;
-        height: auto;
-    }
-    
-    .nav-links {
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 15px;
-    }
-
-    /* Ocultar buscador del header en móvil para ganar espacio */
-    .navbar .search-container {
-        display: none;
-    }
-
-    /* 2. Dashboards y Perfil: Columna única (Sidebar arriba) */
-    .instructor-dashboard, 
-    .profile-page-container,
-    .content-management-layout {
-        flex-direction: column;
-    }
-
-    .dashboard-sidebar, 
-    .profile-sidebar,
-    .curriculum-display {
-        width: 100% !important;
-        height: auto;
-        position: relative;
-        top: 0;
-        margin-bottom: 20px;
-    }
-
-    .dashboard-content, 
-    .profile-main-content,
-    .add-lesson-form-container {
-        padding: 20px 10px;
-        width: 100%;
-    }
-
-    /* 3. Tablas: Permitir scroll horizontal para que no rompan la pantalla */
-    table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-
-    /* 4. Login/Registro: Ajustar espaciado */
-    .auth-form-side {
-        padding: 20px;
-    }
-    .auth-form-container {
-        width: 100%;
-    }
-
-    /* 5. Home: Ajustar textos gigantes */
-    .hero h1 {
-        font-size: 2rem;
-    }
-    .search-box input {
-        width: 100% !important; /* Que no se salga de la pantalla */
-    }
-    .search-box .search-results-dropdown {
-        width: 100% !important;
-    }
-
-    /* =========================================
-   📱 ESTILOS PARA CELULARES (RESPONSIVE)
-   ========================================= */
-
-@media (max-width: 768px) {
-    
-    /* 1. NAVBAR: Apilar elementos */
-    .navbar {
-        flex-direction: column;
-        gap: 15px;
-        padding: 15px;
-    }
-    
-    .nav-links {
-        flex-direction: column;
-        width: 100%;
-        gap: 10px;
-    }
-
-    .search-bar {
-        width: 100% !important; /* Barra de búsqueda ancho completo */
-    }
-
-    /* 2. PANELES (Instructor / Perfil): Columna única */
-    .instructor-dashboard, 
-    .profile-page-container,
-    .content-management-layout {
-        flex-direction: column;
-    }
-
-    .dashboard-sidebar, 
-    .profile-sidebar, 
-    .curriculum-display {
-        width: 100% !important;
-        margin-bottom: 20px;
-        border-right: none;
-        border-bottom: 1px solid #eee;
-    }
-
-    /* 3. TABLAS (Admin / Listas): Scroll horizontal si no caben */
-    table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-
-    /* 4. AULA VIRTUAL (Lo más importante) */
-    .classroom-container {
-        height: auto; /* Permitir scroll en toda la página */
-        overflow: auto;
-    }
-    
-    .classroom-player-wrapper {
-        flex-direction: column; /* Video arriba, lista abajo */
-        height: auto;
-    }
-
-    .video-section {
-        height: auto;
-        min-height: auto;
-    }
-
-    .video-frame-container {
-        height: auto;
-        aspect-ratio: 16/9; /* Mantener formato de TV */
-    }
-
-    .curriculum-sidebar {
-        width: 100% !important;
-        height: auto;
-        max-height: 400px; /* Limitar altura de la lista */
-        border-left: none;
-        border-top: 1px solid #333;
-    }
-
-    /* 5. FORMULARIOS DE CONFIGURACIÓN */
-    .settings-grid {
-        grid-template-columns: 1fr; /* Una sola columna */
-    }
-
-    /* 6. HOME HERO */
-    .hero h1 {
-        font-size: 2rem; /* Texto más pequeño */
-    }
-    .hero-content {
-        padding: 0 10px;
-    }
-    .search-box input {
-        width: 100% !important;
-        min-width: 0;
-    }
-    .search-box form {
-        flex-direction: column; /* Buscador y botón apilados */
-        width: 100%;
-    }
-    .search-box button {
-        width: 100%;
-    }
-}
 }

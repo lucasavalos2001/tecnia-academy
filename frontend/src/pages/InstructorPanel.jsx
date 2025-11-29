@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext'; 
-import { formatCurrency } from '../utils/formatCurrency'; // ✅ Importamos el formateador
+import { formatCurrency } from '../utils/formatCurrency';
 
 function InstructorPanel() {
   const { user, logout, token } = useAuth();
@@ -12,16 +12,26 @@ function InstructorPanel() {
   const [cursos, setCursos] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // ✅ Estado para datos frescos del usuario
+  const [instructorData, setInstructorData] = useState(user);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // 1. Cargar Cursos
         const resCursos = await axios.get(`${API_URL}/cursos/instructor`, { headers: { Authorization: `Bearer ${token}` } });
         setCursos(resCursos.data.cursos);
 
+        // 2. Cargar Estadísticas
         const resStats = await axios.get(`${API_URL}/cursos/instructor/stats`, { headers: { Authorization: `Bearer ${token}` } });
         setStats(resStats.data);
+        
+        // 3. ✅ Cargar Perfil Actualizado
+        const resPerfil = await axios.get(`${API_URL}/usuario/perfil`, { headers: { Authorization: `Bearer ${token}` } });
+        setInstructorData(resPerfil.data);
+
       } catch (error) {
         console.error("Error datos instructor:", error);
       } finally {
@@ -52,27 +62,24 @@ function InstructorPanel() {
                     <span className="logo-tecnia">Tecnia</span><span className="logo-academy">Academy</span>
                 </div>
             </Link>
+            
+            {/* ✅ SECCIÓN DE PERFIL ACTUALIZADA */}
             <div className="instructor-profile">
-                {/* LÓGICA DE FOTO: Si tiene foto la muestra, si no, muestra iniciales */}
-                <div style={{
-                    width:'80px', height:'80px', 
-                    borderRadius:'50%', 
-                    margin:'0 auto 10px', 
-                    overflow:'hidden', // Para recortar la imagen en círculo
-                    background: user?.foto_perfil ? 'transparent' : '#00d4d4', // Solo color si no hay foto
-                    display:'flex', alignItems:'center', justifyContent:'center', 
-                    fontSize:'2em', color:'white', fontWeight:'bold'
-                }}>
-                    {user?.foto_perfil ? (
-                        <img src={user.foto_perfil} alt="Perfil" style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                {/* FOTO MEJORADA */}
+                <div className="profile-avatar-sidebar">
+                    {instructorData?.foto_perfil ? (
+                        <img src={instructorData.foto_perfil} alt="Perfil" />
                     ) : (
-                        user?.nombre_completo?.charAt(0).toUpperCase()
+                        <span style={{fontSize:'2.5em', color:'white', fontWeight:'bold'}}>
+                            {instructorData?.nombre_completo?.charAt(0).toUpperCase()}
+                        </span>
                     )}
                 </div>
                 
-                <h4 style={{margin:'0'}}>{user?.nombre_completo}</h4>
-                <p style={{fontSize:'0.8rem', color:'rgba(255,255,255,0.7)', marginTop:'5px'}}>Instructor</p>
+                <h4>{instructorData?.nombre_completo}</h4>
+                <p>Instructor</p>
             </div>
+
             <nav className="dashboard-nav">
                 <ul>
                     <li><button onClick={() => setActiveTab('cursos')} className={activeTab==='cursos'?'active':''} style={navBtnStyle}><i className="fas fa-chalkboard-teacher"></i> Mis Cursos</button></li>
@@ -99,7 +106,7 @@ function InstructorPanel() {
                                     <div className="course-info">
                                         <h3>{curso.titulo}</h3>
                                         
-                                        {/* ✅ PRECIO EN GUARANÍES */}
+                                        {/* PRECIO EN GUARANÍES */}
                                         <p className="course-status published">Precio: {formatCurrency(curso.precio)}</p>
                                         
                                         <div className="stats">
@@ -125,7 +132,7 @@ function InstructorPanel() {
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px'}}>
                         <StatBox title="Total Estudiantes" value={stats.totalEstudiantes} icon="fa-users" color="#3498db" />
                         
-                        {/* ✅ INGRESOS EN GUARANÍES */}
+                        {/* INGRESOS EN GUARANÍES */}
                         <StatBox title="Ingresos Totales" value={formatCurrency(stats.totalIngresos)} icon="fa-dollar-sign" color="#27ae60" />
                         
                         <StatBox title="Cursos Activos" value={stats.totalCursos} icon="fa-book" color="#9b59b6" />
@@ -146,7 +153,6 @@ function InstructorPanel() {
                                     <tr key={i} style={{borderBottom:'1px solid #eee'}}>
                                         <td style={{padding:'10px'}}>{d.titulo}</td>
                                         <td style={{padding:'10px'}}>{d.alumnos}</td>
-                                        {/* ✅ DESGLOSE EN GUARANÍES */}
                                         <td style={{padding:'10px', color:'#27ae60', fontWeight:'bold'}}>{formatCurrency(d.ingresos)}</td>
                                     </tr>
                                 ))}

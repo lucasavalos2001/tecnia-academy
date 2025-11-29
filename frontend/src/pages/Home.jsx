@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { formatCurrency } from '../utils/formatCurrency'; // ✅ IMPORTAR FORMATEADOR
+import { formatCurrency } from '../utils/formatCurrency';
 
 function Home() {
   const { user } = useAuth();
@@ -64,6 +64,16 @@ function Home() {
     }
   };
 
+  // Categorías para la nueva sección
+  const categoriasPopulares = [
+    { key: 'programacion', label: 'Programación', icon: 'fa-code' },
+    { key: 'diseno', label: 'Diseño', icon: 'fa-paint-brush' },
+    { key: 'negocios', label: 'Negocios', icon: 'fa-chart-line' },
+    { key: 'marketing', label: 'Marketing', icon: 'fa-bullhorn' },
+    { key: 'idiomas', label: 'Idiomas', icon: 'fa-language' },
+    { key: 'fotografia', label: 'Fotografía', icon: 'fa-camera' },
+  ];
+
   return (
     <>
       <Navbar />
@@ -116,6 +126,37 @@ function Home() {
           </div>
         </section>
 
+        {/* ✅ NUEVA SECCIÓN: CATEGORÍAS POPULARES (MEJORA VISUAL) */}
+        <section style={{maxWidth: '1200px', margin: '40px auto', padding: '0 20px'}}>
+            <h3 style={{color: '#333', marginBottom: '20px', fontWeight: '600'}}>Categorías principales</h3>
+            <div style={{display: 'flex', gap: '15px', flexWrap: 'wrap'}}>
+                {categoriasPopulares.map(cat => (
+                    <button 
+                        key={cat.key}
+                        onClick={() => navigate(`/biblioteca?q=${cat.key}`)}
+                        style={{
+                            padding: '15px 25px',
+                            background: 'white',
+                            border: '1px solid #eee',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontSize: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            transition: 'all 0.2s',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 5px 15px rgba(0,0,0,0.1)'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)'; }}
+                    >
+                        <i className={`fas ${cat.icon}`} style={{color: '#00d4d4'}}></i>
+                        {cat.label}
+                    </button>
+                ))}
+            </div>
+        </section>
+
         {/* SECCIÓN: CURSOS DESTACADOS */}
         <section style={{maxWidth: '1200px', margin: '60px auto', padding: '0 20px'}}>
             <h2 style={{color: '#0b3d91', borderBottom: '2px solid #00d4d4', display: 'inline-block', paddingBottom: '10px', marginBottom: '30px'}}>
@@ -146,7 +187,6 @@ function Home() {
                                     <span style={{color:'#666', fontSize:'0.8rem'}}>
                                         <i className="fas fa-user-tie"></i> {curso.instructor?.nombre_completo}
                                     </span>
-                                    {/* ✅ PRECIO EN GUARANÍES */}
                                     <span style={{fontWeight:'bold', color:'#0b3d91', fontSize:'1.1rem'}}>
                                         {formatCurrency(curso.precio)}
                                     </span>
