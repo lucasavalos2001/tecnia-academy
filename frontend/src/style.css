@@ -476,30 +476,137 @@ body {
 }
 .btn-save-settings:hover { background-color: #08327a; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 
-/* --- RESPONSIVE (MÓVIL) --- */
-@media (max-width: 768px) {
-  .navbar { padding: 15px 20px; flex-direction: column; height: auto; gap: 15px; }
-  .nav-links { flex-direction: column; width: 100%; gap: 10px; }
-  .search-container { display: none; }
-  .nav-links a { font-size: 0.8rem; }
-  .btn-registrarse { padding: 6px 12px; font-size: 0.8rem; }
-  .auth-card, .create-course-card { padding: 25px; }
-  .instructor-dashboard { flex-direction: column; }
-  .dashboard-sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #eee; }
-  .auth-split-screen { flex-direction: column; }
-  .auth-banner-side { display: none; height: 200px; }
-  .profile-page-container { flex-direction: column; padding: 0 15px; }
-  .profile-sidebar { width: 100%; position: relative; top: 0; margin-top: 0; padding-top: 40px; margin-bottom: 20px; }
-  .profile-avatar-container { margin: -20px auto 15px auto; /* Menos agresivo en móvil */ }
-  .classroom-player-wrapper { flex-direction: column; height: auto; }
-  .video-frame-container { height: auto; aspect-ratio: 16/9; }
-  .curriculum-sidebar { width: 100%; height: auto; max-height: 400px; border-left: none; border-top: 1px solid #333; }
-  .content-management-layout { flex-direction: column; }
-  .curriculum-display, .add-lesson-form-container { width: 100%; min-width: 0; }
-  .settings-grid { grid-template-columns: 1fr; }
-}
+/* =========================================
+   📱 ESTILOS PARA CELULARES (RESPONSIVE PRO)
+   ========================================= */
 
-@media (max-width: 576px) {
-  .navbar { padding: 10px 15px; }
-  .auth-card { padding: 20px; }
+@media (max-width: 768px) {
+    
+    /* 1. NAVBAR: Compacto y ordenado */
+    .navbar {
+        flex-direction: column;
+        padding: 10px;
+        gap: 10px;
+        background-color: var(--color-primario);
+    }
+    
+    .logo {
+        font-size: 1.5rem; /* Logo un poco más pequeño */
+    }
+
+    .nav-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+    }
+
+    /* Botones del menú más compactos para que quepan */
+    .nav-links a, .nav-links button {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        border: none;
+    }
+
+    /* Ocultar buscador del header en móvil */
+    .navbar .search-container {
+        display: none;
+    }
+
+    /* 2. AULA VIRTUAL: Optimización de Espacio */
+    .classroom-container {
+        height: auto; /* Permitir scroll natural */
+        overflow-x: hidden;
+    }
+    
+    .virtual-classroom-main {
+        margin-top: 0 !important; /* Pegar al navbar */
+        flex-direction: column;
+    }
+
+    .classroom-player-wrapper {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .video-section {
+        padding: 0 !important; /* Quitar padding para que el video vaya de borde a borde */
+        background: black;
+    }
+
+    .video-frame-container {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16/9; /* Formato video perfecto */
+        border-radius: 0; /* Sin bordes redondeados en móvil para ganar espacio */
+    }
+
+    /* Pestañas y Detalles */
+    .video-info-tabs {
+        padding: 15px !important;
+        background: white;
+    }
+    
+    .tabs-header {
+        justify-content: space-between;
+        overflow-x: auto; /* Scroll si hay muchas pestañas */
+    }
+
+    .lesson-details-modern h1 {
+        font-size: 1.4rem !important; /* Título de lección más pequeño */
+    }
+
+    /* 3. SIDEBAR DE CONTENIDO (Debajo del video) */
+    .curriculum-sidebar {
+        width: 100% !important;
+        height: auto;
+        max-height: none; /* Dejar que crezca */
+        border-left: none;
+        border-top: 1px solid #ddd;
+        position: relative;
+        z-index: 1;
+    }
+
+    .lesson-list-container {
+        max-height: 400px; /* Limitar altura de la lista si es muy larga */
+        overflow-y: auto;
+    }
+
+    /* Botón flotante del temario (Ocultar en móvil porque ya se ve abajo) */
+    .toggle-sidebar-btn {
+        display: none; 
+    }
+
+    /* 4. PANELES Y OTROS */
+    .instructor-dashboard, 
+    .profile-page-container,
+    .content-management-layout,
+    .auth-split-screen { 
+        flex-direction: column; 
+    }
+
+    .dashboard-sidebar, .profile-sidebar { 
+        width: 100% !important; 
+        height: auto; 
+        position: relative; top: 0; 
+        margin-bottom: 20px; 
+        padding: 20px;
+    }
+
+    .profile-avatar-container { 
+        margin: -10px auto 15px auto; /* Ajuste del margen negativo */
+    }
+
+    .auth-banner-side { display: none; }
+
+    /* Scroll en tablas para que no rompan el diseño */
+    table { display: block; overflow-x: auto; white-space: nowrap; }
+    
+    /* Ajuste de textos grandes en Home */
+    .hero h1 { font-size: 2rem; }
+    .search-box input { width: 100% !important; }
+    .search-box .search-results-dropdown { width: 100% !important; }
 }
