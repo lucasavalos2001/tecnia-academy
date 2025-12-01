@@ -477,54 +477,63 @@ body {
 .btn-save-settings:hover { background-color: #08327a; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 
 /* =========================================
-   📱 ESTILOS PARA CELULARES (RESPONSIVE PREMIUM)
+   📱 ESTILOS PARA CELULARES (RESPONSIVE PRO MEJORADO)
    ========================================= */
 
 @media (max-width: 768px) {
     
-    /* 1. NAVBAR: Limpio y Fácil de Tocar */
+    /* 1. NAVBAR: Espacioso y Organizado */
     .navbar {
         flex-direction: column;
-        padding: 15px 20px;
-        gap: 15px;
+        padding: 20px; /* Más espacio interno */
+        gap: 20px;
         background-color: var(--color-primario);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Sombra suave */
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     }
     
     .logo {
         font-size: 1.8rem;
-        justify-content: center; /* Centrar logo */
+        justify-content: center;
         width: 100%;
+        margin-bottom: 5px;
     }
 
     .nav-links {
         display: flex;
-        flex-direction: column; /* Lista vertical es más fácil en móvil */
+        flex-direction: column;
         width: 100%;
-        gap: 10px;
+        gap: 12px; /* Más separación entre botones */
     }
 
-    /* Botones grandes para dedos */
+    /* Botones del menú: Grandes, legibles y con estilo */
     .nav-links a, .nav-links button {
         font-size: 1rem;
-        padding: 12px;
+        padding: 14px; /* Área de toque más grande */
         background: rgba(255,255,255,0.1);
-        border-radius: 8px;
-        border: none;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.1);
         width: 100%;
         text-align: center;
         display: block;
+        color: white !important;
+        font-weight: 500;
+        letter-spacing: 0.5px;
     }
 
-    .navbar .search-container { display: none; } /* Ocultar buscador */
+    .navbar .search-container { display: none; }
 
-    /* 2. AULA VIRTUAL: Experiencia Tipo App */
+    /* 2. AULA VIRTUAL: Video Protagonista */
     .classroom-container {
         height: auto;
         overflow-x: hidden;
-        background-color: #f4f7fa;
+        background-color: #f8f9fa;
     }
     
+    .virtual-classroom-main {
+        margin-top: 0 !important;
+        flex-direction: column;
+    }
+
     .classroom-player-wrapper {
         flex-direction: column;
         height: auto;
@@ -533,108 +542,129 @@ body {
     .video-section {
         padding: 0 !important;
         background: black;
-        position: relative;
+        position: sticky; /* El video se pega arriba al hacer scroll */
+        top: 0;
+        z-index: 100;
     }
 
     .video-frame-container {
         width: 100%;
         aspect-ratio: 16/9;
-        border-radius: 0; /* Borde a borde se ve más cine */
-        position: sticky; /* El video se queda arriba un poco */
-        top: 0;
-        z-index: 50;
+        border-radius: 0;
     }
 
-    /* Pestañas Deslizables (Scroll Horizontal) */
+    /* Pestañas Deslizables Modernas */
     .video-info-tabs {
-        padding: 20px !important;
+        padding: 20px 15px !important;
         background: white;
         border-radius: 0 0 20px 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
     }
     
     .tabs-header {
         display: flex;
         overflow-x: auto;
         white-space: nowrap;
-        gap: 10px;
-        padding-bottom: 5px;
-        /* Ocultar barra de scroll fea */
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none; 
+        gap: 12px;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+        -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+        scrollbar-width: none; /* Ocultar barra scroll */
     }
     .tabs-header::-webkit-scrollbar { display: none; }
 
     .tab-btn {
         padding: 10px 20px;
         font-size: 0.95rem;
-        background: #f0f2f5;
-        border-radius: 20px;
-        border: none !important; /* Quitar borde inferior estilo desktop */
+        background: #f1f3f5;
+        border-radius: 50px; /* Botones redondos tipo cápsula */
+        border: none !important;
         color: #666;
+        flex-shrink: 0;
     }
     .tab-btn.active {
         background: var(--color-primario);
         color: white !important;
         font-weight: 600;
+        box-shadow: 0 2px 8px rgba(11, 61, 145, 0.3);
     }
 
-    /* Textos más legibles */
+    /* Detalles de la lección */
+    .lesson-details-modern {
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
     .lesson-details-modern h1 {
-        font-size: 1.5rem !important;
+        font-size: 1.6rem !important;
         line-height: 1.3;
         margin-top: 10px;
+        color: var(--color-texto);
     }
-    
     .lesson-details-modern p {
         font-size: 1rem;
-        line-height: 1.6;
-        color: #444;
+        line-height: 1.7; /* Mejor lectura */
+        color: #555;
     }
 
-    /* Botones de acción grandes */
+    /* Botón de acción flotante o grande */
     .lesson-details-modern button {
         width: 100%;
         justify-content: center;
-        padding: 15px !important;
+        padding: 16px !important;
         font-size: 1.1rem !important;
+        margin-top: 15px;
+        border-radius: 12px !important;
     }
 
-    /* 3. TEMARIO (Debajo del video) */
+    /* 3. TEMARIO: Lista limpia debajo */
     .curriculum-sidebar {
         width: 100% !important;
         height: auto;
         max-height: none;
         border: none;
-        background: transparent;
-        padding: 10px;
+        background: white;
+        padding: 0;
+        margin-top: 10px;
     }
 
     .lesson-list-container {
-        max-height: 500px; /* Evita que la página sea infinita */
+        max-height: 500px;
         overflow-y: auto;
         background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-top: 1px solid #eee;
+    }
+    
+    .module-title {
+        padding: 15px 20px;
+        font-size: 1rem;
+    }
+    
+    .lesson-row {
+        padding: 15px 20px; /* Más espacio para el dedo */
+        border-bottom: 1px solid #f5f5f5;
     }
 
     .toggle-sidebar-btn { display: none; }
 
-    /* 4. PANELES Y PERFIL */
+    /* 4. PANELES Y PERFIL: Tarjetas separadas */
     .instructor-dashboard, 
     .profile-page-container,
-    .content-management-layout { 
+    .content-management-layout,
+    .auth-split-screen { 
         flex-direction: column;
-        padding: 10px;
+        padding: 15px;
+        gap: 20px;
     }
 
     .dashboard-sidebar, .profile-sidebar { 
         width: 100% !important; 
         height: auto; 
         position: relative; top: 0; 
-        margin-bottom: 20px; 
+        margin-bottom: 0; 
         padding: 25px;
         border-radius: 15px;
+        border: 1px solid #eee;
     }
 
     .profile-avatar-container { 
@@ -642,9 +672,21 @@ body {
         width: 100px; height: 100px; font-size: 2.5rem;
     }
 
+    /* Formularios en móvil */
+    .dashboard-content, .profile-main-content {
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
     .auth-banner-side { display: none; }
-    .auth-split-screen { flex-direction: column; }
-    .auth-form-side { padding: 30px 20px; }
+    .auth-form-side { padding: 20px; }
+    
+    /* Inputs grandes para no hacer zoom */
+    input, select, textarea {
+        font-size: 16px !important; /* Tamaño estándar seguro para iOS */
+        padding: 14px !important;
+    }
 
     /* Tablas con Scroll Suave */
     table { 
@@ -652,35 +694,61 @@ body {
         overflow-x: auto; 
         white-space: nowrap; 
         -webkit-overflow-scrolling: touch;
+        margin-bottom: 20px;
     }
     
-    /* 5. HOME HERO */
-    .hero { height: auto; padding: 60px 0; }
-    .hero h1 { font-size: 2.2rem; line-height: 1.2; }
-    .hero p { font-size: 1.1rem; padding: 0 15px; }
+    /* 5. HOME HERO: Impacto Visual */
+    .hero { height: auto; padding: 60px 20px; text-align: center; }
+    .hero h1 { font-size: 2.4rem; line-height: 1.2; margin-bottom: 15px; }
+    .hero p { font-size: 1.1rem; margin-bottom: 30px; }
     
     .search-box form {
         flex-direction: column;
         width: 100%;
-        padding: 0 20px;
+        gap: 15px;
     }
     .search-box input {
         width: 100% !important;
         min-width: 0;
-        font-size: 1rem; /* Evita zoom automático en iOS */
-        padding: 15px;
+        padding: 16px 20px;
+        border-radius: 50px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
     .search-box button {
         width: 100%;
-        margin-top: 10px;
-        padding: 15px;
+        padding: 16px;
         font-size: 1.1rem;
+        border-radius: 50px;
+        box-shadow: 0 4px 15px rgba(0, 212, 212, 0.3);
     }
-    .search-box .search-results-dropdown { width: 90% !important; left: 5%; }
+    .search-box .search-results-dropdown { 
+        width: 100% !important; 
+        position: relative; /* Para que empuje el contenido abajo y no lo tape */
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        margin-top: 10px;
+    }
 
-    /* 6. TARJETAS DE CURSO */
+    /* 6. TARJETAS DE CURSO: Grandes y vistosas */
     .curso-grid {
-        grid-template-columns: 1fr; /* Una columna */
-        padding: 0 10px;
+        grid-template-columns: 1fr; /* Una sola columna */
+        gap: 25px;
+        padding: 0 5px;
+    }
+    
+    .curso-card {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        border-radius: 15px;
+    }
+    
+    .card-image-wrapper {
+        height: 200px; /* Imagen más alta para que luzca */
+    }
+    
+    .card-content {
+        padding: 25px;
+    }
+    
+    .card-content h3 {
+        font-size: 1.3rem;
     }
 }
