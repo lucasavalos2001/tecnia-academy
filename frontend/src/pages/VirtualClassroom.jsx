@@ -104,11 +104,14 @@ function VirtualClassroom() {
       
       // Fondo negro SÓLIDO para que no se vea nada detrás
       const containerStyle = {position:'relative', paddingTop:'56.25%', width: '100%', background:'black'};
+      
+      // --- CORRECCIÓN APLICADA ---
+      const iframeStyle = { position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0, display: 'block' };
 
       if (url.includes('bunny') || url.includes('mediadelivery')) {
           return (
             <div style={containerStyle}>
-              <iframe src={url} loading="lazy" style={{border:0, position:'absolute', top:0, left:0, height:'100%', width:'100%'}} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen={true}></iframe>
+              <iframe src={url} loading="lazy" style={iframeStyle} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen={true}></iframe>
             </div>
           );
       }

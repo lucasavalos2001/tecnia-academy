@@ -542,15 +542,22 @@ body {
     .video-section {
         padding: 0 !important;
         background: black;
-        position: sticky; /* El video se pega arriba al hacer scroll */
+        /* position: sticky;  <-- Nota: Si mueves el sticky al container de abajo, quizás quieras quitarlo de aquí, pero lo dejo según el código original por precaución */
+        position: sticky; 
         top: 0;
         z-index: 100;
     }
 
+    /* --- CORRECCIÓN APLICADA AQUÍ --- */
     .video-frame-container {
         width: 100%;
-        aspect-ratio: 16/9;
+        height: auto; /* Deja que la altura se ajuste sola */
         border-radius: 0;
+        position: sticky; 
+        top: 0;
+        z-index: 100;
+        display: block; /* Asegura que se comporte como bloque */
+        /* aspect-ratio: 16/9; <-- ELIMINADO */
     }
 
     /* Pestañas Deslizables Modernas */
