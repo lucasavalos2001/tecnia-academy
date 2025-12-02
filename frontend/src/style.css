@@ -476,193 +476,138 @@ body {
 }
 .btn-save-settings:hover { background-color: #08327a; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 /* =========================================
-   📱 ESTILOS MÓVILES PROFESIONALES (APP-LIKE)
+   📱 ESTILOS MÓVILES - FIX TOTAL (NAVBAR + VIDEO)
    ========================================= */
 
-@media (max-width: 768px) {
+@media only screen and (max-width: 768px) {
     
-    /* --- 1. HEADER & NAVBAR --- */
+    /* 1. CONTENEDOR PRINCIPAL */
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+    }
+
+    /* 2. NAVBAR: Columna Estricta */
     .navbar {
-        flex-direction: column;
-        padding: 15px;
-        background: linear-gradient(180deg, var(--color-primario) 0%, #082a66 100%); /* Degradado sutil */
-        gap: 15px;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        padding: 15px 10px !important;
+        height: auto !important;
+        width: 100%;
+        box-sizing: border-box;
+        position: relative; 
     }
     
     .logo {
-        font-size: 1.6rem;
         width: 100%;
+        text-align: center;
         justify-content: center;
-        margin: 0;
+        margin-bottom: 15px !important;
+        font-size: 1.5rem;
     }
 
-    /* Menú de navegación: Grid de 2 columnas para ahorrar espacio vertical */
+    /* 3. MENÚ DE NAVEGACIÓN */
     .nav-links {
-        display: grid;
-        grid-template-columns: 1fr 1fr; /* Dos botones por fila */
-        gap: 10px;
-        width: 100%;
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        gap: 10px !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     .nav-links a, .nav-links button {
-        font-size: 0.85rem;
-        padding: 10px 5px;
-        background: rgba(255,255,255,0.1);
-        border: 1px solid rgba(255,255,255,0.1);
+        display: block !important;
+        width: 100% !important;
+        text-align: center;
+        padding: 12px 0 !important;
+        font-size: 0.95rem !important;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         border-radius: 8px;
         color: white !important;
-        text-align: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        box-sizing: border-box;
-        white-space: nowrap;
+        box-sizing: border-box; 
     }
-    
-    /* Botón Cerrar Sesión ocupa todo el ancho abajo */
+
     .nav-links button:last-child {
-        grid-column: 1 / -1;
-        background: rgba(231, 76, 60, 0.2); /* Un toque rojo sutil */
-        border-color: rgba(231, 76, 60, 0.3);
+        background-color: rgba(220, 53, 69, 0.8) !important;
+        margin-top: 5px;
     }
 
-    .navbar .search-container { display: none; }
+    .navbar .search-container { display: none !important; }
 
-    /* --- 2. HERO SECTION --- */
-    .hero {
-        height: auto;
-        padding: 40px 20px;
-        text-align: center;
-    }
-
-    .hero h1 {
-        font-size: 1.8rem;
-        line-height: 1.3;
-    }
-
-    /* Buscador Grande */
+    /* --- AJUSTES DE CONTENIDO GENERAL --- */
+    .hero { padding: 40px 15px; height: auto; }
+    .hero h1 { font-size: 1.8rem; }
+    
     .search-box form {
         flex-direction: column;
         width: 100%;
-        padding: 0;
+        padding: 0 10px;
+        box-sizing: border-box;
     }
+    .search-box input { width: 100% !important; font-size: 16px; } 
+    .search-box button { width: 100%; margin-top: 10px; }
     
-    .search-box input {
-        width: 100% !important;
-        padding: 15px;
-        font-size: 1rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        border: none;
-    }
-    
-    .search-box button {
-        width: 100%;
-        border-radius: 12px;
-        padding: 15px;
-        font-size: 1.1rem;
-        margin-top: 10px;
-        box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4);
-    }
-
-    /* --- 3. AULA VIRTUAL INMERSIVA --- */
-    .classroom-container {
-        height: auto;
-        overflow-x: hidden;
-        background-color: #f4f7fa;
-    }
-    
-    .classroom-player-wrapper {
+    .instructor-dashboard, .profile-page-container, .content-management-layout {
         flex-direction: column;
-        height: auto;
-    }
-
-    .video-section {
-        padding: 0 !important;
-        background: black;
-        position: sticky;
-        top: 0; /* Video pegado arriba */
-        z-index: 900; /* Debajo del navbar si es sticky, o encima si navbar scroll */
+        padding: 10px;
     }
     
-    /* Ajuste para que el video no se tape con el navbar sticky */
-    .navbar { position: relative; } 
-
-    .video-frame-container {
-        width: 100%;
-        aspect-ratio: 16/9;
-        height: auto;
-    }
-
-    /* Pestañas deslizables estilo App */
-    .video-info-tabs {
-        padding: 15px !important;
-        background: white;
-        border-radius: 0 0 20px 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    
-    .tabs-header {
-        justify-content: flex-start;
-        overflow-x: auto;
-        gap: 10px;
-        padding-bottom: 5px;
-    }
-    
-    .tab-btn {
-        padding: 8px 16px;
-        background: #f1f3f5;
-        border-radius: 20px;
-        border: none !important;
-        white-space: nowrap;
-    }
-    .tab-btn.active {
-        background: var(--color-primario);
-        color: white !important;
-    }
-
-    /* --- 4. PANELES Y CONTENIDO --- */
-    .instructor-dashboard, 
-    .profile-page-container,
-    .content-management-layout, 
-    .auth-split-screen {
-        flex-direction: column;
-        padding: 15px;
-        gap: 20px;
-    }
-
     .dashboard-sidebar, .profile-sidebar {
         width: 100% !important;
-        position: relative; top: 0;
-        margin-bottom: 0;
-        padding: 20px;
-        border-radius: 15px;
+        margin-bottom: 20px;
     }
     
-    .profile-avatar-container {
-        margin: 0 auto 15px auto; /* Resetear margen negativo */
+    /* 4. ✅ AULA VIRTUAL CORREGIDA (VIDEO FULL WIDTH) */
+    .classroom-player-wrapper { 
+        flex-direction: column !important; 
+        height: auto !important; 
     }
-    
-    /* Ocultar banner de login en móvil */
-    .auth-banner-side { display: none; }
-    .auth-form-side { padding: 20px; }
 
-    /* Tablas con scroll horizontal limpio */
-    table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-        border-collapse: collapse;
+    .video-section { 
+        padding: 0 !important; 
+        width: 100% !important; 
+        background: black; 
+        /* Aseguramos que el video se quede arriba al hacer scroll */
+        position: sticky;
+        top: 0;
+        z-index: 100;
     }
-    
-    /* Tarjetas de curso: Full width */
-    .curso-grid {
-        grid-template-columns: 1fr;
-        padding: 0 5px;
+
+    /* Forzamos el contenedor del video a ocupar todo el ancho y tener altura mínima */
+    .video-frame-container {
+        width: 100% !important;
+        height: auto !important;
+        min-height: 250px; /* Evita que se vea aplastado */
+        aspect-ratio: 16/9;
+        display: block !important;
+        background-color: #000;
     }
+
+    /* Aseguramos que el iframe o video dentro ocupe todo */
+    .video-frame-container iframe, 
+    .video-frame-container video,
+    .video-frame-container .react-player {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    .curriculum-sidebar { 
+        width: 100% !important; 
+        height: auto; 
+        border: none; 
+        margin-top: 10px;
+    }
+
+    /* Tablas con Scroll */
+    table { display: block; overflow-x: auto; white-space: nowrap; }
 }
+
+    
+
