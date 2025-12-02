@@ -1,11 +1,11 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); // Nativo de Node
+const crypto = require('crypto'); 
 const nodemailer = require('nodemailer');
 const { Op } = require('sequelize');
 
-// Configuración del transporte de correo
+// Configuración Email
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -14,42 +14,85 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// --- REGISTRO ---
 const registerUser = async (req, res) => {
     const { nombre_completo, email, password } = req.body;
+    console.log("📝 Intento de registro:", email); // LOG
+
     try {
+        // Validación básica
+        if (!password || !email) {
+            return res.status(400).json({ message: 'Faltan datos obligatorios' });
+        }
+
         const existeUsuario = await User.findOne({ where: { email } });
         if (existeUsuario) {
             return res.status(400).json({ message: 'El correo ya está registrado' });
         }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const nuevoUsuario = await User.create({
+        
+        // Crear usuario
+        await User.create({
             nombre_completo,
             email,
             contraseña_hash: hashedPassword
         });
+
+        console.log("✅ Usuario registrado con éxito:", email);
         res.status(201).json({ message: 'Usuario registrado con éxito' });
+
     } catch (error) {
-        res.status(500).json({ message: 'Error en el servidor', error });
+        console.error("❌ Error en registro:", error); // LOG DETALLADO
+        res.status(500).json({ message: 'Error en el servidor al registrar', error: error.message });
     }
 };
 
+// --- LOGIN (AQUÍ ESTABA EL ERROR 500) ---
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
+    console.log("🔑 Intento de Login:", email); // LOG
+
     try {
+        // 1. Buscar usuario
         const usuario = await User.findOne({ where: { email } });
+        
         if (!usuario) {
-            return res.status(400).json({ message: 'Credenciales inválidas' });
+            console.log("❌ Usuario no encontrado en BD");
+            return res.status(400).json({ message: 'Credenciales inválidas (Usuario no existe)' });
         }
+
+        // 🔍 DIAGNÓSTICO: Ver si el usuario tiene contraseña
+        console.log("Usuario encontrado:", usuario.nombre_completo);
+        console.log("Hash en BD:", usuario.contraseña_hash ? "Existe (Oculto)" : "UNDEFINED (ERROR)");
+
+        // 2. Validar que el hash exista ANTES de comparar (Evita el crash 500)
+        if (!usuario.contraseña_hash) {
+            console.error("🚨 EL USUARIO TIENE LA CONTRASEÑA CORRUPTA (NULL)");
+            return res.status(500).json({ message: 'Error crítico: Usuario corrupto en BD. Contacta soporte.' });
+        }
+
+        // 3. Comparar contraseña
         const isMatch = await bcrypt.compare(password, usuario.contraseña_hash);
         if (!isMatch) {
-            return res.status(400).json({ message: 'Credenciales inválidas' });
+            console.log("❌ Contraseña incorrecta");
+            return res.status(400).json({ message: 'Credenciales inválidas (Contraseña mal)' });
         }
+
+        // 4. Generar Token
+        if (!process.env.JWT_SECRET) {
+            console.error("🚨 FALTA JWT_SECRET EN .ENV");
+            return res.status(500).json({ message: 'Error de configuración del servidor' });
+        }
+
         const token = jwt.sign(
             { id: usuario.id, rol: usuario.rol, nombre_completo: usuario.nombre_completo },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        console.log("✅ Login exitoso, enviando token.");
         res.json({
             token,
             user: {
@@ -60,82 +103,65 @@ const loginUser = async (req, res) => {
                 foto_perfil: usuario.foto_perfil
             }
         });
+
     } catch (error) {
-        res.status(500).json({ message: 'Error en el servidor', error });
+        console.error("🔴 CRASH EN LOGIN:", error); // ESTO NOS DIRÁ EL ERROR REAL
+        res.status(500).json({ message: 'Error interno en el servidor', error: error.message });
     }
 };
 
-// ✅ 1. SOLICITAR RECUPERACIÓN (Olvide contraseña)
+// --- RECUPERACIÓN DE CONTRASEÑA ---
 const forgotPassword = async (req, res) => {
     const { email } = req.body;
     try {
         const user = await User.findOne({ where: { email } });
-        if (!user) {
-            return res.status(404).json({ message: "No existe un usuario con ese correo." });
-        }
+        if (!user) return res.status(404).json({ message: "No existe un usuario con ese correo." });
 
-        // Generar token
         const token = crypto.randomBytes(20).toString('hex');
-        
-        // Guardar token y expiración (1 hora)
         user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 3600000; // 1 hora
+        user.resetPasswordExpires = Date.now() + 3600000; 
         await user.save();
 
-        // Crear link de reset (Apunta al Frontend)
-        // Nota: Usa tu dominio real si está en prod
         const resetUrl = `https://tecniaacademy.com/reset-password/${token}`;
 
         const mailOptions = {
             from: '"Soporte Tecnia Academy" <tecniaacademy@gmail.com>',
             to: user.email,
-            subject: 'Restablecer tu contraseña - Tecnia Academy',
-            text: `Hola ${user.nombre_completo},\n\nRecibimos una solicitud para restablecer tu contraseña.\n\nHaz clic en el siguiente enlace para cambiarla:\n\n${resetUrl}\n\nSi no solicitaste esto, ignora este correo.\n\nSaludos,\nEquipo Tecnia.`
+            subject: 'Restablecer tu contraseña',
+            text: `Hola,\n\nHaz clic aquí para cambiar tu contraseña:\n${resetUrl}\n\nSi no fuiste tú, ignora este correo.`
         };
 
         await transporter.sendMail(mailOptions);
-
-        res.json({ message: "Correo de recuperación enviado." });
+        res.json({ message: "Correo enviado." });
 
     } catch (error) {
-        console.error(error);
+        console.error("❌ Error enviando correo:", error);
         res.status(500).json({ message: "Error al enviar correo." });
     }
 };
 
-// ✅ 2. RESTABLECER CONTRASEÑA (Reset Password)
 const resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
-
     try {
-        // Buscar usuario con ese token y que no haya expirado
         const user = await User.findOne({
             where: {
                 resetPasswordToken: token,
-                resetPasswordExpires: { [Op.gt]: Date.now() } // gt = greater than (mayor que ahora)
+                resetPasswordExpires: { [Op.gt]: Date.now() }
             }
         });
+        if (!user) return res.status(400).json({ message: "Enlace inválido o expirado." });
 
-        if (!user) {
-            return res.status(400).json({ message: "El enlace es inválido o ha expirado." });
-        }
-
-        // Encriptar nueva contraseña
         const salt = await bcrypt.genSalt(10);
         user.contraseña_hash = await bcrypt.hash(password, salt);
-        
-        // Limpiar token
         user.resetPasswordToken = null;
         user.resetPasswordExpires = null;
-        
         await user.save();
 
-        res.json({ message: "Contraseña actualizada con éxito. Ahora puedes iniciar sesión." });
-
+        res.json({ message: "Contraseña actualizada." });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error al restablecer contraseña." });
+        console.error("Error reset password:", error);
+        res.status(500).json({ message: "Error al restablecer." });
     }
 };
 
