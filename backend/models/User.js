@@ -24,20 +24,27 @@ const User = sequelize.define('User', {
         type: DataTypes.ENUM('student', 'instructor', 'admin', 'superadmin'),
         defaultValue: 'student',
     },
-    // ✅ CAMPO: BIOGRAFÍA
     biografia: {
-        type: DataTypes.TEXT, 
-        allowNull: true,      
+        type: DataTypes.TEXT,
+        allowNull: true,
     },
-    // ✅ NUEVO CAMPO: EMAIL DE CONTACTO (PÚBLICO)
     email_contacto: {
         type: DataTypes.STRING,
-        allowNull: true, // Puede estar vacío si no quieren mostrarlo
+        allowNull: true,
     },
     foto_perfil: {
         type: DataTypes.STRING,
         allowNull: true,
-        },
+    },
+    // ✅ NUEVOS CAMPOS PARA RECUPERACIÓN
+    resetPasswordToken: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    resetPasswordExpires: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
     fecha_registro: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,

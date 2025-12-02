@@ -65,6 +65,13 @@ function Login() {
                         />
                     </div>
                     
+                    {/* ✅ ENLACE DE OLVIDÉ CONTRASEÑA */}
+                    <div style={{textAlign:'right', marginBottom:'15px'}}>
+                        <Link to="/olvide-password" style={{fontSize:'0.9rem', color:'#666', textDecoration:'none'}}>
+                            ¿Olvidaste tu contraseña?
+                        </Link>
+                    </div>
+
                     <button type="submit" className="btn-auth" disabled={isLoading}>
                         {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
                     </button>

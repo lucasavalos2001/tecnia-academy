@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import './style.css'; 
 
-// Importar componentes de página
+// Importar componentes de página existing
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -17,7 +17,11 @@ import VirtualClassroom from './pages/VirtualClassroom';
 import CertificateView from './pages/CertificateView';
 import AdminDashboard from './pages/AdminDashboard';
 import EditCourse from './pages/EditCourse'; 
-import CourseDetailPublic from './pages/CourseDetailPublic'; // ✅ NUEVA IMPORTACIÓN
+import CourseDetailPublic from './pages/CourseDetailPublic';
+
+// ✅ NUEVAS IMPORTACIONES: Recuperación de contraseña
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 function App() {
   return (
@@ -28,8 +32,12 @@ function App() {
       <Route path="/registro" element={<Register />} />
       <Route path="/biblioteca" element={<CourseLibrary />} />
       
-      {/* ✅ RUTA PÚBLICA DE DETALLE (Landing Page del Curso) */}
+      {/* RUTA PÚBLICA DE DETALLE (Landing Page del Curso) */}
       <Route path="/curso/:id" element={<CourseDetailPublic />} />
+
+      {/* ✅ NUEVAS RUTAS DE RECUPERACIÓN */}
+      <Route path="/olvide-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* RUTAS PROTEGIDAS (Requieren Token JWT) */}
       

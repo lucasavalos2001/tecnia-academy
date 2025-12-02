@@ -1,13 +1,14 @@
 const express = require('express');
-// Importa las funciones del controlador
-const { registerUser, loginUser } = require('../controllers/authController'); 
+const { registerUser, loginUser, forgotPassword, resetPassword } = require('../controllers/authController');
 
-// 1. Crear la instancia del router de Express
-const router = express.Router(); 
+const router = express.Router();
 
-// 2. Definir los endpoints
-router.post('/registro', registerUser); 
+// Rutas de Autenticación
+router.post('/registro', registerUser);
 router.post('/login', loginUser);
 
-// 3. Exportar el router (la función que Express espera)
+// ✅ Rutas de Recuperación
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
+
 module.exports = router;
