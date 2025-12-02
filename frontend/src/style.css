@@ -561,7 +561,7 @@ body {
         margin-bottom: 20px;
     }
     
-    /* 4. ✅ AULA VIRTUAL CORREGIDA (VIDEO FULL WIDTH) */
+    /* 4. ✅ AULA VIRTUAL CORREGIDA (VIDEO FULL WIDTH SIN BARRAS NEGRAS) */
     .classroom-player-wrapper { 
         flex-direction: column !important; 
         height: auto !important; 
@@ -571,23 +571,22 @@ body {
         padding: 0 !important; 
         width: 100% !important; 
         background: black; 
-        /* Aseguramos que el video se quede arriba al hacer scroll */
         position: sticky;
         top: 0;
         z-index: 100;
     }
 
-    /* Forzamos el contenedor del video a ocupar todo el ancho y tener altura mínima */
+    /* El contenedor se ajusta al ancho y calcula la altura exacta 16:9 */
     .video-frame-container {
         width: 100% !important;
         height: auto !important;
-        min-height: 250px; /* Evita que se vea aplastado */
-        aspect-ratio: 16/9;
+        aspect-ratio: 16/9 !important; /* Clave: Mantiene proporción de TV */
         display: block !important;
         background-color: #000;
+        position: relative;
     }
 
-    /* Aseguramos que el iframe o video dentro ocupe todo */
+    /* Forzamos al iframe/video a llenar ese espacio exacto */
     .video-frame-container iframe, 
     .video-frame-container video,
     .video-frame-container .react-player {
@@ -596,6 +595,7 @@ body {
         position: absolute;
         top: 0;
         left: 0;
+        object-fit: contain; /* Asegura que el video se vea completo */
     }
 
     .curriculum-sidebar { 
@@ -608,6 +608,4 @@ body {
     /* Tablas con Scroll */
     table { display: block; overflow-x: auto; white-space: nowrap; }
 }
-
-    
 
