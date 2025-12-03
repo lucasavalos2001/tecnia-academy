@@ -1,28 +1,36 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); 
+const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const { Op } = require('sequelize');
 
-// Configuración Email
+// Configuración del transporte de correo (CORRECCIÓN: Formato explícito para evitar ETIMEDOUT en VPS)
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: "smtp.gmail.com",  // Servidor explícito para prevenir ETIMEDOUT en VPS
+    port: 465,               // Puerto seguro SSL
+    secure: true,            // Usar SSL
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
-    }
+    },
+    // Añadir timeouts de conexión para una respuesta más rápida en caso de fallo
+    socketTimeout: 5000,
+    connectionTimeout: 5000
 });
 
-// --- REGISTRO ---
+// --- REGISTRO (CORRECCIÓN: Robustez de Contraseña) ---
 const registerUser = async (req, res) => {
-    const { nombre_completo, email, password } = req.body;
-    console.log("📝 Intento de registro:", email); // LOG
+    // Captura ambas opciones de contraseña para robustez
+    const { nombre_completo, email, password, contraseña } = req.body;
+    const passwordFinal = password || contraseña; // Usa la variable que sí llegó
+    
+    console.log("📝 Intento de registro:", email);
 
     try {
         // Validación básica
-        if (!password || !email) {
-            return res.status(400).json({ message: 'Faltan datos obligatorios' });
+        if (!passwordFinal || !email) {
+            return res.status(400).json({ message: 'Faltan datos obligatorios (email o contraseña)' });
         }
 
         const existeUsuario = await User.findOne({ where: { email } });
@@ -31,7 +39,7 @@ const registerUser = async (req, res) => {
         }
 
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+        const hashedPassword = await bcrypt.hash(passwordFinal, salt); // Usamos passwordFinal
         
         // Crear usuario
         await User.create({
@@ -44,15 +52,18 @@ const registerUser = async (req, res) => {
         res.status(201).json({ message: 'Usuario registrado con éxito' });
 
     } catch (error) {
-        console.error("❌ Error en registro:", error); // LOG DETALLADO
+        console.error("❌ Error en registro:", error);
         res.status(500).json({ message: 'Error en el servidor al registrar', error: error.message });
     }
 };
 
-// --- LOGIN (AQUÍ ESTABA EL ERROR 500) ---
+// --- LOGIN (CORRECCIÓN: Robustez de Contraseña) ---
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
-    console.log("🔑 Intento de Login:", email); // LOG
+    // Manejo de contraseña dual en login también por si acaso
+    const { email, password, contraseña } = req.body;
+    const passwordFinal = password || contraseña;
+    
+    console.log("🔑 Intento de Login:", email);
 
     try {
         // 1. Buscar usuario
@@ -63,18 +74,14 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Credenciales inválidas (Usuario no existe)' });
         }
 
-        // 🔍 DIAGNÓSTICO: Ver si el usuario tiene contraseña
-        console.log("Usuario encontrado:", usuario.nombre_completo);
-        console.log("Hash en BD:", usuario.contraseña_hash ? "Existe (Oculto)" : "UNDEFINED (ERROR)");
-
-        // 2. Validar que el hash exista ANTES de comparar (Evita el crash 500)
+        // 2. Validar que el hash exista ANTES de comparar
         if (!usuario.contraseña_hash) {
             console.error("🚨 EL USUARIO TIENE LA CONTRASEÑA CORRUPTA (NULL)");
             return res.status(500).json({ message: 'Error crítico: Usuario corrupto en BD. Contacta soporte.' });
         }
 
-        // 3. Comparar contraseña
-        const isMatch = await bcrypt.compare(password, usuario.contraseña_hash);
+        // 3. Comparar contraseña (usando passwordFinal)
+        const isMatch = await bcrypt.compare(passwordFinal, usuario.contraseña_hash);
         if (!isMatch) {
             console.log("❌ Contraseña incorrecta");
             return res.status(400).json({ message: 'Credenciales inválidas (Contraseña mal)' });
@@ -86,6 +93,7 @@ const loginUser = async (req, res) => {
             return res.status(500).json({ message: 'Error de configuración del servidor' });
         }
 
+        // Se usa usuario.rol al firmar el token, por eso se incluye
         const token = jwt.sign(
             { id: usuario.id, rol: usuario.rol, nombre_completo: usuario.nombre_completo },
             process.env.JWT_SECRET,
@@ -105,12 +113,12 @@ const loginUser = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("🔴 CRASH EN LOGIN:", error); // ESTO NOS DIRÁ EL ERROR REAL
+        console.error("🔴 CRASH EN LOGIN:", error);
         res.status(500).json({ message: 'Error interno en el servidor', error: error.message });
     }
 };
 
-// --- RECUPERACIÓN DE CONTRASEÑA ---
+// --- RECUPERACIÓN DE CONTRASEÑA (CORRECCIÓN: Manejo de errores específico) ---
 const forgotPassword = async (req, res) => {
     const { email } = req.body;
     try {
@@ -132,17 +140,25 @@ const forgotPassword = async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-        res.json({ message: "Correo enviado." });
+        res.json({ message: "Correo enviado. Revisa tu bandeja de entrada." });
 
     } catch (error) {
         console.error("❌ Error enviando correo:", error);
-        res.status(500).json({ message: "Error al enviar correo." });
+        // Devolver un error específico para diagnosticar el fallo en el servidor
+        if (error.code === 'EAUTH') {
+             res.status(500).json({ message: "Error: Credenciales de correo inválidas. Verifica EMAIL_PASS y Contraseña de Aplicación." });
+        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
+             res.status(500).json({ message: "Error: No se pudo conectar al servidor de correo. Verifica la conexión a internet/VPN." });
+        } else {
+             res.status(500).json({ message: "Error al enviar correo." });
+        }
     }
 };
 
 const resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
+    
     try {
         const user = await User.findOne({
             where: {
