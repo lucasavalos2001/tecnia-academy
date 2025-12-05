@@ -18,4 +18,18 @@ const verifyToken = (req, res, next) => {
     }
 };
 
-module.exports = { verifyToken };
+// 🟢 NUEVO: Middleware para verificar si es Administrador
+const isAdmin = (req, res, next) => {
+    // req.usuario ya debe existir (gracias a verifyToken que se ejecuta antes)
+    // Verificamos que el rol sea exactamente 'admin'
+    if (req.usuario && req.usuario.rol === 'admin') {
+        next(); // Tiene permiso, puede pasar
+    } else {
+        return res.status(403).json({ 
+            message: "Acceso denegado. Se requieren permisos de administrador." 
+        });
+    }
+};
+
+// 🟢 Exportamos AMBAS funciones
+module.exports = { verifyToken, isAdmin };

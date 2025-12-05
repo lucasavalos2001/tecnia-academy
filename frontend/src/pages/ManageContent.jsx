@@ -21,6 +21,9 @@ function ManageContent() {
   // --- ESTADOS LECCIÓN (Video + Desc) ---
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonDescription, setLessonDescription] = useState('');
+  // 🟢 1. ESTADO PARA DURACIÓN (Se llena solo o manual)
+  const [lessonDuration, setLessonDuration] = useState(''); 
+  
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -36,6 +39,64 @@ function ManageContent() {
   // Edición y Control
   const [editingLessonId, setEditingLessonId] = useState(null);
   const abortControllerRef = useRef(null);
+
+  // ==========================================
+  //  🟢 FUNCIONES PARA CALCULAR DURACIÓN AUTO
+  // ==========================================
+  
+  const getVideoDuration = (file) => {
+    return new Promise((resolve, reject) => {
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function() {
+          window.URL.revokeObjectURL(video.src);
+          resolve(video.duration);
+        }
+        video.onerror = function() {
+          reject("No se pudo cargar el video para leer su duración.");
+        }
+        video.src = URL.createObjectURL(file);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
+
+  const formatDuration = (seconds) => {
+      if (!seconds) return "00:00";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      
+      const mDisplay = m < 10 ? `0${m}` : m;
+      const sDisplay = s < 10 ? `0${s}` : s;
+      
+      if (h > 0) {
+          const hDisplay = h < 10 ? `0${h}` : h;
+          return `${hDisplay}:${mDisplay}:${sDisplay}`;
+      }
+      return `${mDisplay}:${sDisplay}`;
+  };
+
+  // 🟢 MANEJADOR AL SELECCIONAR ARCHIVO
+  const handleVideoSelect = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      setVideoFile(file); // Guardamos el archivo para subir
+      
+      try {
+          // Calculamos duración y actualizamos el input
+          const durationInSeconds = await getVideoDuration(file);
+          const formattedDuration = formatDuration(durationInSeconds);
+          setLessonDuration(formattedDuration); 
+      } catch (error) {
+          console.error("Error leyendo duración automática:", error);
+      }
+  };
+  // ==========================================
+
 
   // --- CARGAR DATOS ---
   const fetchCurriculum = async () => {
@@ -67,13 +128,11 @@ function ManageContent() {
 
   // --- FUNCIONES QUIZ ---
   const addQuestionToQuiz = () => {
-      // Validar que haya pregunta y al menos 2 opciones
       if(!tempQuestion.pregunta.trim() || !tempQuestion.opcion1.trim() || !tempQuestion.opcion2.trim()) {
           alert("Por favor, completa la pregunta y al menos las opciones A y B.");
           return;
       }
       
-      // Crear el array de opciones filtrando las vacías
       const opcionesLimon = [tempQuestion.opcion1, tempQuestion.opcion2, tempQuestion.opcion3]
           .map(o => o.trim())
           .filter(o => o !== '');
@@ -84,14 +143,12 @@ function ManageContent() {
           correcta: parseInt(tempQuestion.correcta)
       };
 
-      // Validar que el índice de correcta sea válido para la cantidad de opciones
       if(nuevaPregunta.correcta >= nuevaPregunta.opciones.length) {
           alert("La respuesta correcta seleccionada no es válida para las opciones ingresadas.");
           return;
       }
 
       setQuizQuestions([...quizQuestions, nuevaPregunta]);
-      // Resetear formulario temporal
       setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
   };
 
@@ -104,6 +161,8 @@ function ManageContent() {
   // --- FUNCIONES VIDEO ---
   const removeSelectedFile = () => {
       setVideoFile(null);
+      // Si quitas el video, podrías querer limpiar la duración o dejarla, depende de tu gusto.
+      // setLessonDuration(''); // Descomenta si quieres que se borre la duración al quitar el video.
       const fileInput = document.getElementById('videoInput');
       if(fileInput) fileInput.value = "";
   };
@@ -122,9 +181,9 @@ function ManageContent() {
     setEditingLessonId(leccion.id);
     setLessonTitle(leccion.titulo);
     setLessonDescription(leccion.contenido_texto || '');
+    setLessonDuration(leccion.duracion || ''); 
     setSelectedModuleId(moduleId);
     
-    // Cargar Quiz si existe
     if (leccion.contenido_quiz && leccion.contenido_quiz.length > 0) {
         setQuizQuestions(leccion.contenido_quiz);
         setShowQuizBuilder(true);
@@ -132,7 +191,6 @@ function ManageContent() {
         setQuizQuestions([]);
         setShowQuizBuilder(false);
     }
-    // Resetear formulario temporal de pregunta al editar
     setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
 
     setVideoFile(null); 
@@ -143,6 +201,7 @@ function ManageContent() {
     setEditingLessonId(null);
     setLessonTitle('');
     setLessonDescription('');
+    setLessonDuration(''); 
     setVideoFile(null);
     setQuizQuestions([]);
     setShowQuizBuilder(false);
@@ -156,8 +215,7 @@ function ManageContent() {
     
     if (!selectedModuleId || !lessonTitle) { alert("Faltan datos (Módulo o Título)."); return; }
     
-    // Validación principal: Debe haber contenido (Video O Quiz)
-    const hasVideo = !!videoFile || (editingLessonId && !videoFile); // Si edito, puede que ya tenga video y no suba uno nuevo
+    const hasVideo = !!videoFile || (editingLessonId && !videoFile);
     const hasQuiz = quizQuestions.length > 0;
 
     if (!hasVideo && !hasQuiz) { 
@@ -172,7 +230,7 @@ function ManageContent() {
     try {
         let finalEmbedUrl = null;
 
-        // 1. Subir Video (Solo si se seleccionó un archivo nuevo)
+        // 1. Subir Video
         if (videoFile) {
             const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
                 { title: lessonTitle }, 
@@ -193,15 +251,14 @@ function ManageContent() {
             finalEmbedUrl = embedUrl;
         }
 
-        // 2. Preparar Datos para el Backend
+        // 2. Preparar Datos
         const leccionData = { 
             titulo: lessonTitle, 
             contenido_texto: lessonDescription,
-            // Si hay preguntas, enviamos el array. Si no, enviamos null para limpiar si antes había.
+            duracion: lessonDuration, // 🟢 Se envía lo que calculamos o lo que editó el usuario
             contenido_quiz: quizQuestions.length > 0 ? quizQuestions : null 
         };
         
-        // Solo añadimos url_video si se subió uno nuevo. Si se está editando y no se subió nada, el backend mantiene el anterior.
         if (finalEmbedUrl) {
             leccionData.url_video = finalEmbedUrl;
         }
@@ -263,7 +320,8 @@ function ManageContent() {
                                         ) : (
                                             <i className="fas fa-film" style={{color: '#00d4d4'}} title="Video"></i>
                                         )}
-                                        {lec.titulo}
+                                        {lec.titulo} 
+                                        {lec.duracion && <span style={{fontSize:'0.8rem', color:'#999', marginLeft:'5px'}}>({lec.duracion})</span>}
                                     </div>
                                     <div>
                                         <button onClick={() => startEditingLesson(lec, mod.id)} style={iconBtnStyle} title="Editar Lección"><i className="fas fa-pencil-alt"></i></button>
@@ -292,7 +350,7 @@ function ManageContent() {
                     </form>
                 </div>
 
-                {/* FORMULARIO LECCIÓN (VIDEO / QUIZ) */}
+                {/* FORMULARIO LECCIÓN */}
                 <div style={{background:'#fff', padding:'25px', borderRadius:'8px', boxShadow:'0 4px 10px rgba(0,0,0,0.08)'}}>
                     <h3 style={{display:'flex', justifyContent:'space-between', marginTop:0, color:'var(--color-primario)'}}>
                         {editingLessonId ? <span><i className="fas fa-edit"></i> Editar Lección</span> : <span><i className="fas fa-plus-circle"></i> Nueva Lección</span>}
@@ -313,6 +371,18 @@ function ManageContent() {
                             <input type="text" placeholder="Ej: Clase 1: Fundamentos..." value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inputStyle} required />
                         </div>
 
+                        {/* 🟢 INPUT DE DURACIÓN (AUTO-RELLENABLE) */}
+                        <div className="form-group">
+                             <label style={labelStyle}>Duración (Auto-calculada al subir video):</label>
+                            <input 
+                                type="text" 
+                                placeholder="MM:SS (Se llena automático)" 
+                                value={lessonDuration} 
+                                onChange={e => setLessonDuration(e.target.value)} 
+                                style={{...inputStyle, background:'#f9f9f9'}} 
+                            />
+                        </div>
+
                         <div className="form-group">
                             <label style={labelStyle}>Descripción / Notas (Opcional):</label>
                             <textarea rows="3" placeholder="Información adicional para el estudiante..." value={lessonDescription} onChange={e => setLessonDescription(e.target.value)} style={{...inputStyle, resize:'vertical'}}></textarea>
@@ -326,7 +396,13 @@ function ManageContent() {
                                     <i className="fas fa-cloud-upload-alt" style={{fontSize:'2rem', color: videoFile ? '#2ecc71' : '#ccc', marginBottom:'10px'}}></i>
                                     <p style={{margin:'0', fontWeight:'500', color:'#555'}}>{videoFile ? videoFile.name : "Clic para seleccionar archivo de video (MP4, MOV...)"}</p>
                                 </div>
-                                <input id="videoInput" type="file" accept="video/*" onChange={e => setVideoFile(e.target.files[0])} style={{display:'none'}} />
+                                <input 
+                                    id="videoInput" 
+                                    type="file" 
+                                    accept="video/*" 
+                                    onChange={handleVideoSelect} /* 🟢 USAMOS LA NUEVA FUNCIÓN */
+                                    style={{display:'none'}} 
+                                />
                             </label>
                             {videoFile && (
                                 <button type="button" onClick={removeSelectedFile} style={{color:'#e74c3c', border:'none', background:'none', marginTop:'8px', cursor:'pointer', display:'flex', alignItems:'center', gap:'5px'}}>
@@ -335,7 +411,7 @@ function ManageContent() {
                             )}
                         </div>
 
-                        {/* --- SECCIÓN CREADOR DE CUESTIONARIOS (MEJORADA) --- */}
+                        {/* --- SECCIÓN CREADOR DE CUESTIONARIOS --- */}
                         <div className="form-group" style={{marginTop:'25px', borderTop:'1px solid #eee', paddingTop:'20px'}}>
                             <button type="button" onClick={() => setShowQuizBuilder(!showQuizBuilder)} style={toggleQuizBtnStyle(showQuizBuilder)}>
                                 <i className={`fas ${showQuizBuilder ? 'fa-chevron-up' : 'fa-tasks'}`}></i> {showQuizBuilder ? 'Ocultar Creador de Cuestionario' : 'Agregar Cuestionario / Quiz'}
@@ -348,7 +424,6 @@ function ManageContent() {
                                     <i className="fas fa-list-ol"></i> Preguntas del Cuestionario ({quizQuestions.length})
                                 </h4>
                                 
-                                {/* LISTA DE PREGUNTAS EXISTENTES */}
                                 {quizQuestions.length > 0 ? (
                                     <div style={quizStyles.questionList}>
                                         {quizQuestions.map((q, idx) => (
@@ -373,7 +448,6 @@ function ManageContent() {
                                     <p style={{color:'#777', fontStyle:'italic', marginBottom:'20px'}}>Aún no has agregado preguntas.</p>
                                 )}
 
-                                {/* FORMULARIO PARA AGREGAR NUEVA PREGUNTA */}
                                 <div style={quizStyles.addFormContainer}>
                                     <h5 style={{margin:'0 0 15px 0', color:'var(--color-primario)', borderBottom:'1px solid #eee', paddingBottom:'10px'}}>Nueva Pregunta</h5>
                                     
@@ -413,7 +487,6 @@ function ManageContent() {
                                 </div>
                             </div>
                         )}
-                        {/* ------------------------------------------- */}
 
 
                         {uploading && (

@@ -6,7 +6,7 @@ function CertificateView() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Recibimos los datos del certificado desde la navegación anterior
+  // Recibimos los datos. 
   const { certificado, usuario } = location.state || {};
 
   // Si alguien entra directo sin datos, lo mandamos al perfil
@@ -20,12 +20,12 @@ function CertificateView() {
   }
 
   const handlePrint = () => {
-    window.print(); // Esto abre el menú de impresión del navegador (PDF)
+    window.print(); // Abre el menú de impresión del navegador
   };
 
   return (
     <>
-      {/* Navbar visible solo en pantalla, no en impresión */}
+      {/* Navbar visible solo en pantalla, se oculta al imprimir */}
       <div className="no-print"><Navbar /></div>
       
       <div className="certificate-viewer-container">
@@ -39,11 +39,20 @@ function CertificateView() {
             </div>
 
             <div className="certificate-body">
-                <p className="subtitle">Se otorga el presente certificado a:</p>
-                <h1>{usuario}</h1>
+                <p className="subtitle">SE OTORGA EL PRESENTE CERTIFICADO A:</p>
                 
-                <p className="subtitle">por haber completado satisfactoriamente el curso:</p>
+                {/* Nombre del Estudiante */}
+                <h1 className="student-name">{usuario.nombre_completo || usuario.nombre || usuario}</h1>
+                
+                <p className="subtitle">POR HABER COMPLETADO SATISFACTORIAMENTE EL CURSO:</p>
+                
+                {/* Título del Curso */}
                 <h2 className="course-name">{certificado.curso.titulo}</h2>
+
+                {/* 🟢 CORRECCIÓN: Se muestra la duración directamente si existe */}
+                <p className="course-hours">
+                  Con una carga horaria de <strong>{certificado.curso.duracion || "Sin duración registrada"}</strong>.
+                </p>
                 
                 <p className="date">
                     Completado el: {new Date(certificado.updatedAt).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -52,13 +61,18 @@ function CertificateView() {
 
             <div className="certificate-footer">
                 <div className="verify-id">
-                    ID: {certificado.id}-{new Date(certificado.updatedAt).getTime()}
-                    <br/>tecnia.academy/verify
+                    <strong>ID de Verificación:</strong><br/>
+                    {certificado.id}<br/>
+                    <small>tecniaacademy.com/verify</small>
                 </div>
-                
-                <div className="signature">
-                    <div className="signature-font">Juan Pérez</div>
-                    <div>Director Académico</div>
+
+                {/* BLOQUE DE FIRMA */}
+                <div className="signature-block" style={{ textAlign: 'center' }}>
+                    <p className="verified-by">Verificado por:</p>
+                    
+                    {/* Tu nombre y cargo */}
+                    <div className="signatory-name">Lucas Francisco López Avalos</div>
+                    <div className="signatory-title">Director General</div>
                 </div>
             </div>
 

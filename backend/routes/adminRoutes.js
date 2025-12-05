@@ -7,32 +7,51 @@ const {
     deleteUser,
     getAllCoursesAdmin,
     deleteCourseAdmin,
-    getRecentEnrollments
+    getRecentEnrollments,
+    // ✅ IMPORTACIONES CORRECTAS:
+    getPendingCourses,
+    reviewCourse // Usamos esta porque maneja aprobar Y rechazar
 } = require('../controllers/adminController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
-// Middleware de seguridad (Solo Admins)
-const verifyAdmin = (req, res, next) => {
-    const { rol } = req.usuario;
-    if (rol !== 'admin' && rol !== 'superadmin') {
-        return res.status(403).json({ message: "Acceso denegado. Solo Administradores." });
-    }
-    next();
-};
+// Importamos el middleware centralizado (más seguro y limpio)
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
 
-// --- Rutas del Dashboard ---
-router.get('/stats', verifyToken, verifyAdmin, getGlobalStats);
+// ==========================================
+// 🔒 SEGURIDAD GLOBAL
+// ==========================================
+// Aplicamos la seguridad a TODAS las rutas de este archivo.
+// Así no tienes que repetirlo en cada línea.
+router.use(verifyToken, isAdmin);
 
-// --- Gestión de Usuarios ---
-router.get('/users', verifyToken, verifyAdmin, getAllUsers);
-router.put('/users/:userId/role', verifyToken, verifyAdmin, updateUserRole);
-router.delete('/users/:userId', verifyToken, verifyAdmin, deleteUser);
+// ==========================================
+// 📊 RUTAS DEL DASHBOARD
+// ==========================================
+router.get('/stats', getGlobalStats);
+router.get('/activity', getRecentEnrollments);
 
-// --- Gestión de Cursos (Moderación) ---
-router.get('/courses', verifyToken, verifyAdmin, getAllCoursesAdmin);
-router.delete('/courses/:courseId', verifyToken, verifyAdmin, deleteCourseAdmin);
+// ==========================================
+// 👥 GESTIÓN DE USUARIOS
+// ==========================================
+router.get('/users', getAllUsers);
+router.put('/users/:userId/role', updateUserRole);
+router.delete('/users/:userId', deleteUser);
 
-// --- Actividad Reciente ---
-router.get('/activity', verifyToken, verifyAdmin, getRecentEnrollments);
+// ==========================================
+// 📚 GESTIÓN DE CURSOS
+// ==========================================
+router.get('/courses', getAllCoursesAdmin); // Catálogo completo
+router.delete('/courses/:courseId', deleteCourseAdmin); // Borrar curso
+
+// ==========================================
+// ✅ SOLICITUDES Y APROBACIÓN (LO NUEVO)
+// ==========================================
+
+// 1. Ver cursos pendientes
+// Ruta final: /api/admin/pending
+router.get('/pending', getPendingCourses);
+
+// 2. Revisar curso (Aprobar o Rechazar)
+// Ruta final: /api/admin/review/:id
+router.post('/review/:id', reviewCourse);
 
 module.exports = router;

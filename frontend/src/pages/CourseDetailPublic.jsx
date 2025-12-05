@@ -4,17 +4,20 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-// ✅ IMPORTANTE: Importar el formateador
 import { formatCurrency } from '../utils/formatCurrency';
 
 function CourseDetailPublic() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isLoggedIn, token } = useAuth();
+  // 🟢 IMPORTANTE: Traemos 'user' para verificar si es admin
+  const { isLoggedIn, token, user } = useAuth();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
   const [curso, setCurso] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Verificamos si es admin
+  const isAdmin = user?.rol === 'admin';
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -30,13 +33,28 @@ function CourseDetailPublic() {
     fetchDetails();
   }, [id]);
 
+  // 🟢 FUNCIÓN DE ADMIN: APROBAR/RECHAZAR
+  const handleAdminReview = async (decision) => {
+      if(!confirm(`¿Estás seguro de que deseas ${decision.toUpperCase()} este curso?`)) return;
+      try {
+          await axios.post(
+              `${API_URL}/admin/review/${curso.id}`, 
+              { decision }, 
+              { headers: { Authorization: `Bearer ${token}` } }
+          );
+          alert(`Curso ${decision === 'aprobar' ? 'PUBLICADO' : 'RECHAZADO'} con éxito.`);
+          navigate('/admin-dashboard'); // Volver al panel
+      } catch (error) {
+          alert("Error al procesar la solicitud.");
+      }
+  };
+
   const handleEnroll = async () => {
     if (!isLoggedIn) {
         navigate('/login');
         return;
     }
     
-    // ✅ PRECIO FORMATEADO EN LA ALERTA
     const precioFormateado = formatCurrency(curso.precio);
     
     if (confirm(`¿Quieres inscribirte en "${curso.titulo}" por ${precioFormateado}?`)) {
@@ -55,11 +73,65 @@ function CourseDetailPublic() {
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Cargando información del curso...</div>;
   if (!curso) return <div style={{padding:'50px', textAlign:'center'}}>Curso no encontrado</div>;
 
+  // Calculamos total de lecciones para el panel de auditoría
+  const totalLecciones = curso.modulos?.reduce((acc, m) => acc + m.lecciones.length, 0) || 0;
+
   return (
     <>
       <Navbar />
+
+      {/* 🟢 PANEL DE AUDITORÍA (SOLO ADMIN) 🟢 */}
+      {isAdmin && (
+          <div style={{backgroundColor: '#2c3e50', color: 'white', padding: '15px 0', borderBottom: '4px solid #f1c40f'}}>
+              <div style={{maxWidth: '1100px', margin: '0 auto', padding: '0 20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  
+                  <div style={{display:'flex', gap:'30px', alignItems:'center'}}>
+                      <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                          <i className="fas fa-user-secret" style={{fontSize:'2rem', color:'#f1c40f'}}></i>
+                          <div>
+                              <h4 style={{margin:0, textTransform:'uppercase', letterSpacing:'1px', fontSize:'0.9rem', color:'#bdc3c7'}}>Modo Auditoría</h4>
+                              <span style={{fontWeight:'bold', fontSize:'1.1rem'}}>Super Administrador</span>
+                          </div>
+                      </div>
+
+                      <div style={{borderLeft:'1px solid #7f8c8d', paddingLeft:'20px'}}>
+                          <p style={{margin:0, fontSize:'0.85rem', color:'#bdc3c7'}}>Estado Actual:</p>
+                          <strong style={{
+                              color: curso.estado === 'publicado' ? '#2ecc71' : 
+                                     curso.estado === 'pendiente' ? '#f1c40f' : '#e74c3c',
+                              textTransform: 'uppercase'
+                          }}>
+                              {curso.estado}
+                          </strong>
+                      </div>
+
+                      <div style={{borderLeft:'1px solid #7f8c8d', paddingLeft:'20px'}}>
+                          <p style={{margin:0, fontSize:'0.85rem', color:'#bdc3c7'}}>Duración Declarada:</p>
+                          {/* 🟢 CORREGIDO: Eliminado "Horas" */}
+                          <strong>{curso.duracion}</strong>
+                      </div>
+                  </div>
+
+                  <div style={{display:'flex', gap:'10px'}}>
+                      <button 
+                          onClick={() => handleAdminReview('rechazado')}
+                          style={{padding:'10px 20px', background:'#c0392b', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
+                      >
+                          <i className="fas fa-times"></i> Rechazar
+                      </button>
+                      <button 
+                          onClick={() => handleAdminReview('aprobar')}
+                          style={{padding:'10px 20px', background:'#27ae60', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
+                      >
+                          <i className="fas fa-check"></i> APROBAR CURSO
+                      </button>
+                  </div>
+
+              </div>
+          </div>
+      )}
       
-      {/* HEADER OSCURO */}
+      {/* HEADER DEL CURSO (NORMAL) */}
       <div style={{backgroundColor: '#1c1d1f', color: 'white', padding: '40px 0'}}>
           <div style={{maxWidth: '1100px', margin: '0 auto', padding: '0 20px', display:'flex', gap:'40px'}}>
               <div style={{flex: 2, paddingRight: '350px'}}> 
@@ -88,7 +160,8 @@ function CourseDetailPublic() {
               {/* Temario */}
               <div>
                   <h3>Contenido del curso</h3>
-                  <p style={{fontSize:'0.9rem', color:'#666'}}>{curso.modulos?.length} secciones • {curso.modulos?.reduce((acc, m) => acc + m.lecciones.length, 0)} clases</p>
+                  {/* 🟢 CORREGIDO: Eliminado "h duración total" */}
+                  <p style={{fontSize:'0.9rem', color:'#666'}}>{curso.modulos?.length} secciones • {totalLecciones} clases • {curso.duracion} duración total</p>
                   
                   <div style={{border: '1px solid #d1d7dc', marginTop:'10px'}}>
                       {curso.modulos?.length === 0 && <div style={{padding:'15px'}}>El instructor aún no ha subido contenido.</div>}
@@ -99,12 +172,50 @@ function CourseDetailPublic() {
                                   <span>{mod.titulo}</span>
                                   <span style={{fontWeight:'normal', fontSize:'0.9rem'}}>{mod.lecciones.length} clases</span>
                               </div>
+                              
+                              {/* LISTA DE LECCIONES */}
                               {mod.lecciones.length > 0 && (
                                   <ul style={{padding:'10px 30px', margin:0, listStyle:'none'}}>
                                       {mod.lecciones?.map(lec => (
-                                          <li key={lec.id} style={{marginBottom:'8px', color:'#666', fontSize:'0.9rem', display:'flex', alignItems:'center', gap:'10px'}}>
-                                              <i className="fas fa-play-circle" style={{color:'#666'}}></i> 
-                                              {lec.titulo}
+                                          <li key={lec.id} style={{
+                                              marginBottom:'10px', 
+                                              color:'#666', 
+                                              fontSize:'0.9rem', 
+                                              display:'flex', 
+                                              alignItems:'center', 
+                                              justifyContent:'space-between', 
+                                              paddingBottom: '8px',
+                                              borderBottom: '1px dashed #eee'
+                                          }}>
+                                              <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                                  <i className="fas fa-play-circle" style={{color: '#00d4d4'}}></i> 
+                                                  <span>{lec.titulo}</span>
+                                              </div>
+
+                                              <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                                                  <span style={{fontSize:'0.8rem', color:'#999', background:'#f8f9fa', padding:'2px 8px', borderRadius:'4px'}}>
+                                                      {lec.duracion || "00:00"}
+                                                  </span>
+
+                                                  {isAdmin && lec.url_video && (
+                                                      <a 
+                                                          href={lec.url_video} 
+                                                          target="_blank" 
+                                                          rel="noopener noreferrer"
+                                                          style={{
+                                                              fontSize:'0.75rem', 
+                                                              color:'white', 
+                                                              background:'#3498db', 
+                                                              padding:'2px 8px', 
+                                                              borderRadius:'4px', 
+                                                              textDecoration:'none',
+                                                              fontWeight:'bold'
+                                                          }}
+                                                      >
+                                                          VER
+                                                      </a>
+                                                  )}
+                                              </div>
                                           </li>
                                       ))}
                                   </ul>
@@ -114,12 +225,11 @@ function CourseDetailPublic() {
                   </div>
               </div>
 
-              {/* ✅ SECCIÓN: TU INSTRUCTOR */}
+              {/* SECCIÓN: TU INSTRUCTOR */}
               <div style={{marginTop: '40px', borderTop:'1px solid #eee', paddingTop:'30px'}}>
                   <h3 style={{fontSize: '1.5rem', marginBottom:'20px'}}>Tu Instructor</h3>
                   
                   <div style={{display:'flex', gap:'20px', alignItems:'flex-start'}}>
-                      {/* Avatar con Foto o Iniciales */}
                       <div style={{
                           width:'100px', height:'100px', 
                           background: curso.instructor?.foto_perfil ? 'transparent' : '#00d4d4', 
@@ -172,7 +282,6 @@ function CourseDetailPublic() {
                   </div>
                   
                   <div style={{padding: '20px'}}>
-                      {/* ✅ PRECIO EN GUARANÍES */}
                       <h2 style={{fontSize:'2rem', margin:'0 0 10px 0', fontWeight:'800'}}>
                           {formatCurrency(curso.precio)}
                       </h2>
@@ -189,7 +298,8 @@ function CourseDetailPublic() {
                       <div style={{marginTop:'20px'}}>
                           <h4 style={{fontSize:'0.9rem', marginBottom:'5px'}}>Este curso incluye:</h4>
                           <ul style={{listStyle:'none', padding:0, fontSize:'0.9rem', color:'#2d2f31'}}>
-                              <li style={{marginBottom:'5px'}}><i className="fas fa-video" style={{width:'20px', textAlign:'center'}}></i> Acceso de por vida</li>
+                              {/* 🟢 CORREGIDO: Eliminado "horas de video" */}
+                              <li style={{marginBottom:'5px'}}><i className="fas fa-clock" style={{width:'20px', textAlign:'center'}}></i> {curso.duracion} de contenido</li>
                               <li style={{marginBottom:'5px'}}><i className="fas fa-mobile-alt" style={{width:'20px', textAlign:'center'}}></i> Acceso en dispositivos móviles</li>
                               <li style={{marginBottom:'5px'}}><i className="fas fa-certificate" style={{width:'20px', textAlign:'center'}}></i> Certificado de finalización</li>
                           </ul>

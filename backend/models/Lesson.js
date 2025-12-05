@@ -24,11 +24,17 @@ const Lesson = sequelize.define('Lesson', {
         type: DataTypes.TEXT,
         allowNull: true,
     },
-    // ✅ NUEVO CAMPO: AQUÍ GUARDAMOS LAS PREGUNTAS
+    // ✅ CAMPO PARA LAS PREGUNTAS
     // Estructura: [{ pregunta: "...", opciones: ["A", "B"], correcta: 0 }]
     contenido_quiz: {
         type: DataTypes.JSON, 
         allowNull: true,
+    },
+    // 🟢 NUEVO CAMPO: DURACIÓN
+    duracion: {
+        type: DataTypes.STRING, // Ej: "10:30" o "5 min"
+        allowNull: true,
+        defaultValue: "00:00"
     },
     orden: {
         type: DataTypes.INTEGER,

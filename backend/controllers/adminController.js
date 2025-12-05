@@ -8,7 +8,7 @@ const getGlobalStats = async (req, res) => {
         const totalCourses = await Course.count();
         const totalEnrollments = await Enrollment.count();
         
-        // Ingresos teóricos (Suma de precios de cursos donde hubo inscripción)
+        // Ingresos teóricos
         const [results] = await sequelize.query(`
             SELECT SUM(c.precio) as total_ingresos
             FROM enrollments e
@@ -23,7 +23,7 @@ const getGlobalStats = async (req, res) => {
     }
 };
 
-// 2. Gestión de Usuarios: Ver todos y cambiar roles
+// 2. Gestión de Usuarios
 const getAllUsers = async (req, res) => {
     try {
         const users = await User.findAll({
@@ -57,7 +57,9 @@ const deleteUser = async (req, res) => {
     }
 };
 
-// 3. Gestión de Cursos: Ver TODOS los cursos (Moderación)
+// 3. Gestión de Cursos (Moderación)
+
+// Ver TODOS los cursos (Catálogo completo)
 const getAllCoursesAdmin = async (req, res) => {
     try {
         const courses = await Course.findAll({
@@ -67,6 +69,48 @@ const getAllCoursesAdmin = async (req, res) => {
         res.json(courses);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener cursos" });
+    }
+};
+
+// 🟢 Ver SOLO los cursos PENDIENTES
+const getPendingCourses = async (req, res) => {
+    try {
+        const courses = await Course.findAll({
+            where: { estado: 'pendiente' },
+            include: [{ model: User, as: 'instructor', attributes: ['nombre_completo', 'email'] }],
+            order: [['updatedAt', 'ASC']]
+        });
+        res.json(courses);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al obtener cursos pendientes" });
+    }
+};
+
+// 🟢 REVISAR CURSO (Aprobar o Rechazar)
+const reviewCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { decision } = req.body; // 'aprobar' o 'rechazar'
+
+        const curso = await Course.findByPk(id);
+        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        if (decision === 'aprobar') {
+            await curso.update({ estado: 'publicado' });
+            return res.json({ message: "Curso publicado exitosamente." });
+        } 
+        
+        if (decision === 'rechazado') {
+            await curso.update({ estado: 'rechazado' });
+            return res.json({ message: "Curso rechazado y devuelto al instructor." });
+        }
+
+        return res.status(400).json({ message: "Decisión no válida." });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al procesar la revisión" });
     }
 };
 
@@ -80,11 +124,11 @@ const deleteCourseAdmin = async (req, res) => {
     }
 };
 
-// 4. Actividad: Ver últimas inscripciones
+// 4. Actividad
 const getRecentEnrollments = async (req, res) => {
     try {
         const enrollments = await Enrollment.findAll({
-            limit: 20, // Solo las últimas 20
+            limit: 20,
             order: [['createdAt', 'DESC']],
             include: [
                 { model: User, attributes: ['nombre_completo', 'email'] },
@@ -100,10 +144,9 @@ const getRecentEnrollments = async (req, res) => {
 
 module.exports = { 
     getGlobalStats, 
-    getAllUsers, 
-    updateUserRole, 
-    deleteUser, // <--- Nuevo
-    getAllCoursesAdmin, // <--- Nuevo
-    deleteCourseAdmin, // <--- Nuevo
-    getRecentEnrollments // <--- Nuevo
+    getAllUsers, updateUserRole, deleteUser, 
+    getAllCoursesAdmin, deleteCourseAdmin,
+    getPendingCourses, // 🟢
+    reviewCourse,      // 🟢 (Antes era approveCourse, ahora maneja ambos)
+    getRecentEnrollments 
 };

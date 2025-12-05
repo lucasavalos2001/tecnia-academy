@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-// Borramos la importación de Navbar porque no la necesitamos aquí
 
 function AdminDashboard() {
   const { user, token } = useAuth();
@@ -13,7 +12,8 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
-  
+  const [pendingCourses, setPendingCourses] = useState([]); // 🟢 Cursos pendientes
+   
   // Estado de Interfaz y Búsqueda
   const [activeTab, setActiveTab] = useState('stats'); 
   const [loading, setLoading] = useState(false);
@@ -21,8 +21,10 @@ function AdminDashboard() {
 
   // --- Cargas de Datos ---
   const loadStats = async () => {
-    const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
-    setStats(res.data);
+    try {
+        const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
+        setStats(res.data);
+    } catch (error) { console.error("Error stats", error); }
   };
   const loadUsers = async () => {
     const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
@@ -36,6 +38,14 @@ function AdminDashboard() {
     const res = await axios.get(`${API_URL}/admin/activity`, { headers: { Authorization: `Bearer ${token}` } });
     setEnrollments(res.data);
   };
+  
+  // 🟢 Cargar cursos pendientes
+  const loadPendingCourses = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/admin/pending`, { headers: { Authorization: `Bearer ${token}` } });
+        setPendingCourses(res.data);
+    } catch (error) { console.error("Error pendientes", error); }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -43,10 +53,11 @@ function AdminDashboard() {
     if (activeTab === 'users') loadUsers();
     if (activeTab === 'courses') loadCourses();
     if (activeTab === 'activity') loadActivity();
+    if (activeTab === 'requests') loadPendingCourses(); 
     setLoading(false);
   }, [activeTab]);
 
-  // --- Acciones ---
+  // --- Acciones Existentes ---
   const handleDeleteUser = async (id) => {
     if(!confirm("¿Estás SEGURO? Esto borrará al usuario y sus datos.")) return;
     await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -65,19 +76,38 @@ function AdminDashboard() {
     loadCourses();
   };
 
-  // --- LÓGICA DE FILTRADO ---
+  // 🟢 Acciones de Revisión (Aprobar/Rechazar)
+  const handleReviewCourse = async (courseId, decision) => {
+      const actionText = decision === 'aprobar' ? 'PUBLICAR' : 'RECHAZAR';
+      if(!confirm(`¿Estás seguro de que quieres ${actionText} este curso?`)) return;
+
+      try {
+          await axios.post(
+              `${API_URL}/admin/review/${courseId}`, 
+              { decision }, 
+              { headers: { Authorization: `Bearer ${token}` } }
+          );
+          alert(`Curso ${decision === 'aprobar' ? 'publicado' : 'rechazado'} con éxito.`);
+          loadPendingCourses(); // Recargar lista
+          loadStats(); // Actualizar contadores
+      } catch (error) {
+          alert("Error al procesar la solicitud.");
+          console.error(error);
+      }
+  };
+
+  // --- LÓGICA DE FILTRADO USUARIOS ---
   const filteredUsers = users.filter(u => {
       const term = searchTerm.toLowerCase();
       return (
           u.nombre_completo.toLowerCase().includes(term) || 
-          u.email.toLowerCase().includes(term) ||           
-          u.id.toString().includes(term) ||                 
-          u.rol.toLowerCase().includes(term)                
+          u.email.toLowerCase().includes(term) ||            
+          u.id.toString().includes(term) ||                  
+          u.rol.toLowerCase().includes(term)                 
       );
   });
 
   return (
-    // Eliminamos <Navbar /> para que el diseño flex funcione correctamente
     <div className="instructor-dashboard"> 
         
         {/* SIDEBAR DE ADMIN */}
@@ -97,6 +127,20 @@ function AdminDashboard() {
             <nav className="dashboard-nav">
                 <ul>
                     <li><button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-tachometer-alt"></i> Dashboard</button></li>
+                    
+                    {/* 🟢 PESTAÑA DE SOLICITUDES */}
+                    <li>
+                        <button onClick={() => setActiveTab('requests')} className={activeTab === 'requests' ? 'active' : ''} style={navBtnStyle}>
+                            <i className="fas fa-bell"></i> Solicitudes 
+                            {/* Badge de contador si hay pendientes */}
+                            {pendingCourses.length > 0 && (
+                                <span style={{background:'#e74c3c', color:'white', borderRadius:'50%', padding:'2px 6px', fontSize:'0.7em', marginLeft:'auto'}}>
+                                    {pendingCourses.length}
+                                </span>
+                            )}
+                        </button>
+                    </li>
+
                     <li><button onClick={() => setActiveTab('users')} className={activeTab === 'users' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-users"></i> Usuarios</button></li>
                     <li><button onClick={() => setActiveTab('courses')} className={activeTab === 'courses' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-book"></i> Moderar Cursos</button></li>
                     <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad</button></li>
@@ -117,14 +161,71 @@ function AdminDashboard() {
                     <header className="content-header"><h2>Resumen Global</h2></header>
                     <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px'}}>
                         <StatCard title="Usuarios" value={stats.totalUsers} icon="fa-users" color="#3498db" />
-                        <StatCard title="Cursos" value={stats.totalCourses} icon="fa-graduation-cap" color="#9b59b6" />
+                        <StatCard title="Cursos Totales" value={stats.totalCourses} icon="fa-graduation-cap" color="#9b59b6" />
                         <StatCard title="Inscripciones" value={stats.totalEnrollments} icon="fa-clipboard-list" color="#f1c40f" />
                         <StatCard title="Ingresos (Est.)" value={`$${stats.totalRevenue}`} icon="fa-dollar-sign" color="#27ae60" />
                     </div>
                 </div>
             )}
 
-            {/* VISTA 2: GESTIÓN DE USUARIOS CON BUSCADOR */}
+            {/* 🟢 VISTA NUEVA: SOLICITUDES PENDIENTES */}
+            {activeTab === 'requests' && (
+                <div>
+                    <header className="content-header"><h2>Solicitudes de Publicación</h2></header>
+                    
+                    {pendingCourses.length === 0 ? (
+                        <div style={{textAlign:'center', padding:'40px', color:'#7f8c8d'}}>
+                            <i className="fas fa-check-circle" style={{fontSize:'3em', color:'#2ecc71', marginBottom:'10px'}}></i>
+                            <p>¡Todo al día! No hay cursos pendientes de revisión.</p>
+                        </div>
+                    ) : (
+                        <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                            {pendingCourses.map(curso => (
+                                <div key={curso.id} style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px', borderLeft:'5px solid #f39c12'}}>
+                                    
+                                    <div style={{flex:'1'}}>
+                                        <h3 style={{margin:'0 0 5px 0', color:'#2c3e50'}}>{curso.titulo}</h3>
+                                        <p style={{margin:0, color:'#7f8c8d', fontSize:'0.9em'}}>
+                                            Instructor: <strong>{curso.instructor?.nombre_completo}</strong> | 
+                                            {/* 🟢 CORREGIDO: Eliminada la palabra "horas" */}
+                                            Duración: <strong>{curso.duracion}</strong> | 
+                                            Precio: {new Intl.NumberFormat('es-PY', { style: 'currency', currency: 'PYG' }).format(curso.precio)}
+                                        </p>
+                                        <p style={{margin:'5px 0 0 0', fontSize:'0.85em', color:'#95a5a6'}}>
+                                            Enviado el: {new Date(curso.updatedAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+
+                                    <div style={{display:'flex', gap:'10px'}}>
+                                        {/* Botón Ver */}
+                                        <Link to={`/curso/${curso.id}`} target="_blank" style={{textDecoration:'none', padding:'8px 15px', border:'1px solid #3498db', borderRadius:'4px', color:'#3498db', fontSize:'0.9em'}}>
+                                            <i className="fas fa-eye"></i> Ver Contenido
+                                        </Link>
+
+                                        {/* Botón Rechazar */}
+                                        <button 
+                                            onClick={() => handleReviewCourse(curso.id, 'rechazado')}
+                                            style={{padding:'8px 15px', background:'#e74c3c', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
+                                        >
+                                            <i className="fas fa-times"></i> Rechazar
+                                        </button>
+
+                                        {/* Botón Aprobar */}
+                                        <button 
+                                            onClick={() => handleReviewCourse(curso.id, 'aprobar')}
+                                            style={{padding:'8px 15px', background:'#27ae60', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
+                                        >
+                                            <i className="fas fa-check"></i> Aprobar
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* VISTA 2: GESTIÓN DE USUARIOS */}
             {activeTab === 'users' && (
                 <div>
                     <header className="content-header" style={{display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'10px'}}>
@@ -190,16 +291,27 @@ function AdminDashboard() {
                 </div>
             )}
 
-            {/* VISTA 3: MODERACIÓN DE CURSOS */}
+            {/* VISTA 3: MODERACIÓN DE CURSOS (Lista completa) */}
             {activeTab === 'courses' && (
                 <div>
-                    <header className="content-header"><h2>Todos los Cursos</h2></header>
+                    <header className="content-header"><h2>Todos los Cursos (Catálogo)</h2></header>
                     <div className="course-list">
                         {courses.map(c => (
                             <div className="course-item" key={c.id}>
                                 <div className="course-info">
                                     <h3>{c.titulo}</h3>
-                                    <p style={{fontSize:'0.9em', color:'#666'}}>Instructor: <strong>{c.instructor?.nombre_completo}</strong> | Precio: ${c.precio}</p>
+                                    <p style={{fontSize:'0.9em', color:'#666'}}>
+                                        Instructor: <strong>{c.instructor?.nombre_completo}</strong> | 
+                                        {/* 🟢 AGREGADO: Ver duración aquí también */}
+                                        Duración: <strong>{c.duracion}</strong> |
+                                        Estado: 
+                                        <strong style={{
+                                            color: c.estado === 'publicado' ? '#27ae60' : '#f39c12',
+                                            marginLeft: '5px'
+                                        }}>
+                                            {c.estado.toUpperCase()}
+                                        </strong>
+                                    </p>
                                 </div>
                                 <div className="course-actions">
                                     <button onClick={() => handleDeleteCourse(c.id)} className="btn-action delete">Eliminar Curso</button>

@@ -12,7 +12,7 @@ const Course = sequelize.define('Course', {
         allowNull: false,
     },
     descripcion_larga: {
-        type: DataTypes.TEXT, // TEXT permite descripciones muy largas
+        type: DataTypes.TEXT, 
         allowNull: false,
     },
     categoria: {
@@ -20,20 +20,31 @@ const Course = sequelize.define('Course', {
         allowNull: false,
     },
     precio: {
-        type: DataTypes.DECIMAL(10, 2), // 10 dígitos, 2 decimales (ej: 120000.00)
+        type: DataTypes.DECIMAL(10, 2), 
         defaultValue: 0.00,
     },
     imagen_url: { 
         type: DataTypes.STRING,
-        allowNull: true, // Puede estar vacío al principio
+        allowNull: true, 
     },
+    
+    // 🟢 CORREGIDO: Cambiado de INTEGER a STRING
+    // Esto es vital para que soporte formatos como "5h 30m" o "10:00"
+    duracion: {
+        type: DataTypes.STRING, 
+        allowNull: true,        // Permitimos null para flexibilidad
+        defaultValue: "0m",     // Valor por defecto en texto
+    },
+
+    // 🟢 Estados para el flujo de aprobación
     estado: {
-        type: DataTypes.ENUM('borrador', 'publicado'),
-        defaultValue: 'publicado',
+        type: DataTypes.ENUM('borrador', 'pendiente', 'publicado', 'rechazado'),
+        defaultValue: 'borrador', 
     }
-    // Nota: El campo 'instructorId' se creará automáticamente en el siguiente paso
+    
+    // Nota: 'instructorId' se crea automáticamente por la relación en index.js
 }, {
-    tableName: 'courses', // Así se llamará la tabla en Postgres
+    tableName: 'courses', 
 });
 
 module.exports = Course;

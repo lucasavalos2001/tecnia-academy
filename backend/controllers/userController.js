@@ -30,12 +30,18 @@ const getUserProfile = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al obtener perfil" }); }
 };
 
+// 🟢 FUNCIÓN CORREGIDA: Ahora incluye 'duracion'
 const getUserCertificates = async (req, res) => {
     try {
         const userId = req.usuario.id;
         const certificados = await Enrollment.findAll({
             where: { userId: userId, progreso_porcentaje: 100 },
-            include: [{ model: Course, as: 'curso', attributes: ['id', 'titulo', 'imagen_url', 'updatedAt'] }],
+            include: [{ 
+                model: Course, 
+                as: 'curso', 
+                // Aquí agregamos 'duracion' para que llegue al certificado
+                attributes: ['id', 'titulo', 'imagen_url', 'updatedAt', 'duracion'] 
+            }],
             order: [['updatedAt', 'DESC']]
         });
         res.json({ certificados });

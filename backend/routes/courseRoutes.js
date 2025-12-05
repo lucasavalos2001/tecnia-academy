@@ -1,26 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer'); // Necesario para recibir archivos
+const multer = require('multer'); 
 const { 
     createCourse, getInstructorCourses, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
     getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getInstructorStats
+    getInstructorStats,
+    getPendingCourses, reviewCourse // Funciones de Admin
 } = require('../controllers/courseController');
-const { verifyToken } = require('../middleware/authMiddleware');
 
-// --- CONFIGURACIÓN DE MULTER ---
-// Guardamos la imagen en memoria RAM temporalmente antes de enviarla a Bunny
+// Importamos middleware
+const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ==========================================
-//  RUTAS PÚBLICAS
+//  1. RUTAS PÚBLICAS
 // ==========================================
 router.get('/', getAllCourses);
 router.get('/:id/detalle', getCourseDetail);
 
 // ==========================================
-//  RUTAS PROTEGIDAS
+//  2. RUTAS DE ADMINISTRADOR (PRIORIDAD ALTA) 🟢
+// ==========================================
+// Las ponemos aquí ARRIBA para evitar conflictos con rutas dinámicas
+router.get('/admin/pending', verifyToken, isAdmin, getPendingCourses);
+router.post('/admin/review/:id', verifyToken, isAdmin, reviewCourse);
+
+// ==========================================
+//  3. RUTAS PROTEGIDAS (ALUMNOS/INSTRUCTORES)
 // ==========================================
 
 // --- Estudiante ---
@@ -29,9 +37,8 @@ router.post('/:courseId/inscribirse', verifyToken, enrollInCourse);
 router.post('/:courseId/lecciones/:lessonId/completar', verifyToken, markLessonAsComplete);
 
 // --- Instructor ---
-// ✅ AQUÍ ESTÁ EL CAMBIO: Agregamos 'upload.single' para recibir la imagen
 router.post('/', verifyToken, upload.single('imagen'), createCourse);
-router.put('/:id', verifyToken, upload.single('imagen'), updateCourse); // También para editar
+router.put('/:id', verifyToken, upload.single('imagen'), updateCourse); 
 
 router.get('/instructor', verifyToken, getInstructorCourses);
 router.get('/instructor/stats', verifyToken, getInstructorStats);

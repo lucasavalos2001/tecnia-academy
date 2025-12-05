@@ -1,6 +1,6 @@
 const { Op } = require('sequelize'); 
 const { Course, Module, Lesson, User, Enrollment } = require('../models');
-const axios = require('axios'); // Necesario para subir imágenes a Bunny
+const axios = require('axios');
 
 // --- FUNCIÓN AUXILIAR: SUBIR IMAGEN A BUNNY STORAGE ---
 const uploadToBunny = async (file) => {
@@ -29,13 +29,72 @@ const uploadToBunny = async (file) => {
 };
 
 // ==========================================
+// 🟢 FUNCIÓN AUXILIAR: RECALCULAR DURACIÓN TOTAL
+// ==========================================
+const recalculateCourseDuration = async (courseId) => {
+    try {
+        // 1. Obtener todas las lecciones del curso
+        const curso = await Course.findByPk(courseId, {
+            include: [{
+                model: Module,
+                as: 'modulos',
+                include: [{ model: Lesson, as: 'lecciones' }]
+            }]
+        });
+
+        if (!curso) return;
+
+        let totalSeconds = 0;
+
+        // 2. Recorrer módulos y lecciones para sumar segundos
+        curso.modulos.forEach(mod => {
+            if (mod.lecciones) {
+                mod.lecciones.forEach(lec => {
+                    // Solo sumamos si tiene una duración válida con formato "MM:SS" o "HH:MM:SS"
+                    if (lec.duracion && lec.duracion.includes(':')) {
+                        const parts = lec.duracion.split(':').map(Number);
+                        
+                        if (parts.length === 3) { // HH:MM:SS
+                            totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+                        } else if (parts.length === 2) { // MM:SS
+                            totalSeconds += parts[0] * 60 + parts[1];
+                        }
+                    }
+                });
+            }
+        });
+
+        // 3. Convertir a formato legible (Ej: "10h 30m" o "45m")
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+        let durationString = "";
+        if (hours > 0) {
+            durationString = `${hours}h ${minutes}m`;
+        } else {
+            durationString = `${minutes}m`;
+        }
+        
+        // Si no hay videos aún, no sobrescribimos con "0m" para respetar la estimación manual del instructor,
+        // a menos que totalSeconds sea mayor a 0.
+        if (totalSeconds > 0) {
+            await curso.update({ duracion: durationString });
+            console.log(`Duración del curso ${curso.id} recalculada a: ${durationString}`);
+        }
+
+    } catch (error) {
+        console.error("Error recalculando duración:", error);
+    }
+};
+
+// ==========================================
 //  ÁREA DEL INSTRUCTOR (GESTIÓN DE CURSOS)
 // ==========================================
 
 const createCourse = async (req, res) => {
     try {
         const instructorId = req.usuario.id;
-        const { titulo, descripcion_larga, categoria, precio } = req.body;
+        const { titulo, descripcion_larga, categoria, precio, duracion } = req.body;
         let imagen_url = null;
 
         if (req.file) {
@@ -49,11 +108,13 @@ const createCourse = async (req, res) => {
             descripcion_larga, 
             categoria, 
             precio, 
+            duracion: duracion || "0h", // Aquí guarda la estimación inicial
+            estado: 'borrador', 
             instructorId, 
             imagen_url
         });
 
-        res.status(201).json({ message: 'Curso creado con éxito', curso: nuevoCurso });
+        res.status(201).json({ message: 'Curso creado (Borrador)', curso: nuevoCurso });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Error al crear el curso" });
@@ -64,7 +125,7 @@ const updateCourse = async (req, res) => {
     try {
         const { id } = req.params;
         const instructorId = req.usuario.id;
-        const { titulo, descripcion_larga, categoria, precio } = req.body;
+        const { titulo, descripcion_larga, categoria, precio, duracion, estado } = req.body;
 
         const curso = await Course.findOne({ where: { id, instructorId } });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
@@ -74,13 +135,22 @@ const updateCourse = async (req, res) => {
             nueva_imagen_url = await uploadToBunny(req.file);
         }
 
-        await curso.update({ 
+        const updateData = {
             titulo, 
             descripcion_larga, 
             categoria, 
-            precio, 
+            precio,
+            duracion, // Permite corrección manual si el instructor quiere
             imagen_url: nueva_imagen_url 
-        });
+        };
+
+        if (estado) {
+            if (estado === 'pendiente' || estado === 'borrador') {
+                updateData.estado = estado;
+            }
+        }
+
+        await curso.update(updateData);
 
         res.json({ message: "Curso actualizado", curso });
     } catch (error) {
@@ -177,7 +247,13 @@ const addModule = async (req, res) => {
 const deleteModule = async (req, res) => {
     try {
         const { id } = req.params;
-        await Module.destroy({ where: { id } });
+        const modulo = await Module.findByPk(id);
+        if (modulo) {
+            const courseId = modulo.courseId;
+            await Module.destroy({ where: { id } });
+            // Recalcular horas tras borrar módulo
+            await recalculateCourseDuration(courseId);
+        }
         res.json({ message: "Módulo eliminado" });
     } catch (error) { res.status(500).json({ message: "Error al eliminar módulo" }); }
 };
@@ -191,19 +267,27 @@ const updateModule = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al actualizar módulo" }); }
 };
 
-// ✅ [ACTUALIZADO] Función addLesson con soporte para Quizzes
+// 🟢 FUNCIÓN ACTUALIZADA: RECALCULA HORAS
 const addLesson = async (req, res) => {
     try {
         const { moduleId } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz } = req.body;
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion } = req.body;
         
         const nuevaLeccion = await Lesson.create({ 
             titulo, 
             url_video, 
             contenido_texto, 
-            contenido_quiz, // Guardamos el quiz
+            contenido_quiz, 
+            duracion, 
             moduleId 
         });
+
+        // RECALCULAR CURSO
+        const modulo = await Module.findByPk(moduleId);
+        if (modulo) {
+            await recalculateCourseDuration(modulo.courseId);
+        }
+
         res.status(201).json(nuevaLeccion);
     } catch (error) { 
         console.error(error);
@@ -211,27 +295,46 @@ const addLesson = async (req, res) => {
     }
 };
 
+// 🟢 FUNCIÓN ACTUALIZADA: RECALCULA HORAS
 const deleteLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        await Lesson.destroy({ where: { id } });
-        res.json({ message: "Lección eliminada" });
+        const leccion = await Lesson.findByPk(id, { include: [{ model: Module, as: 'modulo' }] });
+        
+        if (leccion) {
+            const courseId = leccion.modulo.courseId;
+            await Lesson.destroy({ where: { id } });
+            
+            // RECALCULAR CURSO
+            await recalculateCourseDuration(courseId);
+            return res.json({ message: "Lección eliminada" });
+        }
+        res.status(404).json({ message: "Lección no encontrada" });
     } catch (error) { res.status(500).json({ message: "Error al eliminar lección" }); }
 };
 
-// ✅ [ACTUALIZADO] Función updateLesson con soporte para Quizzes
+// 🟢 FUNCIÓN ACTUALIZADA: RECALCULA HORAS
 const updateLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz } = req.body;
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion } = req.body;
         
-        await Lesson.update({ 
+        const leccion = await Lesson.findByPk(id, { include: [{ model: Module, as: 'modulo' }] });
+        if (!leccion) return res.status(404).json({ message: "Lección no encontrada" });
+
+        await leccion.update({ 
             titulo, 
             url_video, 
             contenido_texto, 
-            contenido_quiz // Actualizamos el quiz
-        }, { where: { id } });
+            contenido_quiz,
+            duracion 
+        });
         
+        // RECALCULAR CURSO
+        if (leccion.modulo) {
+            await recalculateCourseDuration(leccion.modulo.courseId);
+        }
+
         res.json({ message: "Lección actualizada" });
     } catch (error) { 
         console.error(error);
@@ -343,8 +446,55 @@ const markLessonAsComplete = async (req, res) => {
     }
 };
 
+// ==========================================
+//  ÁREA DEL ADMINISTRADOR (APROBACIÓN)
+// ==========================================
+
+const getPendingCourses = async (req, res) => {
+    try {
+        const cursosPendientes = await Course.findAll({
+            where: { estado: 'pendiente' },
+            include: [{ model: User, as: 'instructor', attributes: ['nombre_completo', 'email'] }],
+            order: [['updatedAt', 'ASC']] 
+        });
+        res.json(cursosPendientes);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al obtener pendientes" });
+    }
+};
+
+const reviewCourse = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { decision } = req.body; 
+
+        const curso = await Course.findByPk(id);
+        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        if (decision === 'aprobar') {
+            curso.estado = 'publicado';
+            await curso.save();
+            return res.json({ message: `Curso '${curso.titulo}' publicado exitosamente.` });
+        } 
+        
+        if (decision === 'rechazado') {
+            curso.estado = 'rechazado';
+            await curso.save();
+            return res.json({ message: "Curso rechazado. Se devolvió al instructor." });
+        }
+
+        return res.status(400).json({ message: "Decisión inválida" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al procesar revisión" });
+    }
+};
+
 module.exports = { 
     createCourse, getInstructorCourses, getInstructorStats, updateCourse, deleteCourse, 
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
-    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete
+    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete,
+    getPendingCourses, reviewCourse
 };

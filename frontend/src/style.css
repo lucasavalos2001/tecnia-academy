@@ -1,5 +1,5 @@
 /* ---- IMPORTACIONES EXTERNAS ---- */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Great+Vibes&display=swap');
 
 /* ---- ESTILOS GLOBALES Y VARIABLES ---- */
 :root {
@@ -434,24 +434,184 @@ body {
 .tab-body { padding: 20px 0; min-height: 300px; }
 .toggle-sidebar-btn { position: absolute; right: 0; top: 20px; background: #1c1d1f; color: white; border: 1px solid #fff; padding: 10px; cursor: pointer; z-index: 10; border-right: none; border-radius: 5px 0 0 5px; }
 
-/* ---- VISTA DE CERTIFICADO ---- */
-.certificate-viewer-container { background-color: #525659; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 40px; }
-.certificate-document { background-color: #fff; width: 800px; height: 600px; padding: 50px; border: 10px double var(--color-primario); box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; position: relative; display: flex; flex-direction: column; justify-content: space-between; }
-.certificate-header .logo-cert { font-size: 2rem; font-weight: bold; color: var(--color-primario); }
-.certificate-body h1 { font-size: 3rem; margin: 20px 0; font-family: 'Times New Roman', serif; border-bottom: 2px solid var(--color-secundario); display: inline-block; padding-bottom: 10px; }
-.certificate-body .subtitle { font-size: 1.2rem; color: #666; text-transform: uppercase; letter-spacing: 2px; }
-.certificate-body .course-name { font-size: 2.5rem; color: var(--color-primario); margin: 10px 0; }
-.certificate-body .date { font-size: 1.1rem; color: #666; font-style: italic; }
-.certificate-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
-.signature { text-align: center; border-top: 1px solid #333; padding-top: 10px; width: 200px; }
-.signature-font { font-family: 'cursive'; font-size: 1.5rem; margin-bottom: 5px; }
-.verify-id { font-size: 0.8rem; color: #999; }
-.btn-print { position: fixed; bottom: 30px; right: 30px; background-color: var(--color-secundario); color: var(--color-primario); border: none; padding: 15px 30px; border-radius: 50px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: transform 0.2s; }
+
+/* =====================================================
+   🎓 VISTA DE CERTIFICADO (DISEÑO PROFESIONAL CORREGIDO)
+   ===================================================== */
+
+/* Contenedor Web (Para ver antes de imprimir) */
+.certificate-viewer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #e9ebee; /* Fondo gris suave */
+  padding: 40px 20px;
+  min-height: 100vh;
+}
+
+/* El Documento A4 Horizontal */
+.certificate-document {
+  width: 297mm; /* Ancho A4 Horizontal */
+  height: 210mm; /* Alto A4 Horizontal */
+  background: white;
+  padding: 40px 60px;
+  position: relative;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  border: 15px double #0b3d91; /* Borde Doble Elegante */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: center;
+  box-sizing: border-box;
+  margin-bottom: 30px;
+}
+
+/* Cabecera del Certificado */
+.certificate-header .logo-cert {
+  font-size: 2.2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Cuerpo del Certificado */
+.certificate-body .subtitle {
+  font-size: 1rem;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin: 15px 0 5px 0;
+}
+
+.certificate-body .student-name {
+  font-family: 'Times New Roman', serif;
+  font-size: 3.2rem;
+  color: #222;
+  margin: 10px 0 20px 0;
+  font-weight: normal;
+  border-bottom: 1px solid #ddd;
+  display: inline-block;
+  padding: 0 20px 10px 20px;
+}
+
+.certificate-body .course-name {
+  font-size: 2.5rem;
+  color: #0b3d91; /* Azul Tecnia */
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 10px 0;
+  line-height: 1.2;
+}
+
+.certificate-body .course-hours {
+  font-size: 1.3rem;
+  color: #444;
+  margin: 5px 0 20px 0;
+}
+
+.certificate-body .date {
+  font-size: 1.1rem;
+  color: #666;
+  font-style: italic;
+  margin-top: 20px;
+}
+
+/* Pie del Certificado */
+.certificate-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 20px;
+}
+
+.verify-id {
+  font-size: 0.85rem;
+  color: #999;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* Bloque de Firma (Nombre y Cargo de Director) */
+.signature-block {
+  text-align: center;
+  min-width: 280px;
+}
+
+.signature-line {
+  border-top: 2px solid #333;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.signatory-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #000;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.signatory-title {
+  font-size: 1rem;
+  color: #0b3d91;
+  font-weight: 600;
+}
+
+/* Botón Descargar */
+.btn-print {
+  padding: 15px 35px;
+  background-color: #00d4d4;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4);
+  transition: transform 0.2s;
+}
 .btn-print:hover { transform: scale(1.05); }
+
+/* 🖨️ ESTILOS DE IMPRESIÓN (PDF Perfecto) */
 @media print {
-    .certificate-viewer-container { background-color: white; padding: 0; }
-    .certificate-document { box-shadow: none; border: 5px solid var(--color-primario); width: 100%; height: 100vh; }
-    .btn-print, .navbar, .footer { display: none !important; }
+  @page {
+    size: landscape; /* Fuerza la hoja horizontal */
+    margin: 0;       /* Quita márgenes blancos */
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ocultar elementos de navegación */
+  .no-print, 
+  .btn-print, 
+  .navbar, 
+  .footer {
+    display: none !important;
+  }
+
+  .certificate-viewer-container {
+    padding: 0;
+    margin: 0;
+    background: white;
+    min-height: auto;
+    display: block;
+  }
+
+  .certificate-document {
+    width: 100%;
+    height: 100vh; /* Ocupa toda la hoja */
+    margin: 0;
+    box-shadow: none;
+    border: 15px double #0b3d91 !important; /* Fuerza impresión del borde */
+    page-break-after: avoid;
+    padding: 30px 50px;
+  }
 }
 
 /* ---- CONFIGURACIÓN DE PERFIL (ESTILO PRO) ---- */
@@ -608,4 +768,3 @@ body {
     /* Tablas con Scroll */
     table { display: block; overflow-x: auto; white-space: nowrap; }
 }
-
