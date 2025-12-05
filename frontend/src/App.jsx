@@ -5,7 +5,7 @@ import './style.css';
 
 // Importar componentes de página existing
 import Home from './pages/Home';
-import Login from './pages/Login';
+import Login from './pages/login';
 import Register from './pages/Register';
 import CourseLibrary from './pages/CourseLibrary';
 import MyCourses from './pages/MyCourses';

@@ -16,6 +16,9 @@ function CourseDetailPublic() {
   const [curso, setCurso] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 🟢 ESTADO PARA EL MODAL DE VIDEO (SOLUCIÓN BUNNY CDN)
+  const [videoModal, setVideoModal] = useState(null); // Guarda la URL del video a ver
+
   // Verificamos si es admin
   const isAdmin = user?.rol === 'admin';
 
@@ -80,6 +83,39 @@ function CourseDetailPublic() {
     <>
       <Navbar />
 
+      {/* 🟢 MODAL REPRODUCTOR DE VIDEO (NUEVO) */}
+      {videoModal && (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)', zIndex: 9999,
+            display: 'flex', justifyContent: 'center', alignItems: 'center'
+        }}>
+            <div style={{width: '90%', maxWidth: '800px', position: 'relative'}}>
+                {/* Botón cerrar */}
+                <button 
+                    onClick={() => setVideoModal(null)}
+                    style={{
+                        position: 'absolute', top: '-40px', right: 0,
+                        background: 'transparent', border: 'none', color: 'white',
+                        fontSize: '2rem', cursor: 'pointer'
+                    }}
+                >
+                    <i className="fas fa-times"></i>
+                </button>
+
+                {/* Reproductor Iframe (Bypassea la seguridad de Bunny al estar en el dominio correcto) */}
+                <div style={{position: 'relative', paddingTop: '56.25%' /* Aspect Ratio 16:9 */}}>
+                    <iframe 
+                        src={videoModal} 
+                        style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none', borderRadius: '8px'}}
+                        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" 
+                        allowFullScreen={true}
+                    ></iframe>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* 🟢 PANEL DE AUDITORÍA (SOLO ADMIN) 🟢 */}
       {isAdmin && (
           <div style={{backgroundColor: '#2c3e50', color: 'white', padding: '15px 0', borderBottom: '4px solid #f1c40f'}}>
@@ -107,7 +143,6 @@ function CourseDetailPublic() {
 
                       <div style={{borderLeft:'1px solid #7f8c8d', paddingLeft:'20px'}}>
                           <p style={{margin:0, fontSize:'0.85rem', color:'#bdc3c7'}}>Duración Declarada:</p>
-                          {/* 🟢 CORREGIDO: Eliminado "Horas" */}
                           <strong>{curso.duracion}</strong>
                       </div>
                   </div>
@@ -160,7 +195,6 @@ function CourseDetailPublic() {
               {/* Temario */}
               <div>
                   <h3>Contenido del curso</h3>
-                  {/* 🟢 CORREGIDO: Eliminado "h duración total" */}
                   <p style={{fontSize:'0.9rem', color:'#666'}}>{curso.modulos?.length} secciones • {totalLecciones} clases • {curso.duracion} duración total</p>
                   
                   <div style={{border: '1px solid #d1d7dc', marginTop:'10px'}}>
@@ -197,23 +231,23 @@ function CourseDetailPublic() {
                                                       {lec.duracion || "00:00"}
                                                   </span>
 
+                                                  {/* 🟢 BOTÓN DE VER MODIFICADO PARA ADMIN */}
                                                   {isAdmin && lec.url_video && (
-                                                      <a 
-                                                          href={lec.url_video} 
-                                                          target="_blank" 
-                                                          rel="noopener noreferrer"
+                                                      <button 
+                                                          onClick={() => setVideoModal(lec.url_video)}
                                                           style={{
                                                               fontSize:'0.75rem', 
                                                               color:'white', 
                                                               background:'#3498db', 
                                                               padding:'2px 8px', 
                                                               borderRadius:'4px', 
-                                                              textDecoration:'none',
+                                                              border:'none',
+                                                              cursor: 'pointer',
                                                               fontWeight:'bold'
                                                           }}
                                                       >
                                                           VER
-                                                      </a>
+                                                      </button>
                                                   )}
                                               </div>
                                           </li>
@@ -298,7 +332,6 @@ function CourseDetailPublic() {
                       <div style={{marginTop:'20px'}}>
                           <h4 style={{fontSize:'0.9rem', marginBottom:'5px'}}>Este curso incluye:</h4>
                           <ul style={{listStyle:'none', padding:0, fontSize:'0.9rem', color:'#2d2f31'}}>
-                              {/* 🟢 CORREGIDO: Eliminado "horas de video" */}
                               <li style={{marginBottom:'5px'}}><i className="fas fa-clock" style={{width:'20px', textAlign:'center'}}></i> {curso.duracion} de contenido</li>
                               <li style={{marginBottom:'5px'}}><i className="fas fa-mobile-alt" style={{width:'20px', textAlign:'center'}}></i> Acceso en dispositivos móviles</li>
                               <li style={{marginBottom:'5px'}}><i className="fas fa-certificate" style={{width:'20px', textAlign:'center'}}></i> Certificado de finalización</li>
