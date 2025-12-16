@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import * as tus from 'tus-js-client'; // 🟢 1. IMPORTAMOS TUS
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -21,7 +22,7 @@ function ManageContent() {
   // --- ESTADOS LECCIÓN (Video + Desc) ---
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonDescription, setLessonDescription] = useState('');
-  // 🟢 1. ESTADO PARA DURACIÓN (Se llena solo o manual)
+  // 🟢 ESTADO PARA DURACIÓN
   const [lessonDuration, setLessonDuration] = useState(''); 
   
   const [videoFile, setVideoFile] = useState(null);
@@ -38,7 +39,10 @@ function ManageContent() {
 
   // Edición y Control
   const [editingLessonId, setEditingLessonId] = useState(null);
-  const abortControllerRef = useRef(null);
+  
+  // 🟢 REFERENCIA PARA SUBIDA TUS
+  const uploadRef = useRef(null); 
+  const abortControllerRef = useRef(null); // Mantenemos por compatibilidad
 
   // ==========================================
   //  🟢 FUNCIONES PARA CALCULAR DURACIÓN AUTO
@@ -161,18 +165,17 @@ function ManageContent() {
   // --- FUNCIONES VIDEO ---
   const removeSelectedFile = () => {
       setVideoFile(null);
-      // Si quitas el video, podrías querer limpiar la duración o dejarla, depende de tu gusto.
-      // setLessonDuration(''); // Descomenta si quieres que se borre la duración al quitar el video.
       const fileInput = document.getElementById('videoInput');
       if(fileInput) fileInput.value = "";
   };
 
   const cancelUpload = () => {
-      if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
+      // 🟢 Cancelación para TUS
+      if (uploadRef.current) {
+          uploadRef.current.abort();
           setUploading(false);
           setUploadProgress(0);
-          alert("Cancelado.");
+          alert("Subida cancelada.");
       }
   };
 
@@ -209,7 +212,7 @@ function ManageContent() {
     setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
   };
 
-  // --- GUARDAR TODO (VIDEO O QUIZ) ---
+  // --- 🟢 GUARDAR TODO (IMPLEMENTACIÓN TUS) ---
   const handleSaveLesson = async (e) => {
     e.preventDefault();
     
@@ -225,29 +228,58 @@ function ManageContent() {
 
     setUploading(true);
     setUploadProgress(0);
-    abortControllerRef.current = new AbortController();
 
     try {
         let finalEmbedUrl = null;
 
         // 1. Subir Video
         if (videoFile) {
+            // Paso A: Pedir firma al backend
             const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
                 { title: lessonTitle }, 
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-            const { uploadUrl, authHeader, expiration, embedUrl } = signRes.data;
+            
+            // Obtenemos los datos necesarios para TUS
+            const { authHeader, expiration, videoId, embedUrl } = signRes.data;
 
-            await axios.put(uploadUrl, videoFile, {
-                headers: {
-                    'AuthorizationSignature': authHeader,
-                    'AuthorizationExpire': expiration,
-                    'Content-Type': 'application/octet-stream',
-                    'AccessKey': 'f1d8a002-fe51-475d-9853052bac34-5727-429f'
-                },
-                onUploadProgress: (p) => setUploadProgress(Math.round((p.loaded * 100) / p.total)),
-                signal: abortControllerRef.current.signal
+            // 🟢 Paso B: Subir a Bunny usando TUS (Protocolo Seguro)
+            await new Promise((resolve, reject) => {
+                // Configuramos la subida TUS
+                const upload = new tus.Upload(videoFile, {
+                    endpoint: 'https://video.bunnycdn.com/tusupload',
+                    retryDelays: [0, 3000, 5000, 10000, 20000],
+                    metadata: {
+                        filetype: videoFile.type,
+                        title: lessonTitle,
+                    },
+                    headers: {
+                        // Aquí van las credenciales SEGURAS (Firmas, no AccessKey)
+                        'AuthorizationSignature': authHeader, 
+                        'AuthorizationExpire': expiration,
+                        'VideoId': videoId,
+                        'LibraryId': '550746', // ⚠️ Asegúrate que este sea tu ID real de Bunny
+                    },
+                    onError: (error) => {
+                        console.error("Error en TUS:", error);
+                        reject(error);
+                    },
+                    onProgress: (bytesUploaded, bytesTotal) => {
+                        const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(0);
+                        setUploadProgress(percentage);
+                    },
+                    onSuccess: () => {
+                        resolve();
+                    },
+                });
+
+                // Guardamos referencia para poder cancelar
+                uploadRef.current = upload;
+                
+                // Iniciamos la subida
+                upload.start();
             });
+            
             finalEmbedUrl = embedUrl;
         }
 
@@ -263,7 +295,7 @@ function ManageContent() {
             leccionData.url_video = finalEmbedUrl;
         }
 
-        // 3. Guardar en BD
+        // 3. Guardar en BD (Tu servidor)
         if (editingLessonId) {
             await axios.put(`${API_URL}/cursos/lessons/${editingLessonId}`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
             alert("Lección actualizada correctamente.");
@@ -278,7 +310,7 @@ function ManageContent() {
     } catch (error) {
         if (!axios.isCancel(error)) {
             console.error("Error:", error);
-            alert("Error al guardar la lección. Revisa la consola.");
+            alert("Error al guardar la lección: " + (error.message || "Revisa la consola"));
         }
     } finally {
         setUploading(false);
@@ -426,23 +458,23 @@ function ManageContent() {
                                 
                                 {quizQuestions.length > 0 ? (
                                     <div style={quizStyles.questionList}>
-                                        {quizQuestions.map((q, idx) => (
-                                            <div key={idx} style={quizStyles.questionItem}>
-                                                <div style={{flex: 1}}>
-                                                    <div style={{fontWeight:'bold', marginBottom:'5px'}}>{idx + 1}. {q.pregunta}</div>
-                                                    <div style={quizStyles.optionsPreview}>
-                                                        {q.opciones.map((op, i) => (
-                                                            <span key={i} style={{...quizStyles.optionBadge, background: i === q.correcta ? '#d4edda' : '#f1f3f5', color: i === q.correcta ? '#155724' : '#495057', border: i === q.correcta ? '1px solid #c3e6cb' : '1px solid #e9ecef'}}>
-                                                                {op} {i === q.correcta && <i className="fas fa-check-circle" style={{marginLeft:'4px'}}></i>}
-                                                            </span>
-                                                        ))}
+                                            {quizQuestions.map((q, idx) => (
+                                                <div key={idx} style={quizStyles.questionItem}>
+                                                    <div style={{flex: 1}}>
+                                                        <div style={{fontWeight:'bold', marginBottom:'5px'}}>{idx + 1}. {q.pregunta}</div>
+                                                        <div style={quizStyles.optionsPreview}>
+                                                            {q.opciones.map((op, i) => (
+                                                                <span key={i} style={{...quizStyles.optionBadge, background: i === q.correcta ? '#d4edda' : '#f1f3f5', color: i === q.correcta ? '#155724' : '#495057', border: i === q.correcta ? '1px solid #c3e6cb' : '1px solid #e9ecef'}}>
+                                                                    {op} {i === q.correcta && <i className="fas fa-check-circle" style={{marginLeft:'4px'}}></i>}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     </div>
+                                                    <button type="button" onClick={() => removeQuestion(idx)} style={quizStyles.deleteBtn} title="Eliminar esta pregunta">
+                                                        <i className="fas fa-trash-alt"></i>
+                                                    </button>
                                                 </div>
-                                                <button type="button" onClick={() => removeQuestion(idx)} style={quizStyles.deleteBtn} title="Eliminar esta pregunta">
-                                                    <i className="fas fa-trash-alt"></i>
-                                                </button>
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>
                                 ) : (
                                     <p style={{color:'#777', fontStyle:'italic', marginBottom:'20px'}}>Aún no has agregado preguntas.</p>

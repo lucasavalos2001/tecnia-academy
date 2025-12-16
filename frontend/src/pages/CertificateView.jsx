@@ -33,7 +33,7 @@ function CertificateView() {
             
             <div className="certificate-header">
                 <div className="logo-cert">
-                    <span style={{color:'#0b3d91'}}>Tecnia</span>
+                    <span style={{color:'#0b3d91'}}>Tecnia </span>
                     <span style={{color:'#00d4d4'}}>Academy</span>
                 </div>
             </div>

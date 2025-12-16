@@ -23,7 +23,7 @@ function Login() {
             <div className="auth-overlay">
     {/* Logo con colores de marca */}
     <h1>
-        <span className="logo-tecnia">Tecnia</span>
+        <span className="logo-tecnia">Tecnia </span>
         <span className="logo-academy">Academy</span>
     </h1>
     <p>La plataforma líder para impulsar tu carrera técnica. Aprende de expertos y certifícate hoy mismo.</p>

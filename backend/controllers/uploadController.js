@@ -5,15 +5,19 @@ const prepareVideoUpload = async (req, res) => {
     try {
         const { title } = req.body;
         
-        // Forzamos conversión a String para evitar errores de firma
-        const LIBRARY_ID = String(process.env.BUNNY_LIBRARY_ID);
-        const API_KEY = String(process.env.BUNNY_API_KEY);
+        // 1. Limpieza ESTRICTA de credenciales (Vital)
+        // .trim() elimina espacios invisibles que suelen colarse en el .env
+        // String() asegura que se traten como texto
+        const LIBRARY_ID = String(process.env.BUNNY_LIBRARY_ID || "").trim();
+        const API_KEY = String(process.env.BUNNY_API_KEY || "").trim();
 
         if (!LIBRARY_ID || !API_KEY) {
-            return res.status(500).json({ message: "Falta configuración de Bunny.net en el servidor" });
+            console.error("❌ Faltan claves en .env");
+            return res.status(500).json({ message: "Error de configuración de Bunny.net" });
         }
 
-        // 1. Crear el video en Bunny (Paso 1: Create Video Object)
+        // 2. Crear el video en Bunny (Paso 1)
+        // Aquí usamos la API Key porque hablamos de servidor a servidor
         const createRes = await axios.post(
             `https://video.bunnycdn.com/library/${LIBRARY_ID}/videos`,
             { title: title },
@@ -27,22 +31,21 @@ const prepareVideoUpload = async (req, res) => {
 
         const videoId = createRes.data.guid;
 
-        // 2. Generar la Firma SHA256 para autorización (Direct Upload)
-        // Fórmula oficial: LibraryID + APIKey + Expiration + VideoID
-        const expirationTime = Math.floor(Date.now() / 1000) + 3600; // Valido por 1 hora
+        // 3. Generar la Firma SHA256 (Paso 2)
+        // Damos 24 horas (86400s) de validez para evitar problemas de hora
+        const expirationTime = Math.floor(Date.now() / 1000) + 86400; 
+        
+        // Fórmula estricta: LibraryID + APIKey + Expiration + VideoID
         const signatureData = LIBRARY_ID + API_KEY + expirationTime + videoId;
         const signature = crypto.createHash('sha256').update(signatureData).digest('hex');
 
-        // 3. Devolver datos al frontend
+        // 4. Enviar datos al Frontend (SIN LA CLAVE MAESTRA)
         res.json({
             success: true,
             videoId: videoId,
-            // URL directa para subir el archivo (PUT)
             uploadUrl: `https://video.bunnycdn.com/library/${LIBRARY_ID}/videos/${videoId}`,
-            // Cabeceras de seguridad que el frontend debe enviar
             authHeader: signature,
             expiration: expirationTime,
-            // URL para guardar en la base de datos (Reproductor)
             embedUrl: `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${videoId}` 
         });
 
