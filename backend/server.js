@@ -12,6 +12,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const paymentRoutes = require('./routes/paymentRoutes'); // 💰 NUEVO: Importamos rutas de pago
 
 const app = express();
 
@@ -19,20 +20,20 @@ const app = express();
 app.use(helmet());
 
 // 🛡️ 2. SEGURIDAD: RATE LIMITING (Evita ataques de fuerza bruta)
-// Permite máximo 100 peticiones por 15 minutos por IP
+// Permite máximo 300 peticiones por 15 minutos por IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 300, // Límite generoso para usuarios normales
+  max: 300, 
   message: "Demasiadas peticiones desde esta IP, por favor intenta de nuevo en 15 minutos."
 });
 app.use(limiter);
 
 // 🛡️ 3. SEGURIDAD: CORS (Solo permite a tu dominio y localhost)
-// Esto evita que otros sitios web intenten usar tu API
 const whitelist = ['https://tecniaacademy.com', 'https://www.tecniaacademy.com', 'http://localhost:5173'];
 const corsOptions = {
   origin: function (origin, callback) {
-    if (whitelist.indexOf(origin) !== -1 || !origin) { // !origin permite Postman/Server-to-Server
+    // !origin permite Postman y Webhooks de Pagopar (Servidor a Servidor)
+    if (whitelist.indexOf(origin) !== -1 || !origin) { 
       callback(null, true);
     } else {
       callback(new Error('Bloqueado por CORS'));
@@ -55,6 +56,7 @@ app.use('/api/cursos', courseRoutes);
 app.use('/api/usuario', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/pagos', paymentRoutes); // 💰 NUEVO: Registramos la ruta de pagos
 
 app.get('/', (req, res) => {
     res.send('API Segura de Tecnia Academy funcionando 🛡️');

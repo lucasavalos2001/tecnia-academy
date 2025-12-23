@@ -10,7 +10,17 @@ const verifyToken = (req, res, next) => {
             if (err) {
                 return res.status(403).json({ message: "Token inválido o expirado" });
             }
-            req.usuario = authData; // Guardamos los datos del usuario (id, rol)
+            
+            // 🔍 RAYOS X: Vamos a ver qué tiene el token por dentro
+            console.log("🎟️ TOKEN DECODIFICADO:", authData);
+            
+            // VERIFICACIÓN CRÍTICA:
+            // Si authData no tiene .id, el pago fallará.
+            if (!authData.id) {
+                console.error("⚠️ ALERTA: El token no tiene campo 'id'. El pago fallará.");
+            }
+
+            req.usuario = authData; 
             next();
         });
     } else {
@@ -18,12 +28,9 @@ const verifyToken = (req, res, next) => {
     }
 };
 
-// 🟢 NUEVO: Middleware para verificar si es Administrador
 const isAdmin = (req, res, next) => {
-    // req.usuario ya debe existir (gracias a verifyToken que se ejecuta antes)
-    // Verificamos que el rol sea exactamente 'admin'
     if (req.usuario && req.usuario.rol === 'admin') {
-        next(); // Tiene permiso, puede pasar
+        next(); 
     } else {
         return res.status(403).json({ 
             message: "Acceso denegado. Se requieren permisos de administrador." 
@@ -31,5 +38,4 @@ const isAdmin = (req, res, next) => {
     }
 };
 
-// 🟢 Exportamos AMBAS funciones
 module.exports = { verifyToken, isAdmin };

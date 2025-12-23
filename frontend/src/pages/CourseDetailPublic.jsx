@@ -52,24 +52,38 @@ function CourseDetailPublic() {
       }
   };
 
-  const handleEnroll = async () => {
+  // 💰 1. NUEVA FUNCIÓN: COMPRAR CON PAGOPAR
+  const handleComprar = async () => {
+    // A. Verificar Login
     if (!isLoggedIn) {
+        alert("Debes iniciar sesión para comprar este curso.");
         navigate('/login');
         return;
     }
     
+    // B. Confirmación simple
     const precioFormateado = formatCurrency(curso.precio);
-    
-    if (confirm(`¿Quieres inscribirte en "${curso.titulo}" por ${precioFormateado}?`)) {
-        try {
-            await axios.post(`${API_URL}/cursos/${curso.id}/inscribirse`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            alert("¡Inscripción exitosa! Vamos al aula.");
-            navigate('/mis-cursos');
-        } catch (error) {
-            alert(error.response?.data?.message || "Ya estás inscrito o hubo un error.");
+    // Opcional: Si quieres preguntar antes
+    // if (!confirm(`¿Ir a pagar ${precioFormateado} con Pagopar?`)) return;
+
+    try {
+        // C. Llamada al Backend para obtener Link
+        const response = await axios.post(`${API_URL}/pagos/iniciar`, 
+            { courseId: curso.id }, 
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        // D. Redirección Mágica
+        if (response.data.success && response.data.redirectUrl) {
+            console.log("Redirigiendo a Pagopar...", response.data.redirectUrl);
+            window.location.href = response.data.redirectUrl;
+        } else {
+            alert("Error: El servidor no devolvió el link de pago.");
         }
+
+    } catch (error) {
+        console.error("Error en pago:", error);
+        alert(error.response?.data?.message || "Hubo un error al conectar con Pagopar.");
     }
   };
 
@@ -103,7 +117,7 @@ function CourseDetailPublic() {
                     <i className="fas fa-times"></i>
                 </button>
 
-                {/* Reproductor Iframe (Bypassea la seguridad de Bunny al estar en el dominio correcto) */}
+                {/* Reproductor Iframe */}
                 <div style={{position: 'relative', paddingTop: '56.25%' /* Aspect Ratio 16:9 */}}>
                     <iframe 
                         src={videoModal} 
@@ -294,7 +308,7 @@ function CourseDetailPublic() {
               </div>
           </div>
 
-          {/* COLUMNA DERECHA: TARJETA FLOTANTE */}
+          {/* COLUMNA DERECHA: TARJETA FLOTANTE DE PAGO */}
           <div style={{flex: 1, position: 'relative'}}>
               <div style={{
                   position: 'absolute', 
@@ -320,11 +334,12 @@ function CourseDetailPublic() {
                           {formatCurrency(curso.precio)}
                       </h2>
                       
+                      {/* 💰 2. BOTÓN DE COMPRA MODIFICADO */}
                       <button 
-                        onClick={handleEnroll}
+                        onClick={handleComprar}
                         style={{width:'100%', padding:'15px', background:'#a435f0', color:'white', border:'none', fontWeight:'bold', fontSize:'1rem', cursor:'pointer', marginBottom:'10px'}}
                       >
-                        Inscribirse ahora
+                        Pagar {formatCurrency(curso.precio)}
                       </button>
                       
                       <p style={{textAlign:'center', fontSize:'0.75rem', color:'#666', marginTop:'15px'}}>Garantía de reembolso de 30 días</p>
