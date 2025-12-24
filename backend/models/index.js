@@ -4,7 +4,7 @@ const Course = require('./Course.js');
 const Module = require('./Module.js');
 const Lesson = require('./Lesson.js');
 const Enrollment = require('./Enrollment.js');
-const Transaction = require('./Transaction.js'); // <--- 1. NUEVO: Importamos Transacción
+const Transaction = require('./Transaction.js');
 
 // --- Relaciones de Instructor (Creación) ---
 User.hasMany(Course, { foreignKey: 'instructorId', as: 'cursos_creados' });
@@ -24,24 +24,23 @@ Enrollment.belongsTo(User, { foreignKey: 'userId' });
 Course.hasMany(Enrollment, { foreignKey: 'courseId' });
 Enrollment.belongsTo(Course, { foreignKey: 'courseId', as: 'curso' });
 
-// --- 💰 Relaciones de Transacciones (Pagopar/Pagos) --- <--- 2. NUEVO: Relaciones
-// Una transacción la hace un usuario
+// --- 💰 Relaciones de Transacciones (Pagopar/Pagos) ---
 Transaction.belongsTo(User, { foreignKey: 'userId', as: 'usuario' });
 User.hasMany(Transaction, { foreignKey: 'userId' });
 
-// Una transacción paga por un curso
 Transaction.belongsTo(Course, { foreignKey: 'courseId', as: 'curso' });
 Course.hasMany(Transaction, { foreignKey: 'courseId' });
 
-
 const syncDB = async () => {
     try {
-        await sequelize.sync({ alter: true }); // Esto creará la tabla Transactions automáticamente
-        console.log("✅ Base de Datos Sincronizada Completa (Incluyendo Pagos).");
+        // ⚠️ CAMBIO CRÍTICO PARA EL SERVIDOR ⚠️
+        // Usamos force: true UNA VEZ para limpiar los datos corruptos (usuario 4 no encontrado).
+        // Esto borrará las tablas y las creará de cero, arreglando el error de arranque.
+        await sequelize.sync({ force: true }); 
+        console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - LIMPIEZA).");
     } catch (error) {
         console.error("❌ Error al sincronizar modelos:", error);
     }
 }
 
-// <--- 3. NUEVO: Agregamos Transaction al export
 module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction };

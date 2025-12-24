@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet'); // 🛡️ NUEVO
-const rateLimit = require('express-rate-limit'); // 🛡️ NUEVO
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { connectDB } = require('./config/db');
 const { syncDB } = require('./models');
 
@@ -12,9 +12,14 @@ const courseRoutes = require('./routes/courseRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
-const paymentRoutes = require('./routes/paymentRoutes'); // 💰 NUEVO: Importamos rutas de pago
+const paymentRoutes = require('./routes/paymentRoutes');
 
 const app = express();
+
+// 🚀 CONFIGURACIÓN CRÍTICA PARA NGINX / DIGITAL OCEAN
+// Esto soluciona el error "ValidationError: The 'X-Forwarded-For' header is set..."
+// Permite que el Rate Limit funcione correctamente detrás del proxy reverso.
+app.set('trust proxy', 1);
 
 // 🛡️ 1. SEGURIDAD: HELMET (Protege cabeceras HTTP)
 app.use(helmet());
@@ -56,7 +61,7 @@ app.use('/api/cursos', courseRoutes);
 app.use('/api/usuario', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/pagos', paymentRoutes); // 💰 NUEVO: Registramos la ruta de pagos
+app.use('/api/pagos', paymentRoutes);
 
 app.get('/', (req, res) => {
     res.send('API Segura de Tecnia Academy funcionando 🛡️');
