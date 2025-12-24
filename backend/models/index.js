@@ -36,7 +36,7 @@ const syncDB = async () => {
         // ⚠️ CAMBIO APLICADO: FORCE: TRUE ⚠️
         // Esto borrará y recreará la tabla "Transactions" que está dando error.
         // Una vez que el servidor arranque bien una vez, puedes volver a cambiarlo a { alter: true }
-        await sequelize.sync({ force: true }); 
+        await sequelize.sync({ alter: true }); 
         console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - TABLAS RECREADAS).");
     } catch (error) {
         console.error("❌ Error al sincronizar modelos:", error);
