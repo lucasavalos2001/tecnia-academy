@@ -36,7 +36,7 @@ const syncDB = async () => {
         // ⚠️ CAMBIO CRÍTICO PARA EL SERVIDOR ⚠️
         // Usamos force: true UNA VEZ para limpiar los datos corruptos (usuario 4 no encontrado).
         // Esto borrará las tablas y las creará de cero, arreglando el error de arranque.
-        await sequelize.sync({ force: true }); 
+        await sequelize.sync({ alter: true }); 
         console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - LIMPIEZA).");
     } catch (error) {
         console.error("❌ Error al sincronizar modelos:", error);
