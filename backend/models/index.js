@@ -33,11 +33,11 @@ Course.hasMany(Transaction, { foreignKey: 'courseId' });
 
 const syncDB = async () => {
     try {
-        // ⚠️ CAMBIO CRÍTICO PARA EL SERVIDOR ⚠️
-        // Usamos force: true UNA VEZ para limpiar los datos corruptos (usuario 4 no encontrado).
-        // Esto borrará las tablas y las creará de cero, arreglando el error de arranque.
-        await sequelize.sync({ alter: true }); 
-        console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - LIMPIEZA).");
+        // ⚠️ CAMBIO APLICADO: FORCE: TRUE ⚠️
+        // Esto borrará y recreará la tabla "Transactions" que está dando error.
+        // Una vez que el servidor arranque bien una vez, puedes volver a cambiarlo a { alter: true }
+        await sequelize.sync({ force: true }); 
+        console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - TABLAS RECREADAS).");
     } catch (error) {
         console.error("❌ Error al sincronizar modelos:", error);
     }

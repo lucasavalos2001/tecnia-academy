@@ -28,6 +28,9 @@ const Transaction = sequelize.define("Transaction", {
         type: DataTypes.STRING,
         allowNull: true
     }
+}, {
+    tableName: 'transactions', // <--- ESTO ES LA CLAVE: Fuerza nombre minúscula
+    timestamps: true           // Crea createdAt y updatedAt automáticamente
 });
 
 module.exports = Transaction;
