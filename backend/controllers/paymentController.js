@@ -4,17 +4,16 @@ const { Course, User, Transaction, Enrollment } = require('../models');
 
 // --- 1. INICIAR PAGO ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.1 - TRIM FIX)");
+    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.2 - NO QUOTES FIX)");
 
     try {
-        // CORRECCIÓN DE SEGURIDAD: Usamos .trim() para limpiar espacios vacíos accidentales
-        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
-        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
+        // CORRECCIÓN SUPREMA: Quitamos comillas y espacios
+        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        // Asumimos que el middleware de auth ha puesto el usuario en req.usuario
         const userId = req.usuario.id;
 
         const curso = await Course.findByPk(courseId);
@@ -24,10 +23,8 @@ const initiatePayment = async (req, res) => {
 
         const monto = parseInt(curso.precio);
         const montoString = monto.toString();
-        // ID único para identificar esta orden en Pagopar y en nuestra BD
         const pedidoId = `ORDEN-${Date.now()}`; 
 
-        // 1. Guardar transacción PENDIENTE en nuestra BD antes de ir a Pagopar
         await Transaction.create({
             external_reference: pedidoId,
             amount: monto,
@@ -37,12 +34,10 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
-        // 2. Generar Hash para Pagopar (con claves limpias)
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + montoString)
             .digest('hex');
 
-        // 3. Preparar objeto para Pagopar
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -84,20 +79,13 @@ const initiatePayment = async (req, res) => {
             }
         };
 
-        console.log(`📤 Enviando pedido ${pedidoId} a Pagopar v2.0...`);
+        console.log(`📤 Enviando pedido ${pedidoId}...`);
         const response = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
 
         if (response.data.respuesta === true) {
             const hashPedido = response.data.resultado[0].data;
             const urlFinal = `https://www.pagopar.com/pagos/${hashPedido}`;
-            
-            console.log("✅ ¡LINK GENERADO!", urlFinal);
-            
-            res.json({ 
-                success: true, 
-                redirectUrl: urlFinal,
-                pedidoId: pedidoId 
-            });
+            res.json({ success: true, redirectUrl: urlFinal, pedidoId: pedidoId });
         } else {
             console.error("❌ RECHAZADO:", response.data.resultado);
             res.status(400).json({ message: "Error Pagopar: " + response.data.resultado });
@@ -105,80 +93,61 @@ const initiatePayment = async (req, res) => {
 
     } catch (error) {
         console.error("🔥 ERROR:", error.message);
-        if (error.response) console.error(JSON.stringify(error.response.data, null, 2));
-        res.status(500).json({ message: "Error interno al procesar pago" });
+        res.status(500).json({ message: "Error interno" });
     }
 };
 
-// --- 2. WEBHOOK (Confirmación y Entrega del Curso) ---
+// --- 2. WEBHOOK (Confirmación y Entrega) ---
 const confirmPaymentWebhook = async (req, res) => {
-    console.log("🔔 WEBHOOK RECIBIDO DE PAGOPAR");
+    console.log("🔔 WEBHOOK RECIBIDO");
 
     try {
         const { resultado } = req.body;
-        // Normalizar datos (Pagopar a veces envía array, a veces objeto)
         const data = (resultado && resultado[0]) ? resultado[0] : req.body;
         
-        // Si hay un resultado de prueba (Simulador), lo procesamos pero preparamos la respuesta eco
-        if (req.body.resultado) {
-             console.log("🧪 Intento de simulación recibido.");
-        }
-
-        // Si no hay datos, salimos para no romper el servidor
+        if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
         const { hash_pedido, pagado } = data;
 
-        // --- CORRECCIÓN CRÍTICA: TRIM() ---
-        // Aquí estaba el error: si .env tiene espacios, el hash de consulta fallaba.
-        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
-        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
+        // --- CORRECCIÓN SUPREMA: REMOVER COMILLAS Y ESPACIOS ---
+        // Esto soluciona el error "Token no coincide" si el .env tiene comillas
+        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
-        // Generamos el Hash para consultar el estado (Paso 3)
+        // LOG DE DIAGNÓSTICO (Para confirmar que miden 32 caracteres)
+        console.log(`🔑 Claves limpias - Public: ${PUBLIC_KEY.length}, Private: ${PRIVATE_KEY.length}`);
+
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
         console.log("🔎 Consultando a Pagopar (Paso 3)... hash:", hash_pedido);
 
-        // Hacemos la consulta a Pagopar
         const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
             token_publico: PUBLIC_KEY
         });
 
-        // --- B. PROCESAR PAGO SI ES VÁLIDO ---
         if (verificacion.data.respuesta === true) {
-            console.log("✅ Paso 3 Exitoso: Conexión autorizada por Pagopar.");
+            console.log("✅ Paso 3 Exitoso: Conexión autorizada.");
             const pedidoReal = verificacion.data.resultado[0];
 
             if (pedidoReal.pagado) {
-                console.log("💰 PAGO CONFIRMADO REAL. Procesando entrega...");
-
-                // 'id_pedido_comercio' es nuestro 'external_reference'
+                console.log("💰 PAGO CONFIRMADO REAL.");
                 const idReferencia = pedidoReal.id_pedido_comercio;
-
-                // 1. Buscar la transacción en nuestra BD
-                const transaccion = await Transaction.findOne({ 
-                    where: { external_reference: idReferencia } 
-                });
+                const transaccion = await Transaction.findOne({ where: { external_reference: idReferencia } });
 
                 if (transaccion) {
-                    // 2. Actualizar estado a 'paid'
                     if (transaccion.status !== 'paid') {
                         transaccion.status = 'paid';
                         transaccion.payment_method = 'pagopar'; 
                         await transaccion.save();
-                        console.log("💰 Transacción actualizada a PAID en BD.");
                     }
-
-                    // 3. 🎓 INSCRIBIR AL ESTUDIANTE (Crear Enrollment)
+                    
                     const enrollmentExistente = await Enrollment.findOne({
-                        where: { 
-                            userId: transaccion.userId, 
-                            courseId: transaccion.courseId 
-                        }
+                        where: { userId: transaccion.userId, courseId: transaccion.courseId }
                     });
 
                     if (!enrollmentExistente) {
@@ -189,33 +158,24 @@ const confirmPaymentWebhook = async (req, res) => {
                             progress: 0,
                             enrolledAt: new Date()
                         });
-                        console.log(`🎉 Estudiante ${transaccion.userId} inscrito con éxito en curso ${transaccion.courseId}`);
-                    } else {
-                        console.log("ℹ️ El estudiante ya estaba inscrito en este curso.");
+                        console.log(`🎉 Estudiante inscrito.`);
                     }
-
-                } else {
-                    console.log("ℹ️ No se encontró transacción local (Posible prueba de simulador).");
                 }
-            } 
+            }
         } else {
-            // Si entra aquí, falló el Paso 3 (Hash inválido o Auth Error)
             console.error("❌ ERROR EN PASO 3 (Consulta rechazada):", verificacion.data.resultado);
         }
 
     } catch (error) {
-        console.error("⚠️ Error procesando webhook:", error.message);
-        if (error.response) console.error("Detalle Error API:", error.response.data);
+        console.error("⚠️ Error webhook:", error.message);
     }
 
-    // --- 🚨 BLOQUE CRÍTICO PARA PASAR LA VALIDACIÓN (Paso 2) ---
-    // Si Pagopar nos envía "resultado" (Simulador), devolvemos el eco.
+    // --- BLOQUE PARA SIMULADOR (Paso 2) ---
     if (req.body.resultado) {
-        console.log("🧪 Modo Simulación detectado: Devolviendo eco a Pagopar.");
+        console.log("🧪 Modo Simulación: Devolviendo eco.");
         return res.json(req.body.resultado);
     }
 
-    // Respuesta normal para producción
     res.json({ respuesta: true });
 };
 
