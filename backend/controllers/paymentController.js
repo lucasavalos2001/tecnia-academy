@@ -4,9 +4,10 @@ const { Course, User, Transaction, Enrollment } = require('../models');
 
 // --- 1. INICIAR PAGO ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.0 - VENTA-COMERCIO)");
+    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.1 - TRIM FIX)");
 
     try {
+        // CORRECCIÓN DE SEGURIDAD: Usamos .trim() para limpiar espacios vacíos accidentales
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
@@ -36,7 +37,7 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
-        // 2. Generar Hash para Pagopar
+        // 2. Generar Hash para Pagopar (con claves limpias)
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + montoString)
             .digest('hex');
@@ -118,21 +119,29 @@ const confirmPaymentWebhook = async (req, res) => {
         // Normalizar datos (Pagopar a veces envía array, a veces objeto)
         const data = (resultado && resultado[0]) ? resultado[0] : req.body;
         
-        // Si no hay datos válidos (puede pasar en pruebas vacías), salimos seguro
+        // Si hay un resultado de prueba (Simulador), lo procesamos pero preparamos la respuesta eco
+        if (req.body.resultado) {
+             console.log("🧪 Intento de simulación recibido.");
+        }
+
+        // Si no hay datos, salimos para no romper el servidor
         if (!data) return res.json({ respuesta: true });
 
         const { hash_pedido, pagado } = data;
 
-        // --- A. VALIDACIÓN DE SEGURIDAD (Obligatorio para Pagopar) ---
-        const PUBLIC_KEY = process.env.PAGOPAR_PUBLIC_KEY;
-        const PRIVATE_KEY = process.env.PAGOPAR_PRIVATE_KEY;
+        // --- CORRECCIÓN CRÍTICA: TRIM() ---
+        // Aquí estaba el error: si .env tiene espacios, el hash de consulta fallaba.
+        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
+        // Generamos el Hash para consultar el estado (Paso 3)
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        console.log("🔎 Verificando validez con Pagopar...", hash_pedido);
+        console.log("🔎 Consultando a Pagopar (Paso 3)... hash:", hash_pedido);
 
+        // Hacemos la consulta a Pagopar
         const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
@@ -141,12 +150,13 @@ const confirmPaymentWebhook = async (req, res) => {
 
         // --- B. PROCESAR PAGO SI ES VÁLIDO ---
         if (verificacion.data.respuesta === true) {
+            console.log("✅ Paso 3 Exitoso: Conexión autorizada por Pagopar.");
             const pedidoReal = verificacion.data.resultado[0];
 
             if (pedidoReal.pagado) {
-                console.log("✅ PAGO CONFIRMADO REAL. Procesando entrega...");
+                console.log("💰 PAGO CONFIRMADO REAL. Procesando entrega...");
 
-                // 'id_pedido_comercio' es nuestro 'external_reference' (ORDEN-123...)
+                // 'id_pedido_comercio' es nuestro 'external_reference'
                 const idReferencia = pedidoReal.id_pedido_comercio;
 
                 // 1. Buscar la transacción en nuestra BD
@@ -185,19 +195,21 @@ const confirmPaymentWebhook = async (req, res) => {
                     }
 
                 } else {
-                    // Si no encontramos la transacción, puede ser la prueba del simulador
-                    console.log("ℹ️ No se encontró transacción local (Posiblemente test de simulador).");
+                    console.log("ℹ️ No se encontró transacción local (Posible prueba de simulador).");
                 }
             } 
-        } 
+        } else {
+            // Si entra aquí, falló el Paso 3 (Hash inválido o Auth Error)
+            console.error("❌ ERROR EN PASO 3 (Consulta rechazada):", verificacion.data.resultado);
+        }
 
     } catch (error) {
         console.error("⚠️ Error procesando webhook:", error.message);
+        if (error.response) console.error("Detalle Error API:", error.response.data);
     }
 
-    // --- 🚨 BLOQUE CRÍTICO PARA PASAR LA VALIDACIÓN DE PAGOPAR ---
-    // Si Pagopar nos envía "resultado" (es decir, es una prueba del Simulador),
-    // se lo devolvemos tal cual para que el sistema marque el Check Verde ✅.
+    // --- 🚨 BLOQUE CRÍTICO PARA PASAR LA VALIDACIÓN (Paso 2) ---
+    // Si Pagopar nos envía "resultado" (Simulador), devolvemos el eco.
     if (req.body.resultado) {
         console.log("🧪 Modo Simulación detectado: Devolviendo eco a Pagopar.");
         return res.json(req.body.resultado);
