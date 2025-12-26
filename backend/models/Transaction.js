@@ -1,5 +1,5 @@
-const { sequelize } = require('../config/db'); // Importamos la conexión
-const { DataTypes } = require('sequelize');   // Importamos los tipos de datos
+const { sequelize } = require('../config/db');
+const { DataTypes } = require('sequelize');
 
 const Transaction = sequelize.define("Transaction", {
     id: {
@@ -27,10 +27,19 @@ const Transaction = sequelize.define("Transaction", {
     ip_address: { 
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // ✅ AGREGAMOS EXPLÍCITAMENTE LAS CLAVES FORÁNEAS
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    courseId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
     }
 }, {
-    tableName: 'transactions', // <--- ESTO ES LA CLAVE: Fuerza nombre minúscula
-    timestamps: true           // Crea createdAt y updatedAt automáticamente
+    tableName: 'transactions', // Minúsculas para evitar problemas en Postgres
+    timestamps: true
 });
 
 module.exports = Transaction;
