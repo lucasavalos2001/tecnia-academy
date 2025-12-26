@@ -4,17 +4,15 @@ const { Course, User, Transaction, Enrollment } = require('../models');
 
 // --- 1. INICIAR PAGO ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.3 - FORM DATA FIX)");
+    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.4 - AUTO-SWAP)");
 
     try {
-        // CORRECCIÓN DE SEGURIDAD: Limpiamos comillas y espacios de las claves
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        // Asumimos que el middleware de auth ya validó al usuario
         const userId = req.usuario.id;
 
         const curso = await Course.findByPk(courseId);
@@ -26,7 +24,6 @@ const initiatePayment = async (req, res) => {
         const montoString = monto.toString();
         const pedidoId = `ORDEN-${Date.now()}`; 
 
-        // Guardamos la transacción localmente primero
         await Transaction.create({
             external_reference: pedidoId,
             amount: monto,
@@ -36,12 +33,11 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
-        // Generamos el Hash de inicio (SHA1)
+        // Hash normal para inicio
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + montoString)
             .digest('hex');
 
-        // Objeto para la API 2.0 (Esta sí acepta JSON)
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -101,7 +97,7 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// --- 2. WEBHOOK (Confirmación y Entrega) ---
+// --- 2. WEBHOOK INTELIGENTE (Auto-corrección de Token) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -114,34 +110,43 @@ const confirmPaymentWebhook = async (req, res) => {
 
         const { hash_pedido, pagado } = data;
 
-        // Limpieza de claves (por seguridad)
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
-        // console.log(`🔑 Claves limpias - Public: ${PUBLIC_KEY.length}, Private: ${PRIVATE_KEY.length}`);
+        console.log("🔎 Consultando a Pagopar (Paso 3)... hash:", hash_pedido);
 
-        const tokenConsulta = crypto.createHash('sha1')
+        // INTENTO 1: Orden Estándar (PRIVATE + CONSULTA + PUBLIC)
+        let tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        console.log("🔎 Consultando a Pagopar (Paso 3)... hash:", hash_pedido);
+        // Volvemos a JSON porque el error anterior confirmó que Pagopar lo requiere
+        let respuestaPagopar = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', 
+            { hash_pedido, token: tokenConsulta, token_publico: PUBLIC_KEY },
+            { headers: { 'Content-Type': 'application/json' } } // Forzamos JSON
+        );
 
-        // --- CORRECCIÓN CRÍTICA: CAMBIO A URLSearchParams ---
-        // La API v1.1 es legacy y requiere formato x-www-form-urlencoded
-        const params = new URLSearchParams();
-        params.append('hash_pedido', hash_pedido);
-        params.append('token', tokenConsulta);
-        params.append('token_publico', PUBLIC_KEY);
+        // --- LÓGICA DE AUTO-CORRECCIÓN ---
+        if (respuestaPagopar.data.respuesta === false && 
+            respuestaPagopar.data.resultado === 'Token no coincide') {
+            
+            console.warn("⚠️ Token rechazado. Intentando inversión de claves automática...");
+            
+            // INTENTO 2: Orden Invertido (PUBLIC + CONSULTA + PRIVATE)
+            const tokenInvertido = crypto.createHash('sha1')
+                .update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`)
+                .digest('hex');
 
-        const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', params, {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
+            respuestaPagopar = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', 
+                { hash_pedido, token: tokenInvertido, token_publico: PUBLIC_KEY },
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+        // --------------------------------
 
-        if (verificacion.data.respuesta === true) {
+        if (respuestaPagopar.data.respuesta === true) {
             console.log("✅ Paso 3 Exitoso: Conexión autorizada.");
-            const pedidoReal = verificacion.data.resultado[0];
+            const pedidoReal = respuestaPagopar.data.resultado[0];
 
             if (pedidoReal.pagado) {
                 console.log("💰 PAGO CONFIRMADO REAL.");
@@ -172,14 +177,13 @@ const confirmPaymentWebhook = async (req, res) => {
                 }
             }
         } else {
-            console.error("❌ ERROR EN PASO 3 (Consulta rechazada):", verificacion.data.resultado);
+            console.error("❌ ERROR EN PASO 3 (Final):", respuestaPagopar.data.resultado);
         }
 
     } catch (error) {
         console.error("⚠️ Error webhook:", error.message);
     }
 
-    // --- BLOQUE PARA SIMULADOR (Paso 2) ---
     if (req.body.resultado) {
         console.log("🧪 Modo Simulación: Devolviendo eco.");
         return res.json(req.body.resultado);
