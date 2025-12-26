@@ -4,16 +4,17 @@ const { Course, User, Transaction, Enrollment } = require('../models');
 
 // --- 1. INICIAR PAGO ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.2 - NO QUOTES FIX)");
+    console.log("\n🚀 INICIANDO PAGO (VERSIÓN 2.3 - FORM DATA FIX)");
 
     try {
-        // CORRECCIÓN SUPREMA: Quitamos comillas y espacios
+        // CORRECCIÓN DE SEGURIDAD: Limpiamos comillas y espacios de las claves
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
+        // Asumimos que el middleware de auth ya validó al usuario
         const userId = req.usuario.id;
 
         const curso = await Course.findByPk(courseId);
@@ -25,6 +26,7 @@ const initiatePayment = async (req, res) => {
         const montoString = monto.toString();
         const pedidoId = `ORDEN-${Date.now()}`; 
 
+        // Guardamos la transacción localmente primero
         await Transaction.create({
             external_reference: pedidoId,
             amount: monto,
@@ -34,10 +36,12 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
+        // Generamos el Hash de inicio (SHA1)
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + montoString)
             .digest('hex');
 
+        // Objeto para la API 2.0 (Esta sí acepta JSON)
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -110,13 +114,11 @@ const confirmPaymentWebhook = async (req, res) => {
 
         const { hash_pedido, pagado } = data;
 
-        // --- CORRECCIÓN SUPREMA: REMOVER COMILLAS Y ESPACIOS ---
-        // Esto soluciona el error "Token no coincide" si el .env tiene comillas
+        // Limpieza de claves (por seguridad)
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"]/g, "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"]/g, "").trim();
 
-        // LOG DE DIAGNÓSTICO (Para confirmar que miden 32 caracteres)
-        console.log(`🔑 Claves limpias - Public: ${PUBLIC_KEY.length}, Private: ${PRIVATE_KEY.length}`);
+        // console.log(`🔑 Claves limpias - Public: ${PUBLIC_KEY.length}, Private: ${PRIVATE_KEY.length}`);
 
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
@@ -124,10 +126,17 @@ const confirmPaymentWebhook = async (req, res) => {
 
         console.log("🔎 Consultando a Pagopar (Paso 3)... hash:", hash_pedido);
 
-        const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', {
-            hash_pedido: hash_pedido,
-            token: tokenConsulta,
-            token_publico: PUBLIC_KEY
+        // --- CORRECCIÓN CRÍTICA: CAMBIO A URLSearchParams ---
+        // La API v1.1 es legacy y requiere formato x-www-form-urlencoded
+        const params = new URLSearchParams();
+        params.append('hash_pedido', hash_pedido);
+        params.append('token', tokenConsulta);
+        params.append('token_publico', PUBLIC_KEY);
+
+        const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', params, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         });
 
         if (verificacion.data.respuesta === true) {
