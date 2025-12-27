@@ -7,11 +7,19 @@ const Enrollment = sequelize.define('Enrollment', {
         primaryKey: true,
         autoIncrement: true,
     },
-    // Guardaremos las IDs de las lecciones completadas como un Array de números
-    // PostgreSQL soporta JSON nativo, lo cual es perfecto para esto.
+    // 👇 ESTO ES LO QUE FALTABA PARA QUE FUNCIONE EL PAGO
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    courseId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    // 👆 FIN DE LO AGREGADO
     lecciones_completadas: {
         type: DataTypes.JSON, 
-        defaultValue: [], // Empieza vacío []
+        defaultValue: [], 
     },
     progreso_porcentaje: {
         type: DataTypes.INTEGER,
@@ -21,7 +29,6 @@ const Enrollment = sequelize.define('Enrollment', {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
     }
-    // userId y courseId se agregan automáticamente en las relaciones
 }, {
     tableName: 'enrollments',
 });
