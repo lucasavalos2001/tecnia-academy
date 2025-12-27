@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- 1. INICIAR PAGO (V6.0 - NO TOCAR, YA FUNCIONA PERFECTO) ---
+// --- 1. INICIAR PAGO (V7.0 - NO TOCAR, FUNCIONA PERFECTO) ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (V6.0 - PEDIDO BLINDADO)");
+    console.log("\n🚀 INICIANDO PAGO (V7.0 - PROD READY)");
 
     try {
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
@@ -13,7 +13,6 @@ const initiatePayment = async (req, res) => {
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        // Si no hay usuario, retornamos error pero no rompemos el servidor
         if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
         
         const curso = await Course.findByPk(courseId);
@@ -27,9 +26,10 @@ const initiatePayment = async (req, res) => {
             userId: req.usuario.id, courseId: courseId, ip_address: req.ip || '127.0.0.1'
         });
 
-        // Hash V2.0 (Private + ID + Monto) -> ESTO FUNCIONA
+        // Hash V2.0 OK
         const hash = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
 
+        // Datos Blindados OK
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -65,7 +65,7 @@ const initiatePayment = async (req, res) => {
     } catch (e) { console.error("🔥 ERROR INIT:", e.message); res.status(500).json({msg:"Error"}); }
 };
 
-// --- 2. WEBHOOK (V6.0 - STRICT LEGACY MODE) ---
+// --- 2. WEBHOOK (V7.0 - FIX CAMPO PUBLIC_KEY) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -76,7 +76,6 @@ const confirmPaymentWebhook = async (req, res) => {
         if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
-        // Limpiamos el hash entrante
         let hash_pedido = String(data.hash_pedido || "").trim().replace(/\s/g, "");
 
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
@@ -84,18 +83,17 @@ const confirmPaymentWebhook = async (req, res) => {
 
         console.log(`🔎 Validando Hash: [${hash_pedido}]`);
 
-        // Generamos Token de Consulta: sha1(Privada + 'CONSULTA' + Publica)
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // --- CORRECCIÓN FINAL AQUÍ ---
-        // Enviamos SOLAMENTE lo que pide la API 1.1. Nada más.
-        // Quitamos 'public_key' extra para no confundir al servidor legacy.
+        // --- EL CAMBIO MAESTRO ---
+        // Usamos 'public_key' en lugar de 'token_publico'.
+        // Esto alinea la validación con el formato de tu cuenta V2.0.
         const payload = {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
-            token_publico: PUBLIC_KEY
+            public_key: PUBLIC_KEY // <--- CAMBIO AQUÍ
         };
 
         const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', payload, {
@@ -119,18 +117,17 @@ const confirmPaymentWebhook = async (req, res) => {
         } else {
             console.error("❌ RESPUESTA PAGOPAR:", verificacion.data);
             
-            // Si falla, intentamos la única alternativa matemática posible para la V1.1
-            // A veces usan hash_pedido en lugar de public_key en la firma (Casos raros)
+            // INTENTO DE RESPALDO (SOLO SI FALLA 'public_key')
             if (JSON.stringify(verificacion.data).includes("Token no coincide")) {
-                console.warn("⚠️ Probando inversión de firma...");
-                const tokenInv = crypto.createHash('sha1').update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`).digest('hex');
+                console.warn("⚠️ Probando nombre legacy 'token_publico'...");
                 
+                // Si falla, probamos el nombre viejo pero con las mismas claves (ya sabemos que las claves están bien)
                 const reintento = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', 
-                    { hash_pedido, token: tokenInv, token_publico: PUBLIC_KEY },
+                    { hash_pedido, token: tokenConsulta, token_publico: PUBLIC_KEY },
                     { headers: { 'Content-Type': 'application/json' } }
                 );
                 
-                if (reintento.data.respuesta === true) console.log("✅ ¡Recuperado con inversión!");
+                if (reintento.data.respuesta === true) console.log("✅ ¡Recuperado con nombre legacy!");
                 else console.error("❌ ERROR FINAL:", reintento.data);
             }
         }
