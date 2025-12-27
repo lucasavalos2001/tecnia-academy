@@ -3,7 +3,7 @@ const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
 // =========================================================
-// 1. INICIAR PAGO (Tu versión que ya funciona)
+// 1. INICIAR PAGO (Tu versión que funciona)
 // =========================================================
 const initiatePayment = async (req, res) => {
     console.log("\n🚀 INICIANDO PAGO");
@@ -54,84 +54,77 @@ const initiatePayment = async (req, res) => {
 };
 
 // =========================================================
-// 2. WEBHOOK (ESTRATEGIA BLINDADA PASO 2 Y 3)
+// 2. WEBHOOK (ESTRICTAMENTE SEGÚN TU DOCUMENTACIÓN)
 // =========================================================
 const confirmPaymentWebhook = async (req, res) => {
-    console.log("🔔 WEBHOOK RECIBIDO");
-
-    // Variables de respuesta para asegurar el Paso 2
-    let resultadoPaso2 = { respuesta: true };
+    console.log("🔔 WEBHOOK RECIBIDO (Protocolo Estricto)");
 
     try {
-        const { resultado, respuesta } = req.body;
-        const data = (resultado && resultado[0]) ? resultado[0] : req.body;
-
-        // Si es simulador, preparamos la respuesta EXACTA que pide Pagopar para el Paso 2
-        if (respuesta === true || respuesta === "true") {
-            console.log("📝 Detectado modo Simulador (Preparando Eco)");
-            resultadoPaso2 = resultado; 
+        const body = req.body;
+        
+        // La documentación dice: "Pagopar enviará... { resultado: [...], respuesta: true }"
+        // Y dice: "El comercio debe responder... [ ... ]" (El contenido de resultado)
+        
+        // 1. Verificar si hay resultado
+        if (!body || !body.resultado || !body.resultado[0]) {
+            console.log("⚠️ Webhook vacío o mal formado");
+            return res.json({ error: "Datos insuficientes" });
         }
 
-        // =====================================================
-        // INTENTO DEL PASO 3 (AISLADO EN SU PROPIO TRY-CATCH)
-        // =====================================================
-        if (data && data.hash_pedido) {
-            try {
-                console.log(`🔎 Ejecutando Paso 3 para hash: [${data.hash_pedido}]`);
-                
-                const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
-                const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
-                
-                // Generar Token de Consulta
-                const tokenConsulta = crypto.createHash('sha1').update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`).digest('hex');
+        const datosPago = body.resultado[0];
+        const hash_pedido = datosPago.hash_pedido;
+        const token_recibido = datosPago.token;
+        const pagado = datosPago.pagado; // true o false
 
-                // Hacer la petición a Pagopar (ESTO ACTIVA EL VERDE)
-                // Usamos validateStatus para que axios no lance error si Pagopar responde 404/400
-                const r1 = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', { 
-                    hash_pedido: data.hash_pedido, 
-                    token: tokenConsulta, 
-                    token_publico: PUBLIC_KEY,
-                    public_key: PUBLIC_KEY 
-                }, { 
-                    headers: { 'Content-Type': 'application/json' },
-                    validateStatus: function (status) { return status < 500; } // No lanzar error en 400s
-                });
+        // 2. VALIDACIÓN DE TOKEN (Obligatoria según doc)
+        // Fórmula: sha1(private_key + hash_pedido)
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
+        const token_generado = crypto.createHash('sha1').update(PRIVATE_KEY + hash_pedido).digest('hex');
 
-                console.log("📨 Respuesta Pagopar (Paso 3):", r1.data.respuesta);
+        // En Producción esto debe ser estricto. En Staging a veces el simulador varía, 
+        // pero validamos igual para cumplir el protocolo.
+        if (token_generado === token_recibido) {
+            console.log("✅ Token Válido. Procesando pedido...");
 
-                // Lógica de inscripción (Solo si fue exitoso)
-                if (r1.data.respuesta === true && r1.data.resultado && r1.data.resultado[0].pagado) {
-                    const pedidoReal = r1.data.resultado[0];
-                    const transaccion = await Transaction.findOne({ where: { external_reference: pedidoReal.id_pedido_comercio } });
+            // 3. ACTUALIZAR BASE DE DATOS
+            const transaccion = await Transaction.findOne({ where: { external_reference: datosPago.numero_pedido } }); // Ojo: A veces Pagopar manda id_pedido_comercio en otro campo, pero intentamos matchear.
+            // Si no encuentra por numero_pedido, buscamos por hash si lo guardaste, 
+            // pero para el simulador el flujo principal es responder el JSON.
+
+            if (transaccion) {
+                if (pagado === true && transaccion.status !== 'paid') {
+                    transaccion.status = 'paid';
+                    await transaccion.save();
                     
-                    if (transaccion && transaccion.status !== 'paid') {
-                        transaccion.status = 'paid';
-                        await transaccion.save();
-                        await Enrollment.findOrCreate({
-                            where: { userId: transaccion.userId, courseId: transaccion.courseId },
-                            defaults: { progreso_porcentaje: 0, fecha_inscripcion: new Date(), lecciones_completadas: [] }
-                        });
-                        console.log("✅ Curso habilitado exitosamente.");
-                    }
+                    // Inscribir Alumno
+                    await Enrollment.findOrCreate({
+                        where: { userId: transaccion.userId, courseId: transaccion.courseId },
+                        defaults: { progreso_porcentaje: 0, fecha_inscripcion: new Date(), lecciones_completadas: [] }
+                    });
+                    console.log("🎉 Curso habilitado en BD.");
+                } else if (pagado === false) {
+                    console.log("ℹ️ Pedido reversado o cancelado.");
+                    transaccion.status = 'cancelled';
+                    await transaccion.save();
                 }
-
-            } catch (errorPaso3) {
-                // Si el Paso 3 falla (ej: hash falso del simulador), LO IGNORAMOS para no romper el Paso 2
-                console.log("⚠️ Error en Paso 3 (No crítico):", errorPaso3.message);
             }
+        } else {
+            console.warn("⚠️ ALERTA DE SEGURIDAD: El Token no coincide (o es simulador con key distinta).");
+            console.warn(`Esperado: ${token_generado} | Recibido: ${token_recibido}`);
+            // NOTA: Para pasar el Paso 3 del simulador, a veces hay que responder aunque el token falle 
+            // si las llaves de staging están desfasadas.
         }
-        // =====================================================
 
-    } catch (errorGeneral) {
-        console.error("❌ Error en Webhook:", errorGeneral.message);
+        // 4. RESPUESTA CRÍTICA (LO QUE PIDE EL PDF)
+        // "El comercio debe retornar directamente el contenido del resultado"
+        console.log("📤 Enviando array 'resultado' a Pagopar");
+        return res.json(body.resultado);
+
+    } catch (error) {
+        console.error("❌ Error en Webhook:", error.message);
+        // Incluso en error, intentamos no romper la conexión HTTP
+        return res.status(500).send("Error interno");
     }
-
-    // =====================================================
-    // RESPUESTA FINAL (OBLIGATORIO PARA PASO 2)
-    // =====================================================
-    // Respondemos SIEMPRE al final, pase lo que pase arriba.
-    console.log("📤 Enviando respuesta a Pagopar (Paso 2 ok)");
-    return res.json(resultadoPaso2);
 };
 
 module.exports = { initiatePayment, confirmPaymentWebhook };
