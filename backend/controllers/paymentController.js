@@ -2,23 +2,28 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- 1. INICIAR PAGO (V3.3 - CORRECCIÓN DEFINITIVA COMPRADOR) ---
+// --- UTILIDAD: Limpiador de Objetos ---
+// Elimina claves con valores vacíos, nulos o undefined para evitar rechazo de Pagopar
+const cleanObject = (obj) => {
+    return Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => v != null && v !== "")
+    );
+};
+
+// --- 1. INICIAR PAGO (V4.0 - LIMPIEZA QUIRÚRGICA) ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (V3.3 - ESTÁNDAR COMPLETO)");
+    console.log("\n🚀 INICIANDO PAGO (V4.0 - CLEAN DATA)");
 
     try {
-        // 1. Limpieza de claves (Seguridad anti-basura)
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        
-        // Validación de usuario
         if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
+        
         const userId = req.usuario.id;
-
         const curso = await Course.findByPk(courseId);
         const usuario = await User.findByPk(userId);
 
@@ -27,7 +32,6 @@ const initiatePayment = async (req, res) => {
         const monto = parseInt(curso.precio);
         const pedidoId = `ORDEN-${Date.now()}`; 
 
-        // 2. Crear transacción local
         await Transaction.create({
             external_reference: pedidoId,
             amount: monto,
@@ -37,13 +41,24 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
-        // 3. Generar Hash (API 2.0)
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + monto.toString())
             .digest('hex');
 
-        // 4. Construir objeto Orden (CORRECCIÓN AQUÍ)
-        // Agregamos 'razon_social' y 'direccion' que faltaban en la V3.2
+        // --- CONSTRUCCIÓN DEL OBJETO LIMPIO ---
+        const compradorRaw = {
+            "ruc": usuario.documento ? `${usuario.documento}-1` : null,
+            "email": usuario.email,
+            "ciudad": 1, // Asunción
+            "nombre": usuario.nombre_completo || "Cliente",
+            "telefono": usuario.telefono || "0981000000",
+            "direccion": "Asuncion",
+            "documento": usuario.documento || "4444440",
+            "razon_social": usuario.nombre_completo || "Cliente",
+            "tipo_documento": "CI"
+            // Nota: NO enviamos coordenadas ni referencias vacías
+        };
+
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -68,20 +83,7 @@ const initiatePayment = async (req, res) => {
             "id_pedido_comercio": pedidoId,
             "descripcion_resumen": `Pago curso: ${curso.titulo}`,
             "forma_pago": 9,
-            "comprador": {
-                // VOLVEMOS AL ESTÁNDAR COMPLETO PERO SEGURO
-                "ruc": usuario.documento ? `${usuario.documento}-1` : "4444440-1",
-                "email": usuario.email, 
-                "ciudad": 1, 
-                "nombre": usuario.nombre_completo || "Cliente",
-                "telefono": usuario.telefono || "0981000000", 
-                "direccion": "Asuncion", // Dato obligatorio genérico
-                "documento": usuario.documento || "4444440", 
-                "coordenadas": "",
-                "razon_social": usuario.nombre_completo || "Cliente", // OBLIGATORIO
-                "tipo_documento": "CI", 
-                "direccion_referencia": ""
-            }
+            "comprador": cleanObject(compradorRaw) // <--- MAGIA AQUÍ
         };
 
         const response = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
@@ -100,7 +102,7 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// --- 2. WEBHOOK (V3.3 - Blindado Omni-Campo) ---
+// --- 2. WEBHOOK (V4.0 - Blindado) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -111,19 +113,17 @@ const confirmPaymentWebhook = async (req, res) => {
         if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
-        // Limpieza de datos entrantes y claves
         const hash_pedido = (data.hash_pedido || "").trim();
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
         console.log(`🔎 Validando (Paso 3)... Hash: ${hash_pedido.substring(0,10)}...`);
 
-        // Generar Token
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // ESTRATEGIA OMNI-CAMPO: Enviamos ambos nombres de llave pública
+        // Enviamos JSON Estricto con doble campo de llave pública
         const payload = {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
@@ -158,13 +158,15 @@ const confirmPaymentWebhook = async (req, res) => {
                             userId: transaccion.userId, courseId: transaccion.courseId,
                             status: 'active', progress: 0, enrolledAt: new Date()
                         });
-                        console.log(`🎉 Estudiante inscrito.`);
                     }
                 }
             }
         } else {
-             // AUTO-CORRECCIÓN DE EMERGENCIA (Inversión de claves)
-             if (verificacion.data.resultado === 'Token no coincide') {
+             // Debug detallado del error
+             console.error("❌ RESPUESTA PAGOPAR:", verificacion.data);
+             
+             // Intento de auto-corrección
+             if (JSON.stringify(verificacion.data.resultado).includes("Token no coincide")) {
                 console.warn("⚠️ Reintentando con claves invertidas...");
                 const tokenInvertido = crypto.createHash('sha1').update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`).digest('hex');
                 const reintento = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', {
@@ -173,8 +175,6 @@ const confirmPaymentWebhook = async (req, res) => {
 
                 if (reintento.data.respuesta === true) console.log("✅ ¡Recuperación exitosa!");
                 else console.error("❌ ERROR FINAL PASO 3:", reintento.data.resultado);
-            } else {
-                console.error("❌ ERROR PAGOPAR:", verificacion.data.resultado);
             }
         }
 
