@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- 1. INICIAR PAGO (V7.0 - NO TOCAR, FUNCIONA PERFECTO) ---
+// --- 1. INICIAR PAGO (V8.0 - MANTENEMOS LO QUE FUNCIONA) ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (V7.0 - PROD READY)");
+    console.log("\n🚀 INICIANDO PAGO (V8.0 - PROD READY)");
 
     try {
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
@@ -26,10 +26,9 @@ const initiatePayment = async (req, res) => {
             userId: req.usuario.id, courseId: courseId, ip_address: req.ip || '127.0.0.1'
         });
 
-        // Hash V2.0 OK
+        // Hash para API 2.0 (JSON)
         const hash = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
 
-        // Datos Blindados OK
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -65,7 +64,7 @@ const initiatePayment = async (req, res) => {
     } catch (e) { console.error("🔥 ERROR INIT:", e.message); res.status(500).json({msg:"Error"}); }
 };
 
-// --- 2. WEBHOOK (V7.0 - FIX CAMPO PUBLIC_KEY) ---
+// --- 2. WEBHOOK (V8.0 - CAMBIO A FORM-DATA LEGACY) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -76,28 +75,30 @@ const confirmPaymentWebhook = async (req, res) => {
         if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
+        // 1. Limpieza de Hash y Claves
         let hash_pedido = String(data.hash_pedido || "").trim().replace(/\s/g, "");
-
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
 
         console.log(`🔎 Validando Hash: [${hash_pedido}]`);
 
+        // 2. Token de Consulta (Fórmula estándar)
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // --- EL CAMBIO MAESTRO ---
-        // Usamos 'public_key' en lugar de 'token_publico'.
-        // Esto alinea la validación con el formato de tu cuenta V2.0.
-        const payload = {
-            hash_pedido: hash_pedido,
-            token: tokenConsulta,
-            public_key: PUBLIC_KEY // <--- CAMBIO AQUÍ
-        };
+        // 3. CAMBIO MAESTRO: USAR URLSearchParams (Form-Data)
+        // La API 1.1 prefiere esto mil veces antes que JSON.
+        // Y usamos 'token_publico' que es el nombre nativo de la V1.1
+        const params = new URLSearchParams();
+        params.append('hash_pedido', hash_pedido);
+        params.append('token', tokenConsulta);
+        params.append('token_publico', PUBLIC_KEY);
 
-        const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', payload, {
-            headers: { 'Content-Type': 'application/json' }
+        const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', params, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         });
 
         if (verificacion.data.respuesta === true) {
@@ -110,24 +111,32 @@ const confirmPaymentWebhook = async (req, res) => {
                     transaccion.status = 'paid'; 
                     transaccion.payment_method = 'pagopar';
                     await transaccion.save();
+                    
                     const exist = await Enrollment.findOne({where:{userId:transaccion.userId, courseId:transaccion.courseId}});
-                    if(!exist) await Enrollment.create({userId:transaccion.userId, courseId:transaccion.courseId, status:'active', progress:0, enrolledAt: new Date()});
+                    if(!exist) {
+                        await Enrollment.create({userId:transaccion.userId, courseId:transaccion.courseId, status:'active', progress:0, enrolledAt: new Date()});
+                        console.log("🎓 Estudiante inscrito.");
+                    }
                 }
             }
         } else {
             console.error("❌ RESPUESTA PAGOPAR:", verificacion.data);
             
-            // INTENTO DE RESPALDO (SOLO SI FALLA 'public_key')
-            if (JSON.stringify(verificacion.data).includes("Token no coincide")) {
-                console.warn("⚠️ Probando nombre legacy 'token_publico'...");
+            // Si esto falla, el problema sería sobrenatural, pero intentamos inversión
+            if (JSON.stringify(verificacion.data).includes("Token")) {
+                console.warn("⚠️ Probando inversión con Form-Data...");
+                const tokenInv = crypto.createHash('sha1').update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`).digest('hex');
                 
-                // Si falla, probamos el nombre viejo pero con las mismas claves (ya sabemos que las claves están bien)
-                const reintento = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', 
-                    { hash_pedido, token: tokenConsulta, token_publico: PUBLIC_KEY },
-                    { headers: { 'Content-Type': 'application/json' } }
-                );
+                const paramsInv = new URLSearchParams();
+                paramsInv.append('hash_pedido', hash_pedido);
+                paramsInv.append('token', tokenInv);
+                paramsInv.append('token_publico', PUBLIC_KEY);
+
+                const reintento = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', paramsInv, {
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
                 
-                if (reintento.data.respuesta === true) console.log("✅ ¡Recuperado con nombre legacy!");
+                if (reintento.data.respuesta === true) console.log("✅ ¡Recuperado con inversión!");
                 else console.error("❌ ERROR FINAL:", reintento.data);
             }
         }
