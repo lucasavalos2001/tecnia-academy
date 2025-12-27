@@ -2,15 +2,15 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- UTILIDAD: Limpiador de Objetos ---
-// Elimina claves con valores vacíos, nulos o undefined para evitar rechazo de Pagopar
+// --- UTILIDAD: LIMPIADOR DE OBJETOS (LA CLAVE DEL ÉXITO) ---
+// Elimina campos vacíos para que Pagopar no rechace el pedido por formato incorrecto
 const cleanObject = (obj) => {
     return Object.fromEntries(
         Object.entries(obj).filter(([_, v]) => v != null && v !== "")
     );
 };
 
-// --- 1. INICIAR PAGO (V4.0 - LIMPIEZA QUIRÚRGICA) ---
+// --- 1. INICIAR PAGO (V4.0 - DATOS LIMPIOS) ---
 const initiatePayment = async (req, res) => {
     console.log("\n🚀 INICIANDO PAGO (V4.0 - CLEAN DATA)");
 
@@ -21,9 +21,10 @@ const initiatePayment = async (req, res) => {
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
+        // Validación de usuario
         if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
-        
         const userId = req.usuario.id;
+
         const curso = await Course.findByPk(courseId);
         const usuario = await User.findByPk(userId);
 
@@ -45,18 +46,19 @@ const initiatePayment = async (req, res) => {
             .update(PRIVATE_KEY + pedidoId + monto.toString())
             .digest('hex');
 
-        // --- CONSTRUCCIÓN DEL OBJETO LIMPIO ---
+        // --- CONSTRUCCIÓN DEL COMPRADOR ---
         const compradorRaw = {
             "ruc": usuario.documento ? `${usuario.documento}-1` : null,
             "email": usuario.email,
-            "ciudad": 1, // Asunción
+            "ciudad": 1, // Asunción (Default seguro)
             "nombre": usuario.nombre_completo || "Cliente",
             "telefono": usuario.telefono || "0981000000",
             "direccion": "Asuncion",
             "documento": usuario.documento || "4444440",
             "razon_social": usuario.nombre_completo || "Cliente",
-            "tipo_documento": "CI"
-            // Nota: NO enviamos coordenadas ni referencias vacías
+            "tipo_documento": "CI",
+            "coordenadas": "", // Se eliminará si está vacío gracias a cleanObject
+            "direccion_referencia": "" // Se eliminará si está vacío
         };
 
         const orden = {
@@ -83,7 +85,7 @@ const initiatePayment = async (req, res) => {
             "id_pedido_comercio": pedidoId,
             "descripcion_resumen": `Pago curso: ${curso.titulo}`,
             "forma_pago": 9,
-            "comprador": cleanObject(compradorRaw) // <--- MAGIA AQUÍ
+            "comprador": cleanObject(compradorRaw) // <--- ¡AQUÍ ESTÁ LA MAGIA!
         };
 
         const response = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
@@ -102,7 +104,7 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// --- 2. WEBHOOK (V4.0 - Blindado) ---
+// --- 2. WEBHOOK (V4.0 - Blindado Omni-Campo + Retry) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -123,7 +125,7 @@ const confirmPaymentWebhook = async (req, res) => {
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // Enviamos JSON Estricto con doble campo de llave pública
+        // Enviamos con AMBOS nombres de campo para asegurar compatibilidad
         const payload = {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
@@ -158,14 +160,12 @@ const confirmPaymentWebhook = async (req, res) => {
                             userId: transaccion.userId, courseId: transaccion.courseId,
                             status: 'active', progress: 0, enrolledAt: new Date()
                         });
+                        console.log(`🎉 Estudiante inscrito.`);
                     }
                 }
             }
         } else {
-             // Debug detallado del error
-             console.error("❌ RESPUESTA PAGOPAR:", verificacion.data);
-             
-             // Intento de auto-corrección
+             // LOGICA DE REINTENTO AUTOMÁTICO
              if (JSON.stringify(verificacion.data.resultado).includes("Token no coincide")) {
                 console.warn("⚠️ Reintentando con claves invertidas...");
                 const tokenInvertido = crypto.createHash('sha1').update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`).digest('hex');
@@ -175,6 +175,8 @@ const confirmPaymentWebhook = async (req, res) => {
 
                 if (reintento.data.respuesta === true) console.log("✅ ¡Recuperación exitosa!");
                 else console.error("❌ ERROR FINAL PASO 3:", reintento.data.resultado);
+            } else {
+                console.error("❌ ERROR PAGOPAR:", verificacion.data.resultado);
             }
         }
 
