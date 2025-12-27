@@ -2,19 +2,18 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- 1. INICIAR PAGO (Blindado) ---
+// --- 1. INICIAR PAGO (CORREGIDO: Relleno de datos obligatorios) ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (V3.0 - OMNI-CAMPO)");
+    console.log("\n🚀 INICIANDO PAGO (V3.1 - FIX DATOS VENDEDOR)");
 
     try {
-        // Limpieza agresiva: Asegura que no haya basura invisible en las claves
+        // Limpieza de claves
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        
         // Validación de usuario
         if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
         const userId = req.usuario.id;
@@ -36,20 +35,33 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
-        // Hash para API 2.0 (Initiate Transaction)
+        // Hash para API 2.0
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + monto.toString())
             .digest('hex');
 
+        // --- AQUÍ ESTABA EL ERROR NUEVO ---
+        // Pagopar ahora exige que estos campos NO estén vacíos.
+        // Ponemos datos genéricos de tu empresa/plataforma.
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
             "monto_total": monto,
             "tipo_pedido": "VENTA-COMERCIO",
             "compras_items": [{
-                "ciudad": 1, "nombre": curso.titulo, "cantidad": 1, "categoria": "909",
-                "public_key": PUBLIC_KEY, "url_imagen": curso.imagen_url || "",
-                "descripcion": curso.titulo, "id_producto": courseId.toString(), "precio_total": monto
+                "ciudad": 1, 
+                "nombre": curso.titulo, 
+                "cantidad": 1, 
+                "categoria": "909",
+                "public_key": PUBLIC_KEY, 
+                "url_imagen": curso.imagen_url || "https://tecniaacademy.com/logo.png",
+                "descripcion": curso.titulo, 
+                "id_producto": courseId.toString(), 
+                "precio_total": monto,
+                "vendedor_telefono": "0981000000",           // OBLIGATORIO AHORA
+                "vendedor_direccion": "Oficina Central",     // OBLIGATORIO AHORA
+                "vendedor_direccion_referencia": "Centro",   // OBLIGATORIO AHORA
+                "vendedor_direccion_coordenadas": "-25.2637,-57.5759" // OBLIGATORIO (Asunción genérico)
             }],
             "fecha_maxima_pago": new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
             "id_pedido_comercio": pedidoId,
@@ -57,9 +69,14 @@ const initiatePayment = async (req, res) => {
             "forma_pago": 9,
             "comprador": {
                 "ruc": usuario.documento ? `${usuario.documento}-1` : "4444440-1",
-                "email": usuario.email, "ciudad": 1, "nombre": usuario.nombre_completo || "Cliente",
-                "telefono": usuario.telefono || "0981000000", "direccion": "Online",
-                "documento": usuario.documento || "4444440", "razon_social": usuario.nombre_completo || "Cliente", "tipo_documento": "CI"
+                "email": usuario.email, 
+                "ciudad": 1, 
+                "nombre": usuario.nombre_completo || "Cliente",
+                "telefono": usuario.telefono || "0981000000", 
+                "direccion": "Online",
+                "documento": usuario.documento || "4444440", 
+                "razon_social": usuario.nombre_completo || "Cliente", 
+                "tipo_documento": "CI"
             }
         };
 
@@ -79,7 +96,7 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// --- 2. WEBHOOK (Aquí está la magia V3.0) ---
+// --- 2. WEBHOOK (Estrategia Omni-Campo) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -87,41 +104,32 @@ const confirmPaymentWebhook = async (req, res) => {
         const { resultado } = req.body;
         const data = (resultado && resultado[0]) ? resultado[0] : req.body;
         
-        // Responder rápido al simulador paso 2
         if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
-        // A. LIMPIEZA DE DATOS (Vital: a veces el hash trae espacios)
         const hash_pedido = (data.hash_pedido || "").trim();
 
-        // B. CARGA DE CLAVES
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
-        // Debug seguro: Solo longitudes para confirmar carga correcta
-        console.log(`🔎 Validando (Paso 3)... Claves cargadas: Public(${PUBLIC_KEY.length}), Private(${PRIVATE_KEY.length})`);
+        console.log(`🔎 Validando (Paso 3)... Hash Pedido: ${hash_pedido.substring(0,10)}...`);
 
-        // C. GENERAR TOKEN DE CONSULTA
-        // Fórmula estándar: sha1(PRIVATE_KEY + "CONSULTA" + PUBLIC_KEY)
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // D. ESTRATEGIA OMNI-CAMPO (El Secreto)
-        // Enviamos la clave pública en TODOS los campos posibles para que la API 1.1 no falle.
+        // ESTRATEGIA OMNI-CAMPO: Enviamos ambos nombres
         const payload = {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
-            token_publico: PUBLIC_KEY, // Nombre antiguo
-            public_key: PUBLIC_KEY     // Nombre nuevo
+            token_publico: PUBLIC_KEY, 
+            public_key: PUBLIC_KEY     
         };
 
-        // E. PETICIÓN (JSON Estricto)
         const verificacion = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', payload, {
             headers: { 'Content-Type': 'application/json' }
         });
 
-        // F. VERIFICACIÓN
         if (verificacion.data.respuesta === true) {
             console.log("✅ ¡PASO 3 VERDE! Token aceptado.");
             const pedidoReal = verificacion.data.resultado[0];
@@ -151,27 +159,7 @@ const confirmPaymentWebhook = async (req, res) => {
                 }
             }
         } else {
-            // G. AUTO-CORRECCIÓN DE EMERGENCIA (Si falla, prueba invertir claves)
-            if (verificacion.data.resultado === 'Token no coincide') {
-                console.warn("⚠️ Token estándar rechazado. Intentando inversión de claves...");
-                
-                const tokenInvertido = crypto.createHash('sha1')
-                    .update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`)
-                    .digest('hex');
-                
-                // Reenviamos con token invertido y TAMBIÉN ambos campos de nombre
-                const reintento = await axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', {
-                    hash_pedido, token: tokenInvertido, token_publico: PUBLIC_KEY, public_key: PUBLIC_KEY
-                }, { headers: { 'Content-Type': 'application/json' } });
-
-                if (reintento.data.respuesta === true) {
-                    console.log("✅ ¡Recuperación exitosa con claves invertidas!");
-                } else {
-                    console.error("❌ ERROR FINAL PASO 3:", reintento.data.resultado);
-                }
-            } else {
-                console.error("❌ ERROR PAGOPAR:", verificacion.data.resultado);
-            }
+            console.error("❌ ERROR PAGOPAR:", verificacion.data.resultado);
         }
 
     } catch (error) {
