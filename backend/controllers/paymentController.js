@@ -2,20 +2,23 @@ const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
-// --- 1. INICIAR PAGO (V3.2 - COMPRADOR SIMPLIFICADO) ---
+// --- 1. INICIAR PAGO (V3.3 - CORRECCIÓN DEFINITIVA COMPRADOR) ---
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO (V3.2 - MINIMALISTA)");
+    console.log("\n🚀 INICIANDO PAGO (V3.3 - ESTÁNDAR COMPLETO)");
 
     try {
+        // 1. Limpieza de claves (Seguridad anti-basura)
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves en .env");
 
         const { courseId } = req.body;
-        if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
         
+        // Validación de usuario
+        if (!req.usuario || !req.usuario.id) return res.status(401).json({ message: "Usuario no autenticado" });
         const userId = req.usuario.id;
+
         const curso = await Course.findByPk(courseId);
         const usuario = await User.findByPk(userId);
 
@@ -24,6 +27,7 @@ const initiatePayment = async (req, res) => {
         const monto = parseInt(curso.precio);
         const pedidoId = `ORDEN-${Date.now()}`; 
 
+        // 2. Crear transacción local
         await Transaction.create({
             external_reference: pedidoId,
             amount: monto,
@@ -33,12 +37,13 @@ const initiatePayment = async (req, res) => {
             ip_address: req.ip || '127.0.0.1'
         });
 
+        // 3. Generar Hash (API 2.0)
         const hash = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + monto.toString())
             .digest('hex');
 
-        // --- SOLUCIÓN AL ERROR DEL COMPRADOR ---
-        // Simplificamos el objeto comprador. Quitamos campos opcionales que causan conflicto (RUC, dirección, etc).
+        // 4. Construir objeto Orden (CORRECCIÓN AQUÍ)
+        // Agregamos 'razon_social' y 'direccion' que faltaban en la V3.2
         const orden = {
             "token": hash,
             "public_key": PUBLIC_KEY,
@@ -64,15 +69,18 @@ const initiatePayment = async (req, res) => {
             "descripcion_resumen": `Pago curso: ${curso.titulo}`,
             "forma_pago": 9,
             "comprador": {
-                // MINIMALISMO ABSOLUTO PARA PASAR VALIDACIÓN
-                "email": usuario.email,
+                // VOLVEMOS AL ESTÁNDAR COMPLETO PERO SEGURO
+                "ruc": usuario.documento ? `${usuario.documento}-1` : "4444440-1",
+                "email": usuario.email, 
+                "ciudad": 1, 
                 "nombre": usuario.nombre_completo || "Cliente",
-                "telefono": usuario.telefono || "0981000000",
-                "documento": usuario.documento || "4444440",
-                "tipo_documento": "CI",
-                "ciudad": 1 // Asunción (ID 1 es seguro)
-                // Quitamos: RUC, Dirección texto, Coordenadas, Razón Social.
-                // Estos campos a veces chocan con la validación estricta.
+                "telefono": usuario.telefono || "0981000000", 
+                "direccion": "Asuncion", // Dato obligatorio genérico
+                "documento": usuario.documento || "4444440", 
+                "coordenadas": "",
+                "razon_social": usuario.nombre_completo || "Cliente", // OBLIGATORIO
+                "tipo_documento": "CI", 
+                "direccion_referencia": ""
             }
         };
 
@@ -92,7 +100,7 @@ const initiatePayment = async (req, res) => {
     }
 };
 
-// --- 2. WEBHOOK (Sin cambios, ya está blindado) ---
+// --- 2. WEBHOOK (V3.3 - Blindado Omni-Campo) ---
 const confirmPaymentWebhook = async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
 
@@ -103,17 +111,19 @@ const confirmPaymentWebhook = async (req, res) => {
         if (req.body.resultado) console.log("🧪 Intento de simulación recibido.");
         if (!data) return res.json({ respuesta: true });
 
+        // Limpieza de datos entrantes y claves
         const hash_pedido = (data.hash_pedido || "").trim();
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/['"\r\n\s]/g, "");
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/['"\r\n\s]/g, "");
 
         console.log(`🔎 Validando (Paso 3)... Hash: ${hash_pedido.substring(0,10)}...`);
 
+        // Generar Token
         const tokenConsulta = crypto.createHash('sha1')
             .update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`)
             .digest('hex');
 
-        // ESTRATEGIA OMNI-CAMPO
+        // ESTRATEGIA OMNI-CAMPO: Enviamos ambos nombres de llave pública
         const payload = {
             hash_pedido: hash_pedido,
             token: tokenConsulta,
@@ -153,7 +163,7 @@ const confirmPaymentWebhook = async (req, res) => {
                 }
             }
         } else {
-             // AUTO-CORRECCIÓN DE EMERGENCIA
+             // AUTO-CORRECCIÓN DE EMERGENCIA (Inversión de claves)
              if (verificacion.data.resultado === 'Token no coincide') {
                 console.warn("⚠️ Reintentando con claves invertidas...");
                 const tokenInvertido = crypto.createHash('sha1').update(`${PUBLIC_KEY}CONSULTA${PRIVATE_KEY}`).digest('hex');
