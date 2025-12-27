@@ -48,8 +48,11 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Middlewares estándar
+// --- MIDDLEWARES ESTÁNDAR (CORREGIDO) ---
 app.use(express.json());
+// 👇 ESTA LÍNEA ES VITAL: Permite recibir datos tipo formulario (x-www-form-urlencoded)
+// Pagopar a veces envía los webhooks en este formato.
+app.use(express.urlencoded({ extended: true }));
 
 // Rutas
 app.use('/api/auth', authRoutes);
