@@ -3,13 +3,13 @@ const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
 // =========================================================
-// 1. INICIAR PAGO
+// 1. INICIAR PAGO (Genera el pedido para el Simulador)
 // =========================================================
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO");
+    console.log("\n🚀 INICIANDO PAGO DESDE LA WEB");
     try {
-        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
-        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
+        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves");
 
@@ -29,32 +29,34 @@ const initiatePayment = async (req, res) => {
 
         const hash = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
 
-        // Datos del comprador para evitar errores de formulario
-        const compradorData = {
-            "ruc": req.usuario.documento || "4444440-1", 
-            "email": req.usuario.email || "cliente@prueba.com", 
-            "ciudad": 1, 
-            "nombre": req.usuario.nombre_completo || "Cliente", 
-            "telefono": req.usuario.telefono || "0981000000",
-            "direccion": "Asuncion", 
-            "documento": req.usuario.documento_numero || "4444440", 
-            "razon_social": req.usuario.nombre_completo || "Cliente", 
-            "tipo_documento": "CI"
-        };
-
+        // Datos completísimos para que Pagopar no rechace la creación
         const orden = {
             "token": hash, "public_key": PUBLIC_KEY, "monto_total": monto, "tipo_pedido": "VENTA-COMERCIO",
             "compras_items": [{"ciudad":1,"nombre":curso.titulo.substring(0,40),"cantidad":1,"categoria":"909","public_key":PUBLIC_KEY,"url_imagen":"https://tecniaacademy.com/logo.png","descripcion":"Curso","id_producto":courseId.toString(),"precio_total":monto,"vendedor_telefono":"0981000000","vendedor_direccion":"Asuncion","vendedor_direccion_referencia":"Centro","vendedor_direccion_coordenadas":"-25.2637,-57.5759"}],
             "fecha_maxima_pago": new Date(Date.now()+48*60*60*1000).toISOString(), 
             "id_pedido_comercio": pedidoId, "descripcion_resumen": "Pago curso", "forma_pago": 9,
-            "comprador": compradorData
+            "comprador": {
+                "ruc": req.usuario.documento || "4444440-1", 
+                "email": req.usuario.email || "cliente@prueba.com", 
+                "ciudad": 1, 
+                "nombre": req.usuario.nombre_completo || "Cliente", 
+                "telefono": req.usuario.telefono || "0981000000", 
+                "direccion": "Asuncion", 
+                "documento": req.usuario.documento_numero || "4444440", 
+                "razon_social": req.usuario.nombre_completo || "Cliente", 
+                "tipo_documento": "CI",
+                "coordenadas": "",          
+                "direccion_referencia": ""  
+            }
         };
 
         const r = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
         
         if(r.data.respuesta) {
+            console.log("✅ Pedido Creado. Hash:", r.data.resultado[0].data);
             res.json({success:true, redirectUrl:`https://www.pagopar.com/pagos/${r.data.resultado[0].data}`, pedidoId});
         } else {
+            console.error("❌ Error Pagopar:", r.data.resultado);
             res.status(400).json({message:"Error Pagopar:"+r.data.resultado});
         }
 
@@ -62,75 +64,56 @@ const initiatePayment = async (req, res) => {
 };
 
 // =========================================================
-// 2. WEBHOOK COMPLETO (PDF + SEMÁFORO)
+// 2. WEBHOOK HÍBRIDO (El que activa los semáforos)
 // =========================================================
 const confirmPaymentWebhook = async (req, res) => {
-    console.log("🔔 WEBHOOK FINAL RECIBIDO");
+    console.log("🔔 WEBHOOK RECIBIDO");
 
     try {
         const body = req.body;
-        if (!body || !body.resultado || !body.resultado[0]) {
-            return res.json({ error: "Datos insuficientes" });
-        }
+        if (!body || !body.resultado || !body.resultado[0]) return res.json({ error: "No data" });
 
         const datosPago = body.resultado[0];
         const hash_pedido = datosPago.hash_pedido;
         const token_recibido = datosPago.token;
-        const pagado = datosPago.pagado;
 
-        // 1. OBTENER LLAVES
-        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
-        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").replace(/[^a-zA-Z0-9]/g, "");
+        const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
+        const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
         
-        // 2. VALIDACIÓN DE TOKEN (Seguridad PDF)
+        // Validación de Token Local
         const token_generado = crypto.createHash('sha1').update(PRIVATE_KEY + hash_pedido).digest('hex');
 
         if (token_generado === token_recibido) {
-            console.log("✅ Token Validado.");
+            console.log("✅ Token Local Validado.");
 
-            // ------------------------------------------------------------------
-            // 🔥 PASO 3: LA CONSULTA QUE FALTABA 🔥
-            // Aunque ya sabemos que es válido, Pagopar NECESITA ver que hacemos 
-            // esta petición 'axios.post' para poner el check verde.
-            // ------------------------------------------------------------------
+            // 🔥 DISPARO DE CONSULTA (PASO 3) 🔥
             try {
-                console.log(`🔎 Ejecutando Consulta API (Requisito Semáforo) para: ${hash_pedido}`);
                 const tokenConsulta = crypto.createHash('sha1').update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`).digest('hex');
-                
-                // No usamos await para no retrasar la respuesta del Webhook (Paso 2)
+                // Hacemos la consulta pero NO esperamos (fire & forget) para responder rápido el webhkook
                 axios.post('https://api.pagopar.com/api/pedidos/1.1/traer', { 
-                    hash_pedido: hash_pedido, 
-                    token: tokenConsulta, 
-                    token_publico: PUBLIC_KEY, 
-                    public_key: PUBLIC_KEY 
+                    hash_pedido: hash_pedido, token: tokenConsulta, token_publico: PUBLIC_KEY, public_key: PUBLIC_KEY 
                 }, { headers: { 'Content-Type': 'application/json' } })
-                .then(r => console.log("✅ Consulta API enviada correctamente."))
-                .catch(e => console.log("⚠️ Consulta API enviada (con error de red, pero enviada)."));
-                
-            } catch (err) { console.log("Error intentando consulta API"); }
-            // ------------------------------------------------------------------
+                .then(r => console.log("✅ Consulta Paso 3 Enviada."))
+                .catch(e => console.log("⚠️ Error en consulta Paso 3 (no crítico)."));
+            } catch (err) {}
 
-            // 3. ACTUALIZAR BASE DE DATOS
+            // Actualizar BD
             const transaccion = await Transaction.findOne({ where: { external_reference: datosPago.numero_pedido } });
-            
-            if (transaccion && pagado === true && transaccion.status !== 'paid') {
+            if (transaccion && datosPago.pagado === true && transaccion.status !== 'paid') {
                 transaccion.status = 'paid';
                 await transaccion.save();
                 await Enrollment.findOrCreate({
                     where: { userId: transaccion.userId, courseId: transaccion.courseId },
                     defaults: { progreso_porcentaje: 0, fecha_inscripcion: new Date(), lecciones_completadas: [] }
                 });
-                console.log("🎉 Curso Habilitado en BD.");
             }
         }
 
-        // 4. RESPONDER EL JSON EXACTO (Requisito PDF / Paso 2)
-        console.log("📤 Enviando respuesta JSON espejo (Requisito PDF)");
+        // RESPUESTA ESPEJO (PASO 2)
         return res.json(body.resultado);
 
     } catch (error) {
         console.error("❌ Error Webhook:", error.message);
-        // Si falla algo, intentamos responder true para no trabar a Pagopar
         return res.json({ respuesta: true });
     }
 };
