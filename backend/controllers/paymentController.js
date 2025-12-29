@@ -3,13 +3,14 @@ const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
 // =========================================================
-// 1. INICIAR PAGO (Funciona perfecto, no tocar)
+// 1. INICIAR PAGO (Esto ya funciona perfecto)
 // =========================================================
 const initiatePayment = async (req, res) => {
     console.log("\n🚀 INICIANDO PAGO");
     try {
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
+
         if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves");
 
         const { courseId } = req.body;
@@ -43,6 +44,7 @@ const initiatePayment = async (req, res) => {
         };
 
         const r = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
+        
         if(r.data.respuesta) res.json({success:true, redirectUrl:`https://www.pagopar.com/pagos/${r.data.resultado[0].data}`, pedidoId});
         else res.status(400).json({message:"Error Pagopar:"+r.data.resultado});
 
@@ -50,7 +52,7 @@ const initiatePayment = async (req, res) => {
 };
 
 // =========================================================
-// 2. WEBHOOK + CONSULTA ACTIVA (PASO 2 Y PASO 3 JUNTOS)
+// 2. WEBHOOK + CONSULTA (CORREGIDO)
 // =========================================================
 const confirmPaymentWebhook = async (req, res) => {
     console.log("\n🔔 WEBHOOK RECIBIDO");
@@ -62,24 +64,23 @@ const confirmPaymentWebhook = async (req, res) => {
         const datosPago = body.resultado[0];
         const hash_pedido = datosPago.hash_pedido;
         
-        // --- PARTE A: CUMPLIR PASO 2 (Responder Eco) ---
-        // Respondemos INMEDIATAMENTE para que Pagopar marque el Paso 2 en verde
+        // A) CUMPLIR PASO 2: Responder Eco inmediatamente
         res.json(body.resultado);
         console.log("✅ Paso 2: Respuesta enviada.");
 
-        // --- PARTE B: CUMPLIR PASO 3 (Consulta Activa) ---
-        // Esperamos 2 segundos y consultamos a Pagopar
+        // B) CUMPLIR PASO 3: Consultar con la FÓRMULA GANADORA
         setTimeout(async () => {
-            console.log("⏳ Ejecutando Paso 3 (Consulta a /traer)...");
+            console.log("⏳ Ejecutando Paso 3 (Consulta)...");
             
             const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
             const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
-            // Fórmula OFICIAL para /traer: sha1(private + "CONSULTA" + public)
-            const tokenConsulta = crypto.createHash('sha1').update(`${PRIVATE_KEY}CONSULTA${PUBLIC_KEY}`).digest('hex');
+            // 🏆 LA CORRECCIÓN MAESTRA 🏆
+            // Fórmula: sha1(private + "CONSULTA") -> SIN PUBLIC KEY
+            const tokenConsulta = crypto.createHash('sha1').update(`${PRIVATE_KEY}CONSULTA`).digest('hex');
 
             try {
-                // OJO: Usamos 'token_publico', NO 'public_key' en el body para la v1.1
+                // El payload sigue pidiendo token_publico, pero el hash NO lo usa
                 const payload = {
                     hash_pedido: hash_pedido,
                     token: tokenConsulta,
@@ -92,9 +93,8 @@ const confirmPaymentWebhook = async (req, res) => {
 
                 if (consulta.data.respuesta === true) {
                     console.log("🎉 PASO 3 EXITOSO: Pagopar confirmó el estado.");
-                    console.log("📊 Estado Real:", consulta.data.resultado[0].pagado ? "PAGADO" : "PENDIENTE");
                     
-                    // Actualizamos BD Local con la VERDAD de Pagopar
+                    // Actualizamos BD Local
                     const transaccion = await Transaction.findOne({ where: { external_reference: datosPago.numero_pedido } });
                     if (transaccion && consulta.data.resultado[0].pagado === true && transaccion.status !== 'paid') {
                         transaccion.status = 'paid';
@@ -107,7 +107,6 @@ const confirmPaymentWebhook = async (req, res) => {
                 }
             } catch (err) {
                 console.log("❌ Error Red Paso 3:", err.message);
-                if(err.response) console.log(err.response.data);
             }
         }, 2000);
 
