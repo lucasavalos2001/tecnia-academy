@@ -3,7 +3,7 @@ const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
 // =========================================================
-// 1. INICIAR PAGO (MODIFICADO PARA GUARDAR EL HASH)
+// 1. INICIAR PAGO (LÓGICA CORREGIDA: ACTUALIZA EL HASH REAL)
 // =========================================================
 const initiatePayment = async (req, res) => {
     console.log("\n🚀 INICIANDO PAGO");
@@ -22,14 +22,10 @@ const initiatePayment = async (req, res) => {
         const monto = parseInt(curso.precio);
         const pedidoId = `ORDEN-${Date.now()}`; 
 
-        // 1. Generamos el HASH primero
-        // Token creación: sha1(private + id + monto)
-        const hash = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
-
-        // 2. Guardamos la Transacción usando el HASH como referencia
-        // (Así podremos encontrarla cuando vuelva el webhook)
-        await Transaction.create({
-            external_reference: hash, // 👈 CAMBIO CLAVE: Guardamos el Hash, no el "ORDEN-..."
+        // 1. CREAMOS LA TRANSACCIÓN (Con ID temporal)
+        // Guardamos 'pedidoId' temporalmente. Luego lo cambiaremos por el Hash real.
+        const nuevaTransaccion = await Transaction.create({
+            external_reference: pedidoId, 
             amount: monto, 
             status: 'pending', 
             userId: req.usuario.id, 
@@ -38,8 +34,11 @@ const initiatePayment = async (req, res) => {
             payment_method: 'pagopar'
         });
 
+        // Token para firmar el envío (SHA1)
+        const tokenFirma = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
+
         const orden = {
-            "token": hash, 
+            "token": tokenFirma, 
             "public_key": PUBLIC_KEY, 
             "monto_total": monto, 
             "tipo_pedido": "VENTA-COMERCIO",
@@ -58,8 +57,21 @@ const initiatePayment = async (req, res) => {
 
         const r = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
         
-        if(r.data.respuesta) res.json({success:true, redirectUrl:`https://www.pagopar.com/pagos/${r.data.resultado[0].data}`, pedidoId});
-        else res.status(400).json({message:"Error Pagopar:"+r.data.resultado});
+        if(r.data.respuesta) {
+            // 🚨 EL PASO CLAVE: OBTENER EL HASH REAL DE PAGOPAR 🚨
+            const hashRealPagopar = r.data.resultado[0].data; 
+            
+            // Actualizamos nuestra BD con el hash que SÍ usará el webhook
+            nuevaTransaccion.external_reference = hashRealPagopar;
+            await nuevaTransaccion.save();
+            console.log(`✅ Transacción actualizada con Hash Real: ${hashRealPagopar}`);
+
+            res.json({success:true, redirectUrl:`https://www.pagopar.com/pagos/${hashRealPagopar}`, pedidoId});
+        } else {
+            // Si falla, borramos la transacción pendiente para no dejar basura
+            await nuevaTransaccion.destroy();
+            res.status(400).json({message:"Error Pagopar:"+r.data.resultado});
+        }
 
     } catch(e){ console.error(e); res.status(500).json({msg:"Error"}); }
 };
@@ -75,7 +87,7 @@ const confirmPaymentWebhook = async (req, res) => {
         if (!body || !body.resultado || !body.resultado[0]) return res.json({ error: "No data" });
 
         const datosPago = body.resultado[0];
-        const hash_pedido = datosPago.hash_pedido; // 👈 Este es el dato confiable
+        const hash_pedido = datosPago.hash_pedido; 
         
         res.json(body.resultado);
         console.log("✅ Paso 2: Respuesta enviada.");
@@ -86,7 +98,6 @@ const confirmPaymentWebhook = async (req, res) => {
             const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
             const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
-            // Fórmula Correcta: sha1(private + "CONSULTA")
             const tokenConsulta = crypto.createHash('sha1').update(`${PRIVATE_KEY}CONSULTA`).digest('hex');
 
             try {
@@ -103,12 +114,13 @@ const confirmPaymentWebhook = async (req, res) => {
                 if (consulta.data.respuesta === true) {
                     console.log("🎉 PASO 3 EXITOSO: Pagopar confirmó el estado.");
                     
-                    // 🕵️‍♂️ BUSCAMOS POR HASH (Ahora sí coincidirá)
+                    // BUSCAMOS POR HASH (Ahora sí coincidirá porque lo guardamos arriba)
                     const transaccion = await Transaction.findOne({ where: { external_reference: hash_pedido } });
                     
                     if (!transaccion) {
                         console.error("😱 ERROR: Transacción no encontrada por Hash.");
-                        console.error(`   Hash Buscado: ${hash_pedido}`);
+                        console.error(`   Hash Buscado (Pagopar): ${hash_pedido}`);
+                        // Si falla aquí, revisa manualmente la tabla 'Transactions' en tu BD
                         return;
                     }
 
