@@ -33,11 +33,10 @@ Course.hasMany(Transaction, { foreignKey: 'courseId' });
 
 const syncDB = async () => {
     try {
-        // ⚠️ CAMBIO APLICADO: FORCE: TRUE ⚠️
-        // Esto borrará y recreará la tabla "Transactions" que está dando error.
-        // Una vez que el servidor arranque bien una vez, puedes volver a cambiarlo a { alter: true }
+        // 🛡️ MODO PRODUCCIÓN SEGURO: alter: true
+        // Esto ajusta las tablas si agregas columnas nuevas, PERO NO BORRA DATOS.
         await sequelize.sync({ alter: true }); 
-        console.log("✅ Base de Datos Sincronizada (RESET COMPLETO - TABLAS RECREADAS).");
+        console.log("✅ Base de Datos Sincronizada (DATOS SEGUROS - NO SE BORRÓ NADA).");
     } catch (error) {
         console.error("❌ Error al sincronizar modelos:", error);
     }
