@@ -30,7 +30,7 @@ const getUserProfile = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al obtener perfil" }); }
 };
 
-// 🟢 FUNCIÓN CORREGIDA: Ahora incluye 'duracion'
+// 🟢 FUNCIÓN CORREGIDA DEFINITIVA
 const getUserCertificates = async (req, res) => {
     try {
         const userId = req.usuario.id;
@@ -39,13 +39,29 @@ const getUserCertificates = async (req, res) => {
             include: [{ 
                 model: Course, 
                 as: 'curso', 
-                // Aquí agregamos 'duracion' para que llegue al certificado
-                attributes: ['id', 'titulo', 'imagen_url', 'updatedAt', 'duracion'] 
+                // 🟢 AQUÍ ESTABA EL BLOQUEO. AHORA PEDIMOS TODOS LOS DATOS NECESARIOS:
+                attributes: [
+                    'id', 
+                    'titulo', 
+                    'imagen_url', 
+                    'updatedAt', 
+                    'duracion', 
+                    'nombre_instructor_certificado' // <--- ¡VITAL PARA QUE APAREZCA EL NOMBRE!
+                ],
+                // 🟢 TAMBIÉN TRAEMOS LOS DATOS DEL DUEÑO DEL CURSO (PARA RESPALDO)
+                include: [{
+                    model: User,
+                    as: 'instructor',
+                    attributes: ['nombre_completo']
+                }]
             }],
             order: [['updatedAt', 'DESC']]
         });
         res.json({ certificados });
-    } catch (error) { res.status(500).json({ message: "Error al obtener certificados" }); }
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ message: "Error al obtener certificados" }); 
+    }
 };
 
 const becomeInstructor = async (req, res) => {

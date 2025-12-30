@@ -20,20 +20,16 @@ function CertificateView() {
   }
 
   const handlePrint = () => {
-    window.print(); // Abre el menú de impresión del navegador
+    window.print(); 
   };
 
-  // 🟢 LÓGICA CORREGIDA: PRIORIDAD AL NOMBRE PERSONALIZADO
-  // 1. Intentamos leer el campo personalizado 'nombre_instructor_certificado'
-  // 2. Si está vacío o null, usamos el nombre de la cuenta del instructor ('instructor.nombre_completo')
-  // 3. Si todo falla, ponemos un texto por defecto.
+  // 🟢 LÓGICA DE NOMBRE (Prioridad al personalizado)
   const nombreInstructor = certificado.curso?.nombre_instructor_certificado 
                         || certificado.curso?.instructor?.nombre_completo 
-                        || "Instructor Certificado";
+                        || "Firma Autorizada"; // Texto neutro si falla todo
 
   return (
     <>
-      {/* Navbar visible solo en pantalla, se oculta al imprimir */}
       <div className="no-print"><Navbar /></div>
       
       <div className="certificate-viewer-container">
@@ -49,12 +45,10 @@ function CertificateView() {
             <div className="certificate-body">
                 <p className="subtitle">SE OTORGA EL PRESENTE CERTIFICADO A:</p>
                 
-                {/* Nombre del Estudiante */}
                 <h1 className="student-name">{usuario.nombre_completo || usuario.nombre || usuario}</h1>
                 
                 <p className="subtitle">POR HABER COMPLETADO SATISFACTORIAMENTE EL CURSO:</p>
                 
-                {/* Título del Curso */}
                 <h2 className="course-name">{certificado.curso.titulo}</h2>
 
                 <p className="course-hours">
@@ -73,20 +67,20 @@ function CertificateView() {
                     <small>tecniaacademy.com/verify</small>
                 </div>
 
-                {/* BLOQUE DE FIRMA DINÁMICO */}
                 <div className="signature-block" style={{ textAlign: 'center' }}>
                     <p className="verified-by">Verificado por:</p>
                     
-                    {/* Línea de firma visual */}
                     <div className="signature-line" style={{borderTop: '2px solid #333', width: '250px', margin: '0 auto 10px auto'}}></div>
                     
-                    {/* Nombre del Instructor (Personalizado o de Cuenta) */}
-                    <div className="signatory-name">
+                    {/* Nombre del Instructor */}
+                    <div className="signatory-name" style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#000'}}>
                         {nombreInstructor}
                     </div>
                     
-                    {/* Cargo fijo */}
-                    <div className="signatory-title">Instructor</div>
+                    {/* Cargo (Solo dice Instructor) */}
+                    <div className="signatory-title" style={{fontSize: '0.9rem', color: '#666'}}>
+                        Instructor
+                    </div>
                 </div>
             </div>
 
