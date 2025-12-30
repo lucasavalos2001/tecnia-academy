@@ -19,9 +19,14 @@
   --transition-fast: all 0.2s ease-in-out;
 }
 
+html, body {
+  height: 100%; /* Vital para el layout tipo App */
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: var(--font-principal);
-  margin: 0;
   color: var(--color-texto);
   background-color: var(--color-fondo);
   background-image: radial-gradient(#d8e0eb 1px, transparent 1px);
@@ -46,22 +51,19 @@ body {
   justify-content: space-between;
   align-items: center;
   background-color: var(--color-primario);
-  padding: 20px 60px;
+  padding: 15px 40px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.1);
   position: relative;
   z-index: 1001;
 }
 
-.navbar .logo-link { text-decoration: none; }
-
-/* ✅ CORRECCIÓN DE LOGO: Flexbox para separar palabras */
 .logo {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: 1px;
   display: flex;
   align-items: center;
-  gap: 6px; /* Espacio entre Tecnia y Academy */
+  gap: 6px; 
 }
 
 .logo-tecnia { color: var(--color-blanco); }
@@ -70,8 +72,8 @@ body {
     text-shadow: 0px 1px 3px rgba(0,0,0,0.3);
 }
 
-.nav-links { display: flex; align-items: center; gap: 30px; }
-.nav-links a { color: var(--color-blanco); text-decoration: none; font-size: 16px; font-weight: 500; transition: var(--transition-fast); }
+.nav-links { display: flex; align-items: center; gap: 20px; }
+.nav-links a { color: var(--color-blanco); text-decoration: none; font-size: 15px; font-weight: 500; transition: var(--transition-fast); }
 .nav-links a:hover { color: var(--color-secundario); }
 
 .btn-registrarse {
@@ -93,9 +95,8 @@ body {
   color: var(--color-blanco);
   text-align: center;
   padding: 25px 10px;
-  font-size: 15px;
+  font-size: 14px;
   border-top: 2px solid var(--color-secundario);
-  font-family: var(--font-principal);
 }
 .footer span { color: var(--color-secundario); font-weight: 600; }
 
@@ -111,7 +112,6 @@ body {
   outline: none;
   width: 250px;
   transition: var(--transition-fast);
-  font-family: var(--font-principal);
 }
 .search-bar:focus { background-color: rgba(255, 255, 255, 0.2); border-color: var(--color-secundario); }
 
@@ -130,7 +130,6 @@ body {
     overflow-y: auto;
     z-index: 1000;
 }
-
 .search-suggestion-item {
     display: flex;
     align-items: center;
@@ -164,53 +163,31 @@ body {
 .hero p { font-size: 20px; margin-bottom: 40px; }
 
 .search-box { display: flex; justify-content: center; gap: 10px; align-items: flex-start; }
-.search-box input { width: 400px; padding: 14px 20px; border-radius: 30px; border: none; font-size: 16px; outline: none; font-family: var(--font-principal); }
-.search-box button { background-color: var(--color-secundario); color: var(--color-primario); border: none; padding: 14px 30px; border-radius: 30px; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); font-family: var(--font-principal); }
+.search-box input { width: 400px; padding: 14px 20px; border-radius: 30px; border: none; font-size: 16px; outline: none; }
+.search-box button { background-color: var(--color-secundario); color: var(--color-primario); border: none; padding: 14px 30px; border-radius: 30px; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); }
 .search-box button:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
 
 /* =========================================
    ESTILOS DE FORMULARIOS MODERNOS (GLOBAL)
    ========================================= */
 .form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--color-primario);
-    font-size: 0.95rem;
-    letter-spacing: 0.5px;
+    display: block; margin-bottom: 8px; font-weight: 600;
+    color: var(--color-primario); font-size: 0.95rem; letter-spacing: 0.5px;
 }
-
 .form-group input[type="text"],
 .form-group input[type="email"],
 .form-group input[type="password"],
 .form-group input[type="number"],
 .form-group select,
 .form-group textarea {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #e0e0e0;
-    border-radius: 10px; /* Bordes redondeados */
-    font-size: 1rem;
-    font-family: inherit;
-    background-color: #fff;
-    transition: all 0.3s ease;
-    color: #333;
-    box-sizing: border-box; 
+    width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0;
+    border-radius: 10px; font-size: 1rem; font-family: inherit;
+    background-color: #fff; transition: all 0.3s ease; color: #333; box-sizing: border-box; 
 }
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    border-color: var(--color-secundario);
-    box-shadow: 0 0 0 4px rgba(0, 212, 212, 0.15);
-    outline: none;
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--color-secundario); box-shadow: 0 0 0 4px rgba(0, 212, 212, 0.15); outline: none;
 }
-
-.form-group textarea {
-    resize: vertical;
-    min-height: 120px;
-    line-height: 1.5;
-}
+.form-group textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 
 /* ---- FORMULARIOS CONTENEDORES ---- */
 .auth-main-container, .create-course-main { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 40px; box-sizing: border-box; }
@@ -223,35 +200,20 @@ body {
 .auth-form, .create-course-form { text-align: left; }
 .form-group { margin-bottom: 20px; }
 
-/* Botones de Formulario */
 .btn-auth, .btn-submit-course, .btn-add-lesson {
-  width: 100%;
-  padding: 12px;
-  border: none;
-  border-radius: 10px; 
-  background-color: var(--color-primario);
-  color: var(--color-blanco);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: var(--transition-fast);
+  width: 100%; padding: 12px; border: none; border-radius: 10px; 
+  background-color: var(--color-primario); color: var(--color-blanco);
+  font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: var(--transition-fast);
 }
 .btn-auth:hover, .btn-submit-course:hover, .btn-add-lesson:hover { background-color: #08327a; transform: translateY(-2px); }
 .auth-switch { margin-top: 20px; font-size: 14px; text-align: center; }
 
-/* =========================================
-   LOGIN/REGISTRO DIVIDIDO (MODERNO)
-   ========================================= */
+/* LOGIN/REGISTRO DIVIDIDO */
 .auth-split-screen { display: flex; min-height: 100vh; width: 100%; background-color: #fff; }
-
 .auth-banner-side {
-    display: none; 
-    flex: 1;
-    position: relative;
+    display: none; flex: 1; position: relative;
     background-image: url('https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1351&q=80');
-    background-size: cover;
-    background-position: center;
+    background-size: cover; background-position: center;
 }
 .auth-overlay {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -260,7 +222,6 @@ body {
     color: white; text-align: center; padding: 40px;
 }
 .auth-overlay h1 { font-size: 3.5rem; margin-bottom: 10px; font-weight: 800; }
-/* Corrección logo en login */
 .auth-overlay h1 .logo-tecnia { color: white; }
 .auth-overlay h1 .logo-academy { color: var(--color-secundario); text-shadow: none; }
 .auth-overlay p { font-size: 1.2rem; max-width: 400px; line-height: 1.6; opacity: 0.9; }
@@ -271,56 +232,34 @@ body {
 .auth-back-link:hover { color: var(--color-primario); }
 .auth-title { font-size: 2rem; color: var(--color-primario); margin-bottom: 10px; font-weight: 700; }
 .auth-subtitle { color: #666; margin-bottom: 30px; }
-
 @media (min-width: 900px) { .auth-banner-side { display: flex; } }
 
-
-/* ---- TARJETAS DE CURSO MODERNAS (CON ZOOM Y BADGE) ---- */
+/* ---- TARJETAS DE CURSO ---- */
 .main-content { padding: 40px 20px; }
 .explorar { max-width: 1200px; margin: 0 auto; text-align: center; }
 .curso-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; }
 
 .curso-card {
-    background-color: var(--color-blanco);
-    border-radius: 15px;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    border: 1px solid #f0f0f0;
+    background-color: var(--color-blanco); border-radius: 15px; overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: all 0.3s ease;
+    display: flex; flex-direction: column; position: relative; border: 1px solid #f0f0f0;
 }
 .curso-card:hover { transform: translateY(-8px); box-shadow: 0 15px 30px rgba(0,0,0,0.15); }
-
-/* Contenedor de imagen con efecto Zoom */
 .card-image-wrapper { width: 100%; height: 180px; overflow: hidden; position: relative; }
 .curso-card img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; display: block;}
 .curso-card:hover img { transform: scale(1.1); }
-
-/* Etiqueta de Categoría */
 .category-badge {
     position: absolute; top: 15px; left: 15px;
-    background-color: rgba(255, 255, 255, 0.95);
-    color: var(--color-primario);
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    z-index: 2;
+    background-color: rgba(255, 255, 255, 0.95); color: var(--color-primario);
+    padding: 4px 12px; border-radius: 20px; font-size: 0.75rem;
+    font-weight: 700; text-transform: uppercase; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 2;
 }
-
 .curso-card .card-content { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; text-align: left; }
 .curso-card h3 { font-size: 1.1rem; margin: 0 0 10px 0; color: var(--color-texto); font-weight: 700; line-height: 1.4; }
 .curso-card p { font-size: 14px; color: #666; margin-bottom: 20px; flex-grow: 1; line-height: 1.5; }
-
 .btn-inscribirse { background-color: var(--color-secundario); color: var(--color-primario); padding: 10px 20px; border-radius: var(--border-radius-pill); text-decoration: none; font-weight: 600; align-self: flex-start; transition: var(--transition-fast); cursor: pointer; border: none;}
 .btn-inscribirse:hover { background-color: var(--color-primario); color: var(--color-blanco); }
-.btn-continuar { background-color: var(--color-primario); color: var(--color-blanco); }
 
-.curso-card .progress-info { margin-bottom: 20px; }
 .curso-card .progress-bar-container { width: 100%; height: 8px; background-color: #e0e0e0; border-radius: 4px; overflow: hidden; }
 .curso-card .progress-bar { height: 100%; background: linear-gradient(45deg, var(--color-secundario), #00b8b8); position: relative; overflow: hidden; }
 .curso-card .progress-bar::after { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%); animation: progress-shimmer 2.5s infinite linear; }
@@ -339,7 +278,6 @@ body {
 .dashboard-content { flex-grow: 1; padding: 40px; background-color: #f4f7fa; overflow-y: auto; }
 .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
 .btn-create-course { background-color: var(--color-secundario); color: var(--color-primario); padding: 12px 22px; border-radius: var(--border-radius-sm); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 10px; transition: var(--transition-fast); border: none; cursor: pointer; }
-.btn-create-course:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); background-color: #00b8b8; }
 .course-list { display: flex; flex-direction: column; gap: 20px; }
 .course-item { display: flex; align-items: center; gap: 20px; background-color: var(--color-blanco); padding: 20px; border-radius: var(--border-radius-md); box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: var(--transition-fast); flex-wrap: wrap; }
 .course-item:hover { transform: translateY(-5px); box-shadow: var(--shadow-sm); }
@@ -350,75 +288,100 @@ body {
 .course-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 .course-actions .btn-action { padding: 8px 15px; border-radius: var(--border-radius-sm); text-decoration: none; font-weight: 500; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; transition: var(--transition-fast); cursor: pointer; }
 .course-actions .manage { background-color: var(--color-primario); color: var(--color-blanco); border-color: var(--color-primario); }
-.course-actions .manage:hover { background-color: #08327a; border-color: #08327a; }
 .course-actions .edit { background-color: #f0f0f0; color: #333; border-color: #ddd; }
-.course-actions .edit:hover { background-color: #e0e0e0; border-color: #ccc; }
 .course-actions .delete { background-color: transparent; color: #c0392b; }
-.course-actions .delete:hover { background-color: #c0392b; color: var(--color-blanco); }
 
-/* ✅ CORRECCIÓN: PERFIL DE USUARIO (FOTO FLOTANTE BIEN HECHA) */
+/* PERFIL DE USUARIO */
 .profile-page-container { max-width: 1200px; margin: 40px auto; display: flex; gap: 30px; align-items: flex-start; padding: 0 20px; }
-
 .profile-sidebar {
     width: 280px; flex-shrink: 0; background-color: var(--color-blanco);
     border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm);
-    padding: 20px; 
-    /* Aseguramos espacio arriba y permitimos que elementos (la foto) sobresalgan */
-    padding-top: 60px; 
-    margin-top: 60px; /* Bajar la tarjeta entera para que la foto quepa arriba */
+    padding: 20px; padding-top: 60px; margin-top: 60px; 
     position: sticky; top: 30px; text-align: center;
-    border: 1px solid #f0f0f0;
-    overflow: visible; /* CRÍTICO: Permite que la foto "flote" fuera de la tarjeta */
+    border: 1px solid #f0f0f0; overflow: visible; 
 }
-
 .profile-avatar-container {
-    width: 120px; height: 120px;
-    background-color: var(--color-secundario); color: var(--color-primario);
-    border-radius: 50%;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 3em; font-weight: 600;
-    /* Margen negativo para subir la foto por encima del borde superior */
-    margin: -100px auto 15px auto; 
-    border: 6px solid var(--color-blanco); /* Borde grueso blanco para separar */
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    position: relative; z-index: 10;
-    overflow: hidden;
+    width: 120px; height: 120px; background-color: var(--color-secundario); color: var(--color-primario);
+    border-radius: 50%; display: flex; justify-content: center; align-items: center;
+    font-size: 3em; font-weight: 600; margin: -100px auto 15px auto; 
+    border: 6px solid var(--color-blanco); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    position: relative; z-index: 10; overflow: hidden;
 }
-
 .profile-info { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
-.profile-info h3 { margin: 0 0 5px 0; font-size: 1.4em; color: var(--color-primario); }
-.profile-info p { margin: 0; font-size: 0.9em; color: #6a6f73; }
-.profile-tabs { display: flex; flex-direction: column; }
 .profile-tab-button { background: none; border: none; padding: 15px 10px; text-align: left; font-size: 1.1em; font-weight: 500; color: var(--color-texto); cursor: pointer; transition: var(--transition-fast); border-radius: var(--border-radius-sm); display: flex; align-items: center; gap: 15px; }
 .profile-tab-button:hover { background-color: #f7f9fa; color: var(--color-primario); }
 .profile-tab-button.active { background-color: var(--color-primario); color: var(--color-blanco); }
-.profile-tab-button.active:hover { background-color: #08327a; color: var(--color-blanco); }
-.profile-tab-button i { width: 20px; }
 .profile-main-content { flex-grow: 1; min-width: 60%; background-color: var(--color-blanco); padding: 30px; border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm); }
-.profile-main-content h2 { color: var(--color-primario); border-bottom: 2px solid var(--color-secundario); padding-bottom: 10px; margin-top: 0; margin-bottom: 30px; }
 
-/* ---- GESTIÓN DE CONTENIDO (Módulos y Lecciones) ---- */
+/* GESTIÓN DE CONTENIDO */
 .content-management-layout { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
 .curriculum-display { flex: 2; min-width: 300px; background-color: var(--color-blanco); padding: 30px; border-radius: var(--border-radius-md); box-shadow: var(--shadow-sm); }
-.curriculum-display h3 { margin-top: 0; border-bottom: 2px solid var(--color-primario); padding-bottom: 10px; color: var(--color-primario); }
 .add-lesson-form-container { flex: 1; min-width: 280px; background-color: #fdfdfd; padding: 30px; border: 1px solid #e0e0e0; border-radius: var(--border-radius-md); position: sticky; top: 40px; }
-.add-lesson-form-container h3 { margin-top: 0; color: var(--color-primario); text-align: center; margin-bottom: 25px; }
 .module-container { margin-bottom: 20px; border: 1px solid #e0e0e0; border-radius: var(--border-radius-sm); overflow: hidden; }
 .module-header { background-color: #f0f2f5; padding: 12px 15px; font-weight: 600; color: var(--color-texto); }
-.lessons-list-in-module { list-style: none; padding: 0; margin: 0; }
 .lessons-list-in-module li { padding: 12px 15px; border-top: 1px solid #e0e0e0; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; background-color: var(--color-blanco); }
-.lessons-list-in-module li i { color: var(--color-primario); }
 
 /* =====================================================
-   ESTILO UDEMY (AULA VIRTUAL PRO)
+   🎓 AULA VIRTUAL (ESTILO UDEMY) - FIX MOBILE & DESKTOP
    ===================================================== */
-.classroom-container { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.classroom-player-wrapper { display: flex; flex: 1; background-color: #1c1d1f; overflow: hidden; }
-.video-section { flex: 1; display: flex; flex-direction: column; overflow-y: auto; position: relative; }
-.video-frame-container { width: 100%; aspect-ratio: 16/9; background-color: #000; display: flex; justify-content: center; align-items: center; }
-.video-frame-container iframe { width: 100%; height: 100%; }
-.curriculum-sidebar { width: 350px; background-color: #fff; border-left: 1px solid #d1d7dc; display: flex; flex-direction: column; transition: width 0.3s ease; flex-shrink: 0; }
-.curriculum-sidebar.collapsed { width: 0; border: none; }
+.classroom-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh; /* Ocupa toda la pantalla, sin scroll en body */
+  overflow: hidden;
+}
+
+.classroom-player-wrapper {
+  display: flex;
+  flex: 1;
+  background-color: #1c1d1f;
+  overflow: hidden; /* Evita que el contenedor principal scrollee */
+}
+
+/* Área del video + Tabs */
+.video-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto; /* Scroll interno solo aquí */
+  position: relative;
+}
+
+/* Contenedor del Iframe/Player */
+.video-frame-container {
+  width: 100%;
+  background-color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* En Desktop permitimos que crezca, pero en mobile lo forzamos */
+  min-height: 500px; 
+}
+
+.video-frame-container iframe {
+  width: 100%;
+  height: 100%;
+}
+
+/* Sidebar del Curriculum */
+.curriculum-sidebar {
+  width: 350px;
+  background-color: #fff;
+  border-left: 1px solid #d1d7dc;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  flex-shrink: 0;
+  overflow-y: auto; /* Scroll interno para la lista */
+}
+
+.curriculum-sidebar.collapsed {
+  width: 0;
+  border: none;
+  overflow: hidden;
+}
+
+/* Estilos internos del Aula */
 .sidebar-header { padding: 15px; border-bottom: 1px solid #d1d7dc; background-color: #f7f9fa; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
 .lesson-list-container { flex: 1; overflow-y: auto; }
 .module-section { border-bottom: 1px solid #e0e0e0; }
@@ -435,336 +398,118 @@ body {
 .toggle-sidebar-btn { position: absolute; right: 0; top: 20px; background: #1c1d1f; color: white; border: 1px solid #fff; padding: 10px; cursor: pointer; z-index: 10; border-right: none; border-radius: 5px 0 0 5px; }
 
 
-/* =====================================================
-   🎓 VISTA DE CERTIFICADO (DISEÑO PROFESIONAL CORREGIDO)
-   ===================================================== */
-
-/* Contenedor Web (Para ver antes de imprimir) */
-.certificate-viewer-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #e9ebee; /* Fondo gris suave */
-  padding: 40px 20px;
-  min-height: 100vh;
-}
-
-/* El Documento A4 Horizontal */
-.certificate-document {
-  width: 297mm; /* Ancho A4 Horizontal */
-  height: 210mm; /* Alto A4 Horizontal */
-  background: white;
-  padding: 40px 60px;
-  position: relative;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-  border: 15px double #0b3d91; /* Borde Doble Elegante */
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  text-align: center;
-  box-sizing: border-box;
-  margin-bottom: 30px;
-}
-
-/* Cabecera del Certificado */
-.certificate-header .logo-cert {
-  font-size: 2.2rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Cuerpo del Certificado */
-.certificate-body .subtitle {
-  font-size: 1rem;
-  color: #777;
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  margin: 15px 0 5px 0;
-}
-
-.certificate-body .student-name {
-  font-family: 'Times New Roman', serif;
-  font-size: 3.2rem;
-  color: #222;
-  margin: 10px 0 20px 0;
-  font-weight: normal;
-  border-bottom: 1px solid #ddd;
-  display: inline-block;
-  padding: 0 20px 10px 20px;
-}
-
-.certificate-body .course-name {
-  font-size: 2.5rem;
-  color: #0b3d91; /* Azul Tecnia */
-  font-weight: 800;
-  text-transform: uppercase;
-  margin: 10px 0;
-  line-height: 1.2;
-}
-
-.certificate-body .course-hours {
-  font-size: 1.3rem;
-  color: #444;
-  margin: 5px 0 20px 0;
-}
-
-.certificate-body .date {
-  font-size: 1.1rem;
-  color: #666;
-  font-style: italic;
-  margin-top: 20px;
-}
-
-/* Pie del Certificado */
-.certificate-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 20px;
-}
-
-.verify-id {
-  font-size: 0.85rem;
-  color: #999;
-  text-align: left;
-  line-height: 1.4;
-}
-
-/* Bloque de Firma (Nombre y Cargo de Director) */
-.signature-block {
-  text-align: center;
-  min-width: 280px;
-}
-
-.signature-line {
-  border-top: 2px solid #333;
-  margin-bottom: 10px;
-  width: 100%;
-}
-
-.signatory-name {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #000;
-  margin-bottom: 3px;
-  text-transform: uppercase;
-}
-
-.signatory-title {
-  font-size: 1rem;
-  color: #0b3d91;
-  font-weight: 600;
-}
-
-/* Botón Descargar */
-.btn-print {
-  padding: 15px 35px;
-  background-color: #00d4d4;
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4);
-  transition: transform 0.2s;
-}
-.btn-print:hover { transform: scale(1.05); }
-
-/* 🖨️ ESTILOS DE IMPRESIÓN (PDF Perfecto) */
-@media print {
-  @page {
-    size: landscape; /* Fuerza la hoja horizontal */
-    margin: 0;       /* Quita márgenes blancos */
-  }
-
-  body {
-    margin: 0;
-    padding: 0;
-    background: white;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Ocultar elementos de navegación */
-  .no-print, 
-  .btn-print, 
-  .navbar, 
-  .footer {
-    display: none !important;
-  }
-
-  .certificate-viewer-container {
-    padding: 0;
-    margin: 0;
-    background: white;
-    min-height: auto;
-    display: block;
-  }
-
-  .certificate-document {
-    width: 100%;
-    height: 100vh; /* Ocupa toda la hoja */
-    margin: 0;
-    box-shadow: none;
-    border: 15px double #0b3d91 !important; /* Fuerza impresión del borde */
-    page-break-after: avoid;
-    padding: 30px 50px;
-  }
-}
-
-/* ---- CONFIGURACIÓN DE PERFIL (ESTILO PRO) ---- */
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.settings-section { background-color: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 20px; }
-.settings-section h3 { margin-top: 0; color: var(--color-primario); font-size: 1.1rem; border-bottom: 2px solid #e0e0e0; padding-bottom: 10px; margin-bottom: 15px; }
-.full-width { grid-column: 1 / -1; }
-.form-hint { font-size: 0.8rem; color: #888; margin-top: 5px; display: block; }
-
-/* Botón Guardar Configuración */
-.btn-save-settings {
-  background-color: var(--color-primario);
-  color: var(--color-blanco);
-  padding: 12px 25px;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  font-size: 1.1em;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-.btn-save-settings:hover { background-color: #08327a; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
 /* =========================================
-   📱 ESTILOS MÓVILES - FIX TOTAL (NAVBAR + VIDEO)
+   📱 ESTILOS MÓVILES - FIX TOTAL
    ========================================= */
-
 @media only screen and (max-width: 768px) {
     
-    /* 1. CONTENEDOR PRINCIPAL */
     html, body {
         overflow-x: hidden;
         width: 100%;
+        height: auto; /* En móvil permitimos scroll normal */
         position: relative;
     }
 
-    /* 2. NAVBAR: Columna Estricta */
+    /* Navbar en columna */
     .navbar {
-        display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         padding: 15px 10px !important;
         height: auto !important;
-        width: 100%;
-        box-sizing: border-box;
-        position: relative; 
     }
     
-    .logo {
-        width: 100%;
-        text-align: center;
-        justify-content: center;
-        margin-bottom: 15px !important;
-        font-size: 1.5rem;
-    }
-
-    /* 3. MENÚ DE NAVEGACIÓN */
     .nav-links {
-        display: flex !important;
         flex-direction: column !important;
         width: 100% !important;
         gap: 10px !important;
-        margin: 0 !important;
-        padding: 0 !important;
     }
 
-    .nav-links a, .nav-links button {
+    .nav-links a {
         display: block !important;
         width: 100% !important;
         text-align: center;
-        padding: 12px 0 !important;
-        font-size: 0.95rem !important;
         background-color: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 10px !important;
         border-radius: 8px;
-        color: white !important;
-        box-sizing: border-box; 
-    }
-
-    .nav-links button:last-child {
-        background-color: rgba(220, 53, 69, 0.8) !important;
-        margin-top: 5px;
     }
 
     .navbar .search-container { display: none !important; }
 
-    /* --- AJUSTES DE CONTENIDO GENERAL --- */
-    .hero { padding: 40px 15px; height: auto; }
-    .hero h1 { font-size: 1.8rem; }
-    
-    .search-box form {
-        flex-direction: column;
-        width: 100%;
-        padding: 0 10px;
-        box-sizing: border-box;
+    /* ---- AULA VIRTUAL RESPONSIVE ---- */
+    .classroom-container {
+        height: auto !important; /* Scroll infinito en móvil */
+        overflow: visible !important;
     }
-    .search-box input { width: 100% !important; font-size: 16px; } 
-    .search-box button { width: 100%; margin-top: 10px; }
-    
-    .instructor-dashboard, .profile-page-container, .content-management-layout {
-        flex-direction: column;
-        padding: 10px;
-    }
-    
-    .dashboard-sidebar, .profile-sidebar {
-        width: 100% !important;
-        margin-bottom: 20px;
-    }
-    
-    /* 4. ✅ AULA VIRTUAL CORREGIDA (VIDEO FULL WIDTH SIN BARRAS NEGRAS) */
+
     .classroom-player-wrapper { 
         flex-direction: column !important; 
         height: auto !important; 
+        overflow: visible !important;
     }
 
     .video-section { 
-        padding: 0 !important; 
         width: 100% !important; 
-        background: black; 
-        position: sticky;
-        top: 0;
-        z-index: 100;
+        height: auto !important;
+        overflow: visible !important;
+        position: relative !important;
+        z-index: 20;
     }
 
-    /* El contenedor se ajusta al ancho y calcula la altura exacta 16:9 */
+    /* FORZAR ASPECTO 16:9 EN MÓVIL (Anulamos min-height fijo) */
     .video-frame-container {
         width: 100% !important;
+        min-height: 0 !important; /* Anulamos los 500px de escritorio */
         height: auto !important;
-        aspect-ratio: 16/9 !important; /* Clave: Mantiene proporción de TV */
+        aspect-ratio: 16/9 !important; /* Clave: Proporción de Video */
         display: block !important;
         background-color: #000;
         position: relative;
     }
 
-    /* Forzamos al iframe/video a llenar ese espacio exacto */
+    /* El video llena el contenedor 16:9 */
     .video-frame-container iframe, 
     .video-frame-container video,
     .video-frame-container .react-player {
+        position: absolute;
+        top: 0; left: 0;
         width: 100% !important;
         height: 100% !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        object-fit: contain; /* Asegura que el video se vea completo */
     }
 
+    /* Sidebar se apila abajo */
     .curriculum-sidebar { 
         width: 100% !important; 
         height: auto; 
         border: none; 
-        margin-top: 10px;
+        position: relative;
+        z-index: 10;
     }
 
-    /* Tablas con Scroll */
-    table { display: block; overflow-x: auto; white-space: nowrap; }
+    /* Si está colapsado en móvil, lo ocultamos del todo */
+    .curriculum-sidebar.collapsed {
+        display: none !important;
+    }
+
+    .toggle-sidebar-btn {
+        top: auto; bottom: 20px; right: 20px;
+        border-radius: 50%; width: 50px; height: 50px;
+        display: flex; justify-content: center; align-items: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+}
+
+/* CERTIFICADO Y OTROS */
+.certificate-viewer-container { display: flex; flex-direction: column; align-items: center; background-color: #e9ebee; padding: 40px 20px; min-height: 100vh; }
+.certificate-document { width: 297mm; height: 210mm; background: white; padding: 40px 60px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 15px double #0b3d91; display: flex; flex-direction: column; justify-content: space-between; text-align: center; box-sizing: border-box; margin-bottom: 30px; }
+.certificate-header .logo-cert { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+.certificate-body .student-name { font-family: 'Times New Roman', serif; font-size: 3.2rem; border-bottom: 1px solid #ddd; display: inline-block; padding: 0 20px 10px 20px; margin: 10px 0 20px 0; }
+.certificate-body .course-name { font-size: 2.5rem; color: #0b3d91; font-weight: 800; text-transform: uppercase; }
+.btn-print { padding: 15px 35px; background-color: #00d4d4; color: white; border: none; border-radius: 50px; font-size: 1.2rem; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4); }
+
+@media print {
+  @page { size: landscape; margin: 0; }
+  body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-print, .btn-print, .navbar, .footer { display: none !important; }
+  .certificate-viewer-container { padding: 0; margin: 0; background: white; display: block; }
+  .certificate-document { width: 100%; height: 100vh; margin: 0; box-shadow: none; border: 15px double #0b3d91 !important; page-break-after: avoid; }
 }

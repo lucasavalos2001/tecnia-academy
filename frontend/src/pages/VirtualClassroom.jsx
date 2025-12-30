@@ -13,19 +13,26 @@ const QuizRenderer = ({ questions, onComplete }) => {
     const [feedback, setFeedback] = useState(null); 
 
     const handleAnswer = (index) => {
-        if (index === questions[currentQ].correcta) {
-            setScore(score + 1);
+        const esCorrecta = index === questions[currentQ].correcta;
+        
+        if (esCorrecta) {
+            setScore(prev => prev + 1);
             setFeedback('correct');
         } else {
             setFeedback('incorrect');
         }
+
         setTimeout(() => {
             if (currentQ + 1 < questions.length) {
-                setCurrentQ(currentQ + 1);
+                setCurrentQ(prev => prev + 1);
                 setFeedback(null);
             } else {
                 setFinished(true);
-                if ((score + (index === questions[currentQ].correcta ? 1 : 0)) >= questions.length / 2) onComplete();
+                // Calculamos si aprobó (50% o más) incluyendo la última respuesta
+                const finalScore = score + (esCorrecta ? 1 : 0);
+                if (finalScore >= questions.length / 2) {
+                    onComplete();
+                }
             }
         }, 1000);
     };
@@ -34,20 +41,45 @@ const QuizRenderer = ({ questions, onComplete }) => {
         return (
             <div style={{color:'white', textAlign:'center', padding:'40px'}}>
                 <h2>¡Quiz Finalizado!</h2>
-                <p style={{fontSize:'1.5rem'}}>Tu nota: {score} / {questions.length}</p>
-                <button onClick={() => {setFinished(false); setCurrentQ(0); setScore(0); setFeedback(null);}} style={{padding:'10px 20px', marginTop:'20px', cursor:'pointer'}}>Reintentar</button>
+                <p style={{fontSize:'1.5rem', margin:'20px 0'}}>Tu nota: {score} / {questions.length}</p>
+                <div style={{display:'flex', gap:'10px', justifyContent:'center'}}>
+                    <button 
+                        onClick={() => {setFinished(false); setCurrentQ(0); setScore(0); setFeedback(null);}} 
+                        style={{padding:'10px 20px', cursor:'pointer', background:'#3498db', color:'white', border:'none', borderRadius:'4px'}}
+                    >
+                        Reintentar
+                    </button>
+                    {score >= questions.length / 2 && (
+                         <div style={{padding:'10px 20px', background:'#2ecc71', color:'white', borderRadius:'4px'}}>
+                             ¡Aprobado! ✅
+                         </div>
+                    )}
+                </div>
             </div>
         );
     }
 
     return (
-        <div style={{color:'white', padding:'40px', width:'100%', maxWidth:'600px'}}>
-            <div style={{marginBottom:'10px', color:'#aaa'}}>Pregunta {currentQ + 1} de {questions.length}</div>
-            <h2 style={{marginBottom:'20px'}}>{questions[currentQ].pregunta}</h2>
-            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+        <div style={{color:'white', padding:'40px', width:'100%', maxWidth:'800px'}}>
+            <div style={{marginBottom:'10px', color:'#aaa', textTransform:'uppercase', fontSize:'0.8rem', letterSpacing:'1px'}}>
+                Pregunta {currentQ + 1} de {questions.length}
+            </div>
+            <h2 style={{marginBottom:'30px', fontSize:'1.5rem', lineHeight:'1.4'}}>{questions[currentQ].pregunta}</h2>
+            <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                 {questions[currentQ].opciones.map((op, idx) => (
                     <button key={idx} onClick={() => !feedback && handleAnswer(idx)} 
-                        style={{padding:'15px', textAlign:'left', background: feedback && idx===questions[currentQ].correcta ? '#2ecc71' : '#333', color:'white', border:'1px solid #555', borderRadius:'5px', cursor:'pointer'}}>
+                        style={{
+                            padding:'20px', 
+                            textAlign:'left', 
+                            background: feedback && idx === questions[currentQ].correcta ? '#2ecc71' : 
+                                        feedback && idx !== questions[currentQ].correcta && feedback === 'incorrect' ? '#e74c3c' : '#2d2f31', 
+                            color:'white', 
+                            border: feedback && idx === questions[currentQ].correcta ? '1px solid #2ecc71' : '1px solid #555', 
+                            borderRadius:'8px', 
+                            cursor: feedback ? 'default' : 'pointer',
+                            fontSize: '1rem',
+                            transition: 'all 0.2s'
+                        }}>
                         {op}
                     </button>
                 ))}
@@ -59,7 +91,7 @@ const QuizRenderer = ({ questions, onComplete }) => {
 function VirtualClassroom() {
   const { id } = useParams(); 
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const [curso, setCurso] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
@@ -73,26 +105,35 @@ function VirtualClassroom() {
       try {
         const resCurso = await axios.get(`${API_URL}/cursos/${id}/curriculum`, { headers: { Authorization: `Bearer ${token}` } });
         setCurso(resCurso.data);
+        
         const resProgreso = await axios.get(`${API_URL}/cursos/mis-cursos`, { headers: { Authorization: `Bearer ${token}` } });
         const miInscripcion = resProgreso.data.cursos.find(c => c.courseId === parseInt(id));
+        
         if (miInscripcion) setCompletedLessons(miInscripcion.lecciones_completadas || []);
-        if (resCurso.data.modulos?.[0]?.lecciones?.[0]) setActiveLesson(resCurso.data.modulos[0].lecciones[0]);
+        
+        // Cargar primera lección por defecto si no hay activa
+        if (resCurso.data.modulos?.[0]?.lecciones?.[0]) {
+            setActiveLesson(resCurso.data.modulos[0].lecciones[0]);
+        }
       } catch (error) { console.error(error); } finally { setLoading(false); }
     };
-    fetchData();
-  }, [id, token]);
+    if(token) fetchData();
+  }, [id, token, API_URL]);
 
   const handleComplete = async (lessonId) => {
     if (completedLessons.includes(lessonId)) return;
     try {
         const res = await axios.post(`${API_URL}/cursos/${id}/lecciones/${lessonId}/completar`, {}, { headers: { Authorization: `Bearer ${token}` } });
-        setCompletedLessons(res.data.lecciones_completadas);
+        // Aseguramos que la respuesta actualice el estado correctamente
+        if(res.data && res.data.lecciones_completadas) {
+            setCompletedLessons(res.data.lecciones_completadas);
+        }
     } catch (e) { console.error(e); }
   };
 
-  // --- RENDERIZADOR ---
+  // --- RENDERIZADOR DE CONTENIDO ---
   const renderContent = () => {
-      if (!activeLesson) return <h3 style={{color:'white'}}>Selecciona lección</h3>;
+      if (!activeLesson) return <h3 style={{color:'white'}}>Selecciona una lección para comenzar</h3>;
 
       // 1. QUIZ
       if (activeLesson.contenido_quiz && activeLesson.contenido_quiz.length > 0) {
@@ -102,26 +143,47 @@ function VirtualClassroom() {
       // 2. VIDEO (Bunny / YouTube / MP4)
       const url = activeLesson.url_video || "";
       
-      // Fondo negro SÓLIDO para que no se vea nada detrás
+      // Estilos para contenedor responsivo 16:9
       const containerStyle = {position:'relative', paddingTop:'56.25%', width: '100%', background:'black'};
-      
-      // --- CORRECCIÓN APLICADA ---
-      const iframeStyle = { position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0, display: 'block' };
+      const iframeStyle = { position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0 };
 
       if (url.includes('bunny') || url.includes('mediadelivery')) {
           return (
             <div style={containerStyle}>
-              <iframe src={url} loading="lazy" style={iframeStyle} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen={true}></iframe>
+              <iframe 
+                src={url} 
+                loading="lazy" 
+                style={iframeStyle} 
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" 
+                allowFullScreen={true}
+                title="Reproductor Bunny"
+              ></iframe>
             </div>
           );
       }
+      
       if (url.includes('youtu')) {
-          return <ReactPlayer url={url} width="100%" height="100%" controls={true} config={{ youtube: { playerVars: { showinfo: 0 } } }} />;
+          return (
+            <div style={{...containerStyle, paddingTop: 0, height: '100%'}}> {/* Ajuste para ReactPlayer */}
+                <ReactPlayer 
+                    url={url} 
+                    width="100%" 
+                    height="100%" 
+                    controls={true} 
+                    config={{ youtube: { playerVars: { showinfo: 0 } } }} 
+                />
+            </div>
+          );
       }
-      return <video controls width="100%" height="100%" key={url} style={{background:'black'}}><source src={url} type="video/mp4" /></video>;
+      
+      return (
+        <video controls width="100%" height="100%" key={url} style={{background:'black', maxHeight: '100%'}}>
+            <source src={url} type="video/mp4" />
+        </video>
+      );
   };
 
-  if (loading) return <div style={{color:'white', background:'#1c1d1f', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>Cargando...</div>;
+  if (loading) return <div style={{color:'white', background:'#1c1d1f', height:'100vh', display:'flex', alignItems:'center', justifyContent:'center'}}>Cargando aula virtual...</div>;
   
   const isCompleted = completedLessons.includes(activeLesson?.id);
   const isQuiz = activeLesson?.contenido_quiz && activeLesson.contenido_quiz.length > 0;
@@ -129,78 +191,122 @@ function VirtualClassroom() {
   return (
     <div className="classroom-container">
       <Navbar /> 
+      
       <div className="classroom-player-wrapper">
         
+        {/* ZONA PRINCIPAL (VIDEO/QUIZ) */}
         <div className="video-section">
-            {/* REPRODUCTOR CON FONDO NEGRO SÓLIDO */}
-            <div className="video-frame-container" style={{background: '#000', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight:'450px', position:'relative', zIndex: 2}}>
+            <div className="video-frame-container" style={{
+                background: '#000', 
+                width: '100%', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight:'500px', // Altura mínima para que no colapse
+                position:'relative'
+            }}>
                 {renderContent()}
             </div>
             
-            {/* DETALLES DEBAJO */}
-            <div className="video-info-tabs" style={{marginTop: '0', padding: '20px', background: 'white', position: 'relative', zIndex: 1}}>
-                <div className="tabs-header" style={{borderBottom: '2px solid #f0f0f0', marginBottom: '20px'}}>
+            {/* TABS Y DESCRIPCIÓN */}
+            <div className="video-info-tabs">
+                <div className="tabs-header">
                     <button className={`tab-btn ${activeTab==='descripcion'?'active':''}`} onClick={()=>setActiveTab('descripcion')}>Descripción</button>
-                    <button className={`tab-btn ${activeTab==='preguntas'?'active':''}`} onClick={()=>setActiveTab('preguntas')}>Preguntas</button>
-                    <button className={`tab-btn ${activeTab==='archivos'?'active':''}`} onClick={()=>setActiveTab('archivos')}>Archivos</button>
+                    <button className={`tab-btn ${activeTab==='preguntas'?'active':''}`} onClick={()=>setActiveTab('preguntas')}>Preguntas y Respuestas</button>
+                    <button className={`tab-btn ${activeTab==='archivos'?'active':''}`} onClick={()=>setActiveTab('archivos')}>Recursos</button>
                 </div>
 
                 <div className="tab-body">
                     {activeTab === 'descripcion' && (
                         <div>
-                            <h1 style={{fontSize:'1.8rem', color:'var(--color-primario)', marginTop:0, marginBottom:'15px'}}>
-                                {activeLesson?.titulo}
-                            </h1>
-                            <p style={{fontSize:'1rem', lineHeight:'1.6', color:'#555', marginBottom:'30px'}}>
-                                {activeLesson?.contenido_texto || (isQuiz ? "Completa el cuestionario para aprobar." : "No hay descripción.")}
-                            </p>
-
-                            {!isQuiz && (
-                                <div style={{display:'flex', alignItems:'center', borderTop:'1px solid #eee', paddingTop:'20px'}}>
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'20px'}}>
+                                <div>
+                                    <h1 style={{fontSize:'1.5rem', color:'#333', marginTop:0, marginBottom:'10px'}}>
+                                        {activeLesson?.titulo}
+                                    </h1>
+                                    {!isQuiz && (
+                                        <div style={{fontSize:'0.9rem', color:'#666', marginBottom:'20px'}}>
+                                            Lección {activeLesson?.orden || '-'} • {activeLesson?.duracion || 'Duración variable'}
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                {!isQuiz && (
                                     <button 
                                         onClick={() => handleComplete(activeLesson.id)} 
                                         disabled={isCompleted}
-                                        style={{
-                                            padding: '12px 25px', borderRadius: '30px', border: 'none',
-                                            background: isCompleted ? '#2ecc71' : 'var(--color-secundario)',
-                                            color: 'white', fontWeight: 'bold', fontSize: '1rem', cursor: isCompleted ? 'default' : 'pointer',
-                                            display: 'flex', alignItems: 'center', gap: '10px'
-                                        }}
+                                        className={`btn-marcar-completo ${isCompleted ? 'completed' : ''}`}
                                     >
-                                        {isCompleted ? <><i className="fas fa-check-circle"></i> Completada</> : <><i className="far fa-circle"></i> Marcar como Vista</>}
+                                        {isCompleted ? <><i className="fas fa-check"></i> Completada</> : 'Marcar como vista'}
                                     </button>
-                                </div>
-                            )}
+                                )}
+                            </div>
+                            
+                            <hr style={{border:'0', borderTop:'1px solid #eee', margin:'20px 0'}} />
+                            
+                            <p style={{fontSize:'1rem', lineHeight:'1.6', color:'#444'}}>
+                                {activeLesson?.contenido_texto || (isQuiz ? "Completa el cuestionario de arriba para aprobar este módulo." : "No hay descripción adicional para esta lección.")}
+                            </p>
                         </div>
                     )}
-                    {activeTab === 'preguntas' && <p>Foro próximamente.</p>}
-                    {activeTab === 'archivos' && <p>No hay archivos.</p>}
+                    {activeTab === 'preguntas' && <p style={{padding:'20px', color:'#666'}}>El foro de preguntas estará disponible próximamente.</p>}
+                    {activeTab === 'archivos' && <p style={{padding:'20px', color:'#666'}}>No hay recursos descargables para esta lección.</p>}
                 </div>
             </div>
-            {!sidebarOpen && <button className="toggle-sidebar-btn" onClick={() => setSidebarOpen(true)}><i className="fas fa-list"></i></button>}
+
+            {/* BOTÓN PARA ABRIR SIDEBAR (SI ESTÁ CERRADO) */}
+            {!sidebarOpen && (
+                <button 
+                    className="toggle-sidebar-btn open" 
+                    onClick={() => setSidebarOpen(true)}
+                    title="Mostrar contenido del curso"
+                >
+                    <i className="fas fa-list"></i> Contenido del curso
+                </button>
+            )}
         </div>
 
-        {/* SIDEBAR */}
+        {/* SIDEBAR DERECHO (CURRICULUM) */}
         <div className={`curriculum-sidebar ${!sidebarOpen ? 'collapsed' : ''}`}>
             <div className="sidebar-header">
-                <span>Contenido</span>
-                <button onClick={() => setSidebarOpen(false)} style={{background:'none', border:'none', cursor:'pointer'}}><i className="fas fa-times"></i></button>
+                <span style={{fontWeight:'bold'}}>Contenido del curso</span>
+                <button onClick={() => setSidebarOpen(false)} className="close-sidebar-btn">
+                    <i className="fas fa-times"></i>
+                </button>
             </div>
+            
             <div className="lesson-list-container">
                 {curso?.modulos?.map((modulo, idx) => (
                     <div key={modulo.id} className="module-section">
-                        <div className="module-title">Sección {idx+1}: {modulo.titulo}</div>
+                        <div className="module-title">
+                            <strong>Sección {idx+1}:</strong> {modulo.titulo}
+                        </div>
                         {modulo.lecciones?.map((leccion, i) => {
                              const isComp = completedLessons.includes(leccion.id);
                              const isQ = leccion.contenido_quiz && leccion.contenido_quiz.length > 0;
                              const isActive = activeLesson?.id === leccion.id;
+                             
                              return (
-                                <div key={leccion.id} className={`lesson-row ${isActive ? 'active' : ''}`} onClick={() => setActiveLesson(leccion)}>
-                                    <div style={{width:'20px'}}><i className={`fas fa-${isComp ? 'check-circle' : 'circle'}`} style={{color: isComp ? '#2ecc71' : '#ccc'}}></i></div>
-                                    <div style={{flex:1}}>
-                                        {i+1}. {leccion.titulo}
-                                        <div style={{fontSize:'0.8em', color:'#6a6f73'}}>
-                                            {isQ ? <><i className="fas fa-tasks" style={{color:'#f39c12'}}></i> Cuestionario</> : <><i className="fas fa-film"></i> Video</>}
+                                <div 
+                                    key={leccion.id} 
+                                    className={`lesson-row ${isActive ? 'active' : ''}`} 
+                                    onClick={() => setActiveLesson(leccion)}
+                                >
+                                    <div className="lesson-status-icon">
+                                        {isComp ? (
+                                            <i className="fas fa-check-square" style={{color: '#2ecc71'}}></i>
+                                        ) : (
+                                            <i className="far fa-square" style={{color: '#ccc'}}></i>
+                                        )}
+                                    </div>
+                                    <div className="lesson-info">
+                                        <div className="lesson-title">{i+1}. {leccion.titulo}</div>
+                                        <div className="lesson-meta">
+                                            {isQ ? (
+                                                <span style={{color:'#e67e22'}}><i className="fas fa-tasks"></i> Cuestionario</span>
+                                            ) : (
+                                                <span><i className="fas fa-play-circle"></i> {leccion.duracion || "Video"}</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -210,6 +316,7 @@ function VirtualClassroom() {
                 ))}
             </div>
         </div>
+
       </div>
     </div>
   );

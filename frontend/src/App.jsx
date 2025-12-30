@@ -111,7 +111,13 @@ function App() {
         } 
       />
 
-      {/* Ruta: Aula Virtual */}
+      {/* 🟢 LA RUTA MÁGICA QUE FALTABA (Conecta con el botón "Acceder") */}
+      <Route 
+        path="/curso/:id/learn" 
+        element={<ProtectedRoute element={VirtualClassroom} />} 
+      />
+
+      {/* Ruta: Aula Virtual (Versión alternativa que ya tenías) */}
       <Route 
         path="/aula-virtual/:id" 
         element={<ProtectedRoute element={VirtualClassroom} />} 
