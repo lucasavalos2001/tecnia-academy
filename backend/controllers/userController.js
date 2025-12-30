@@ -1,7 +1,7 @@
 const { Enrollment, Course, User } = require('../models');
 const axios = require('axios'); // Necesario para Bunny
 
-// --- HELPER: SUBIR A BUNNY (Reutilizado) ---
+// --- HELPER: SUBIR A BUNNY ---
 const uploadToBunny = async (file) => {
     try {
         const STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
@@ -30,7 +30,6 @@ const getUserProfile = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al obtener perfil" }); }
 };
 
-// 🟢 FUNCIÓN CORREGIDA DEFINITIVA
 const getUserCertificates = async (req, res) => {
     try {
         const userId = req.usuario.id;
@@ -39,16 +38,9 @@ const getUserCertificates = async (req, res) => {
             include: [{ 
                 model: Course, 
                 as: 'curso', 
-                // 🟢 AQUÍ ESTABA EL BLOQUEO. AHORA PEDIMOS TODOS LOS DATOS NECESARIOS:
                 attributes: [
-                    'id', 
-                    'titulo', 
-                    'imagen_url', 
-                    'updatedAt', 
-                    'duracion', 
-                    'nombre_instructor_certificado' // <--- ¡VITAL PARA QUE APAREZCA EL NOMBRE!
+                    'id', 'titulo', 'imagen_url', 'updatedAt', 'duracion', 'nombre_instructor_certificado'
                 ],
-                // 🟢 TAMBIÉN TRAEMOS LOS DATOS DEL DUEÑO DEL CURSO (PARA RESPALDO)
                 include: [{
                     model: User,
                     as: 'instructor',
@@ -64,6 +56,62 @@ const getUserCertificates = async (req, res) => {
     }
 };
 
+// 🟢 NUEVA FUNCIÓN: VERIFICACIÓN PÚBLICA (SIN LOGIN)
+const verifyCertificatePublic = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Buscamos la inscripción por su ID (que es el ID del certificado)
+        const certificado = await Enrollment.findByPk(id, {
+            include: [
+                { 
+                    model: User, 
+                    as: 'usuario',
+                    attributes: ['nombre_completo'] // Nombre del estudiante
+                },
+                { 
+                    model: Course, 
+                    as: 'curso',
+                    attributes: ['titulo', 'duracion', 'nombre_instructor_certificado'],
+                    include: [{ // Incluimos instructor por si no hay nombre personalizado
+                        model: User,
+                        as: 'instructor',
+                        attributes: ['nombre_completo']
+                    }]
+                }
+            ]
+        });
+
+        // Validaciones
+        if (!certificado) {
+            return res.status(404).json({ message: "Certificado no encontrado." });
+        }
+
+        if (certificado.progreso_porcentaje < 100) {
+            return res.status(400).json({ message: "Este curso aún no ha sido completado al 100%." });
+        }
+
+        // Preparamos los datos para mostrar públicamente
+        const nombreInstructor = certificado.curso.nombre_instructor_certificado 
+                              || certificado.curso.instructor.nombre_completo 
+                              || "Instructor Certificado";
+
+        res.json({
+            valido: true,
+            id: certificado.id,
+            estudiante: certificado.usuario.nombre_completo,
+            curso: certificado.curso.titulo,
+            fecha: certificado.updatedAt,
+            duracion: certificado.curso.duracion,
+            instructor: nombreInstructor
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al verificar certificado" });
+    }
+};
+
 const becomeInstructor = async (req, res) => {
     try {
         await User.update({ rol: 'instructor' }, { where: { id: req.usuario.id } });
@@ -71,17 +119,14 @@ const becomeInstructor = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al actualizar" }); }
 };
 
-// ✅ ACTUALIZAR PERFIL CON FOTO
 const updateUserProfile = async (req, res) => {
     try {
         const userId = req.usuario.id;
         const { nombre_completo, biografia, email_contacto } = req.body;
         
-        // Buscar usuario actual
         const user = await User.findByPk(userId);
         let nueva_foto = user.foto_perfil;
 
-        // Si subió foto, enviarla a Bunny
         if (req.file) {
             const url = await uploadToBunny(req.file);
             if (url) nueva_foto = url;
@@ -99,4 +144,10 @@ const updateUserProfile = async (req, res) => {
     }
 };
 
-module.exports = { getUserProfile, getUserCertificates, becomeInstructor, updateUserProfile };
+module.exports = { 
+    getUserProfile, 
+    getUserCertificates, 
+    becomeInstructor, 
+    updateUserProfile, 
+    verifyCertificatePublic // <--- No olvides exportarla
+};

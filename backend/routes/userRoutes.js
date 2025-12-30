@@ -1,18 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer'); // <--- Importar Multer
-const { getUserProfile, getUserCertificates, becomeInstructor, updateUserProfile } = require('../controllers/userController');
+const multer = require('multer'); 
+// 🟢 IMPORTAMOS LA NUEVA FUNCIÓN 'verifyCertificatePublic'
+const { getUserProfile, getUserCertificates, becomeInstructor, updateUserProfile, verifyCertificatePublic } = require('../controllers/userController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
 // Configurar Multer (Memoria)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Rutas protegidas
+// ==========================================
+// 🟢 RUTA PÚBLICA (ACCESO LIBRE)
+// ==========================================
+// Permite verificar la autenticidad de un certificado sin iniciar sesión
+router.get('/verificar/:id', verifyCertificatePublic);
+
+
+// ==========================================
+// 🔒 RUTAS PROTEGIDAS (REQUIEREN LOGIN)
+// ==========================================
 router.get('/perfil', verifyToken, getUserProfile);
 router.get('/certificados', verifyToken, getUserCertificates);
 router.put('/convertirse-instructor', verifyToken, becomeInstructor);
 
-// ✅ AHORA ACEPTA ARCHIVOS ('foto')
 router.put('/actualizar', verifyToken, upload.single('foto'), updateUserProfile);
 
 module.exports = router;

@@ -18,10 +18,11 @@ import CertificateView from './pages/CertificateView';
 import AdminDashboard from './pages/AdminDashboard';
 import EditCourse from './pages/EditCourse'; 
 import CourseDetailPublic from './pages/CourseDetailPublic';
-
-// ✅ NUEVAS IMPORTACIONES: Recuperación de contraseña
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+
+// ✅ NUEVO COMPONENTE: Verificación Pública
+import VerifyCertificate from './pages/VerifyCertificate';
 
 function App() {
   return (
@@ -35,9 +36,12 @@ function App() {
       {/* RUTA PÚBLICA DE DETALLE (Landing Page del Curso) */}
       <Route path="/curso/:id" element={<CourseDetailPublic />} />
 
-      {/* ✅ NUEVAS RUTAS DE RECUPERACIÓN */}
+      {/* RUTAS DE RECUPERACIÓN */}
       <Route path="/olvide-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+      {/* ✅ NUEVA RUTA PÚBLICA DE VERIFICACIÓN */}
+      <Route path="/verify" element={<VerifyCertificate />} />
 
       {/* RUTAS PROTEGIDAS (Requieren Token JWT) */}
       
@@ -51,7 +55,7 @@ function App() {
         element={<ProtectedRoute element={Profile} />} 
       />
       
-      {/* Ruta para ver el certificado */}
+      {/* Ruta para ver el certificado (Privada para el estudiante) */}
       <Route 
         path="/certificado/:id" 
         element={<ProtectedRoute element={CertificateView} />} 
@@ -111,7 +115,7 @@ function App() {
         } 
       />
 
-      {/* 🟢 LA RUTA MÁGICA QUE FALTABA (Conecta con el botón "Acceder") */}
+      {/* LA RUTA MÁGICA QUE FALTABA (Conecta con el botón "Acceder") */}
       <Route 
         path="/curso/:id/learn" 
         element={<ProtectedRoute element={VirtualClassroom} />} 
