@@ -23,10 +23,10 @@ function CertificateView() {
     window.print(); // Abre el menú de impresión del navegador
   };
 
-  // 🟢 LÓGICA INTELIGENTE PARA EL NOMBRE:
-  // 1. Busca si el instructor escribió un nombre personalizado para el certificado.
-  // 2. Si está vacío, usa el nombre de su cuenta de usuario.
-  // 3. Si todo falla, pone un texto por defecto.
+  // 🟢 LÓGICA CORREGIDA: PRIORIDAD AL NOMBRE PERSONALIZADO
+  // 1. Intentamos leer el campo personalizado 'nombre_instructor_certificado'
+  // 2. Si está vacío o null, usamos el nombre de la cuenta del instructor ('instructor.nombre_completo')
+  // 3. Si todo falla, ponemos un texto por defecto.
   const nombreInstructor = certificado.curso?.nombre_instructor_certificado 
                         || certificado.curso?.instructor?.nombre_completo 
                         || "Instructor Certificado";
