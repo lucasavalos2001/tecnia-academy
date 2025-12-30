@@ -1,5 +1,5 @@
 const { Enrollment, Course, User } = require('../models');
-const axios = require('axios'); // Necesario para Bunny
+const axios = require('axios'); 
 
 // --- HELPER: SUBIR A BUNNY ---
 const uploadToBunny = async (file) => {
@@ -56,24 +56,24 @@ const getUserCertificates = async (req, res) => {
     }
 };
 
-// 🟢 NUEVA FUNCIÓN: VERIFICACIÓN PÚBLICA (SIN LOGIN)
+// 🟢 FUNCIÓN DE VERIFICACIÓN CORREGIDA (Sin alias restrictivo)
 const verifyCertificatePublic = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Buscamos la inscripción por su ID (que es el ID del certificado)
+        // Buscamos la inscripción
+        // ⚠️ CAMBIO IMPORTANTE: Quitamos "as: 'usuario'" para evitar choques si la BD no lo tiene definido así.
         const certificado = await Enrollment.findByPk(id, {
             include: [
                 { 
                     model: User, 
-                    as: 'usuario',
-                    attributes: ['nombre_completo'] // Nombre del estudiante
+                    attributes: ['nombre_completo'] 
                 },
                 { 
                     model: Course, 
                     as: 'curso',
                     attributes: ['titulo', 'duracion', 'nombre_instructor_certificado'],
-                    include: [{ // Incluimos instructor por si no hay nombre personalizado
+                    include: [{
                         model: User,
                         as: 'instructor',
                         attributes: ['nombre_completo']
@@ -82,16 +82,18 @@ const verifyCertificatePublic = async (req, res) => {
             ]
         });
 
-        // Validaciones
         if (!certificado) {
             return res.status(404).json({ message: "Certificado no encontrado." });
         }
 
         if (certificado.progreso_porcentaje < 100) {
-            return res.status(400).json({ message: "Este curso aún no ha sido completado al 100%." });
+            return res.status(400).json({ message: "Este certificado no es válido (curso incompleto)." });
         }
 
-        // Preparamos los datos para mostrar públicamente
+        // Detectamos dónde está el usuario (User o user)
+        const estudianteData = certificado.User || certificado.user;
+        const nombreEstudiante = estudianteData ? estudianteData.nombre_completo : "Estudiante";
+
         const nombreInstructor = certificado.curso.nombre_instructor_certificado 
                               || certificado.curso.instructor.nombre_completo 
                               || "Instructor Certificado";
@@ -99,7 +101,7 @@ const verifyCertificatePublic = async (req, res) => {
         res.json({
             valido: true,
             id: certificado.id,
-            estudiante: certificado.usuario.nombre_completo,
+            estudiante: nombreEstudiante,
             curso: certificado.curso.titulo,
             fecha: certificado.updatedAt,
             duracion: certificado.curso.duracion,
@@ -107,8 +109,8 @@ const verifyCertificatePublic = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error al verificar certificado" });
+        console.error("Error backend:", error); // Esto imprimirá el error real en tu consola PM2
+        res.status(500).json({ message: "Error interno al verificar certificado." });
     }
 };
 
@@ -149,5 +151,5 @@ module.exports = {
     getUserCertificates, 
     becomeInstructor, 
     updateUserProfile, 
-    verifyCertificatePublic // <--- No olvides exportarla
+    verifyCertificatePublic 
 };
