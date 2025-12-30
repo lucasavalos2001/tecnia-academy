@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom'; // 👈 Agregamos Link
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -25,8 +25,11 @@ function CourseDetailPublic() {
   // Verificamos si es admin
   const isAdmin = user?.rol === 'admin';
   
-  // Verificamos si el usuario actual es el dueño del curso (para no mostrar botón de compra)
+  // Verificamos si el usuario actual es el dueño del curso
   const isInstructor = user && curso && user.id === curso.instructorId;
+
+  // 🟢 PASE LIBRE: Si es Admin o Instructor, tiene acceso directo
+  const hasFreePass = isAdmin || isInstructor;
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -64,20 +67,18 @@ function CourseDetailPublic() {
   const handleComprar = async () => {
     // A. Verificar Login
     if (!isLoggedIn) {
-        // Guardamos la intención de compra o ruta actual para volver después del login (opcional)
         alert("Debes iniciar sesión para comprar este curso.");
         navigate('/login');
         return;
     }
     
-    // Evitar que el instructor compre su propio curso
+    // Evitar que el instructor compre su propio curso (redundante con FreePass pero seguridad extra)
     if (isInstructor) {
-        alert("No puedes comprar tu propio curso.");
+        alert("Eres el instructor, ya tienes acceso.");
         return;
     }
 
     try {
-        // B. Feedback visual inmediato
         const botonCompra = document.getElementById('btn-comprar');
         if(botonCompra) botonCompra.innerText = "Procesando...";
         if(botonCompra) botonCompra.disabled = true;
@@ -104,7 +105,6 @@ function CourseDetailPublic() {
         console.error("Error en pago:", error);
         alert(error.response?.data?.message || "Hubo un error al conectar con la pasarela de pagos.");
         
-        // Restaurar botón
         const botonCompra = document.getElementById('btn-comprar');
         if(botonCompra) {
             botonCompra.innerText = `Pagar ${formatCurrency(curso.precio)}`;
@@ -116,21 +116,21 @@ function CourseDetailPublic() {
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Cargando información del curso...</div>;
   if (!curso) return <div style={{padding:'50px', textAlign:'center'}}>Curso no encontrado o no disponible.</div>;
 
-  // Calculamos total de lecciones para mostrar info
   const totalLecciones = curso.modulos?.reduce((acc, m) => acc + m.lecciones.length, 0) || 0;
 
   return (
     <>
       <Navbar />
 
-      {/* 🟢 MODAL REPRODUCTOR DE VIDEO */}
+      {/* 🟢 MODAL REPRODUCTOR DE VIDEO (MINI PANTALLA) */}
       {videoModal && (
         <div style={{
             position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
             backgroundColor: 'rgba(0, 0, 0, 0.9)', zIndex: 9999,
             display: 'flex', justifyContent: 'center', alignItems: 'center'
-        }}>
-            <div style={{width: '90%', maxWidth: '800px', position: 'relative'}}>
+        }} onClick={() => setVideoModal(null)}> {/* Cierra al clickear afuera */}
+            
+            <div style={{width: '90%', maxWidth: '900px', position: 'relative'}} onClick={e => e.stopPropagation()}>
                 {/* Botón cerrar */}
                 <button 
                     onClick={() => setVideoModal(null)}
@@ -144,14 +144,17 @@ function CourseDetailPublic() {
                 </button>
 
                 {/* Reproductor Iframe (16:9) */}
-                <div style={{position: 'relative', paddingTop: '56.25%', background: '#000'}}>
+                <div style={{position: 'relative', paddingTop: '56.25%', background: '#000', boxShadow: '0 0 20px rgba(0,0,0,0.5)'}}>
                     <iframe 
                         src={videoModal} 
-                        style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none', borderRadius: '8px'}}
+                        style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none', borderRadius: '4px'}}
                         allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" 
                         allowFullScreen={true}
-                        title="Reproductor de video"
+                        title="Auditoría de Video"
                     ></iframe>
+                </div>
+                <div style={{color:'white', marginTop:'10px', textAlign:'center', fontStyle:'italic'}}>
+                    <i className="fas fa-eye"></i> Estás viendo este contenido en <strong>Modo Auditoría</strong>
                 </div>
             </div>
         </div>
@@ -268,22 +271,24 @@ function CourseDetailPublic() {
                                                       {lec.duracion || "00:00"}
                                                   </span>
 
-                                                  {/* 🟢 BOTÓN DE VER PARA ADMIN (AUDITORÍA) */}
+                                                  {/* 🟢 EL OJO QUE TODO LO VE (SOLO ADMIN) 🟢 */}
                                                   {isAdmin && lec.url_video && (
                                                       <button 
                                                           onClick={() => setVideoModal(lec.url_video)}
+                                                          title="Previsualizar Video (Solo Admin)"
                                                           style={{
-                                                              fontSize:'0.75rem', 
-                                                              color:'white', 
-                                                              background:'#3498db', 
-                                                              padding:'2px 8px', 
-                                                              borderRadius:'4px', 
+                                                              fontSize:'1.2rem', 
+                                                              color:'#2c3e50', 
+                                                              background:'transparent',
                                                               border:'none',
                                                               cursor: 'pointer',
-                                                              fontWeight:'bold'
+                                                              transition: 'color 0.2s',
+                                                              padding: '0 5px'
                                                           }}
+                                                          onMouseOver={e => e.target.style.color = '#3498db'}
+                                                          onMouseOut={e => e.target.style.color = '#2c3e50'}
                                                       >
-                                                          VER (Admin)
+                                                          👁️
                                                       </button>
                                                   )}
                                               </div>
@@ -358,12 +363,26 @@ function CourseDetailPublic() {
                           {formatCurrency(curso.precio)}
                       </h2>
                       
-                      {/* 💰 2. BOTÓN DE COMPRA MODIFICADO */}
-                      {isInstructor ? (
-                          <div style={{padding:'15px', background:'#eee', color:'#555', textAlign:'center', fontWeight:'bold', border:'1px dashed #999'}}>
-                             🎓 Eres el instructor de este curso
+                      {/* 🟢 2. BOTÓN "PASE LIBRE" PARA ADMIN E INSTRUCTOR */}
+                      {hasFreePass ? (
+                          <div style={{marginBottom:'15px'}}>
+                               <div style={{padding:'10px', background:'#d4edda', color:'#155724', textAlign:'center', marginBottom:'10px', borderRadius:'4px', border:'1px solid #c3e6cb'}}>
+                                   {isInstructor ? "🎓 Eres el Creador" : "🛡️ Eres Super Admin"}
+                               </div>
+                               <Link to={`/curso/${curso.id}/learn`} style={{textDecoration:'none'}}>
+                                   <button style={{
+                                       width:'100%', padding:'15px', 
+                                       background:'#28a745', color:'white', 
+                                       border:'none', fontWeight:'bold', fontSize:'1rem', 
+                                       cursor:'pointer', borderRadius:'4px',
+                                       boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                   }}>
+                                       {isInstructor ? "Gestionar mi Curso" : "Auditar Curso Completo"}
+                                   </button>
+                               </Link>
                           </div>
                       ) : (
+                          /* BOTÓN DE COMPRA NORMAL */
                           <button 
                             id="btn-comprar"
                             onClick={handleComprar}
