@@ -6,7 +6,7 @@ function CertificateView() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // Recibimos los datos. 
+  // Recibimos los datos del certificado y del usuario
   const { certificado, usuario } = location.state || {};
 
   // Si alguien entra directo sin datos, lo mandamos al perfil
@@ -22,6 +22,9 @@ function CertificateView() {
   const handlePrint = () => {
     window.print(); // Abre el menú de impresión del navegador
   };
+
+  // 🟢 Extraemos el nombre del instructor de forma segura
+  const nombreInstructor = certificado.curso?.instructor?.nombre_completo || "Instructor Tecnia";
 
   return (
     <>
@@ -49,7 +52,6 @@ function CertificateView() {
                 {/* Título del Curso */}
                 <h2 className="course-name">{certificado.curso.titulo}</h2>
 
-                {/* 🟢 CORRECCIÓN: Se muestra la duración directamente si existe */}
                 <p className="course-hours">
                   Con una carga horaria de <strong>{certificado.curso.duracion || "Sin duración registrada"}</strong>.
                 </p>
@@ -66,13 +68,19 @@ function CertificateView() {
                     <small>tecniaacademy.com/verify</small>
                 </div>
 
-                {/* BLOQUE DE FIRMA */}
+                {/* 🟢 BLOQUE DE FIRMA DINÁMICO */}
                 <div className="signature-block" style={{ textAlign: 'center' }}>
-                    <p className="verified-by">Verificado por:</p>
                     
-                    {/* Tu nombre y cargo */}
-                    <div className="signatory-name">Lucas Francisco López Avalos</div>
-                    <div className="signatory-title">Director General</div>
+                    {/* Línea de firma visual */}
+                    <div className="signature-line" style={{borderTop: '2px solid #333', width: '250px', margin: '0 auto 10px auto'}}></div>
+                    
+                    {/* Nombre del Instructor */}
+                    <div className="signatory-name">
+                        {nombreInstructor}
+                    </div>
+                    
+                    {/* Cargo fijo */}
+                    <div className="signatory-title">Instructor</div>
                 </div>
             </div>
 
