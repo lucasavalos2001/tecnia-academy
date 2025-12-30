@@ -23,8 +23,13 @@ function CertificateView() {
     window.print(); // Abre el menú de impresión del navegador
   };
 
-  // 🟢 Extraemos el nombre del instructor de forma segura
-  const nombreInstructor = certificado.curso?.instructor?.nombre_completo || "Instructor Tecnia";
+  // 🟢 LÓGICA INTELIGENTE PARA EL NOMBRE:
+  // 1. Busca si el instructor escribió un nombre personalizado para el certificado.
+  // 2. Si está vacío, usa el nombre de su cuenta de usuario.
+  // 3. Si todo falla, pone un texto por defecto.
+  const nombreInstructor = certificado.curso?.nombre_instructor_certificado 
+                        || certificado.curso?.instructor?.nombre_completo 
+                        || "Instructor Certificado";
 
   return (
     <>
@@ -68,13 +73,14 @@ function CertificateView() {
                     <small>tecniaacademy.com/verify</small>
                 </div>
 
-                {/* 🟢 BLOQUE DE FIRMA DINÁMICO */}
+                {/* BLOQUE DE FIRMA DINÁMICO */}
                 <div className="signature-block" style={{ textAlign: 'center' }}>
+                    <p className="verified-by">Verificado por:</p>
                     
                     {/* Línea de firma visual */}
                     <div className="signature-line" style={{borderTop: '2px solid #333', width: '250px', margin: '0 auto 10px auto'}}></div>
                     
-                    {/* Nombre del Instructor */}
+                    {/* Nombre del Instructor (Personalizado o de Cuenta) */}
                     <div className="signatory-name">
                         {nombreInstructor}
                     </div>

@@ -28,21 +28,26 @@ const Course = sequelize.define('Course', {
         allowNull: true, 
     },
     
-    // 🟢 CORREGIDO: Cambiado de INTEGER a STRING
-    // Esto es vital para que soporte formatos como "5h 30m" o "10:00"
+    // Duración en texto (Ej: "5h 30m")
     duracion: {
         type: DataTypes.STRING, 
-        allowNull: true,        // Permitimos null para flexibilidad
-        defaultValue: "0m",     // Valor por defecto en texto
+        allowNull: true,       
+        defaultValue: "0m",    
     },
 
-    // 🟢 Estados para el flujo de aprobación
+    // 🟢 NUEVO CAMPO: NOMBRE PERSONALIZADO PARA EL CERTIFICADO
+    // Si se deja vacío, usaremos el nombre de la cuenta del instructor.
+    // Si se llena (ej: "Ing. Juan Pérez & Arq. Ana Gómez"), usaremos este.
+    nombre_instructor_certificado: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+
+    // Estados para el flujo de aprobación
     estado: {
         type: DataTypes.ENUM('borrador', 'pendiente', 'publicado', 'rechazado'),
         defaultValue: 'borrador', 
     }
-    
-    // Nota: 'instructorId' se crea automáticamente por la relación en index.js
 }, {
     tableName: 'courses', 
 });

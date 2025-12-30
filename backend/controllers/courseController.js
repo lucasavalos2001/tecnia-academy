@@ -81,7 +81,8 @@ const recalculateCourseDuration = async (courseId) => {
 const createCourse = async (req, res) => {
     try {
         const instructorId = req.usuario.id;
-        const { titulo, descripcion_larga, categoria, precio, duracion } = req.body;
+        // 🟢 AHORA RECIBIMOS 'nombre_instructor_certificado'
+        const { titulo, descripcion_larga, categoria, precio, duracion, nombre_instructor_certificado } = req.body;
         let imagen_url = null;
 
         if (req.file) {
@@ -92,7 +93,11 @@ const createCourse = async (req, res) => {
 
         const nuevoCurso = await Course.create({
             titulo, descripcion_larga, categoria, precio, 
-            duracion: duracion || "0h", estado: 'borrador', instructorId, imagen_url
+            duracion: duracion || "0h", 
+            estado: 'borrador', 
+            instructorId, 
+            imagen_url,
+            nombre_instructor_certificado // Guardamos el nombre personalizado
         });
 
         res.status(201).json({ message: 'Curso creado (Borrador)', curso: nuevoCurso });
@@ -106,7 +111,8 @@ const updateCourse = async (req, res) => {
     try {
         const { id } = req.params;
         const instructorId = req.usuario.id;
-        const { titulo, descripcion_larga, categoria, precio, duracion, estado } = req.body;
+        // 🟢 AHORA RECIBIMOS 'nombre_instructor_certificado'
+        const { titulo, descripcion_larga, categoria, precio, duracion, estado, nombre_instructor_certificado } = req.body;
 
         const curso = await Course.findOne({ where: { id, instructorId } });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
@@ -118,7 +124,8 @@ const updateCourse = async (req, res) => {
 
         const updateData = {
             titulo, descripcion_larga, categoria, precio,
-            duracion, imagen_url: nueva_imagen_url 
+            duracion, imagen_url: nueva_imagen_url,
+            nombre_instructor_certificado // Actualizamos el nombre personalizado
         };
 
         if (estado && (estado === 'pendiente' || estado === 'borrador')) {
@@ -268,7 +275,6 @@ const updateModule = async (req, res) => {
 const addLesson = async (req, res) => {
     try {
         const { moduleId } = req.params;
-        // 🟢 ACEPTAMOS EL NUEVO CAMPO 'enlace_recurso'
         const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
         
         const nuevaLeccion = await Lesson.create({ 
@@ -277,7 +283,7 @@ const addLesson = async (req, res) => {
             contenido_texto, 
             contenido_quiz, 
             duracion, 
-            enlace_recurso, // Guardamos el link
+            enlace_recurso, 
             moduleId 
         });
 
@@ -309,7 +315,6 @@ const deleteLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        // 🟢 ACEPTAMOS EL NUEVO CAMPO 'enlace_recurso'
         const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
         
         const leccion = await Lesson.findByPk(id, { include: [{ model: Module, as: 'modulo' }] });
@@ -321,7 +326,7 @@ const updateLesson = async (req, res) => {
             contenido_texto, 
             contenido_quiz, 
             duracion,
-            enlace_recurso // Actualizamos el link
+            enlace_recurso 
         });
         
         if (leccion.modulo) await recalculateCourseDuration(leccion.modulo.courseId);
@@ -372,8 +377,6 @@ const getCourseDetail = async (req, res) => {
                 { 
                     model: Module, 
                     as: 'modulos', 
-                    // ⚠️ AQUÍ ESTÁ EL TRUCO: Solo pedimos titulo y duracion. 
-                    // Excluimos explícitamente 'url_video' y 'enlace_recurso' (opcional) para que no viaje por la red.
                     include: [{ 
                         model: Lesson, 
                         as: 'lecciones',

@@ -9,13 +9,19 @@ function EditCourse() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const [formData, setFormData] = useState({
-    titulo: '', descripcion_larga: '', categoria: '', precio: '', duracion: ''
+    titulo: '', 
+    descripcion_larga: '', 
+    categoria: '', 
+    precio: '', 
+    duracion: '',
+    // 🟢 NUEVO CAMPO: NOMBRE PARA CERTIFICADO
+    nombre_instructor_certificado: '' 
   });
   
-  // 🟢 ESTADO DEL CURSO (Para saber si mostrar botón de revisión)
+  // ESTADO DEL CURSO (Para saber si mostrar botón de revisión)
   const [cursoEstado, setCursoEstado] = useState('borrador');
 
   const [imagenFile, setImagenFile] = useState(null);
@@ -36,9 +42,11 @@ function EditCourse() {
             descripcion_larga: c.descripcion_larga,
             categoria: c.categoria,
             precio: c.precio,
-            duracion: c.duracion || '' // 🟢 Cargar duración (puede ser texto "5h 30m")
+            duracion: c.duracion || '',
+            // Cargar nombre personalizado si existe, o dejar vacío
+            nombre_instructor_certificado: c.nombre_instructor_certificado || '' 
         });
-        setCursoEstado(c.estado); // 🟢 Guardar estado actual
+        setCursoEstado(c.estado); 
       } catch (error) {
         alert("Error al cargar datos.");
         navigate('/panel-instructor');
@@ -47,7 +55,7 @@ function EditCourse() {
       }
     };
     fetchCurso();
-  }, [id]);
+  }, [id, API_URL, navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -69,13 +77,13 @@ function EditCourse() {
       }
   };
 
-  // 🟢 FUNCIÓN PARA GUARDAR CAMBIOS (Sin cambiar estado)
+  // FUNCIÓN PARA GUARDAR CAMBIOS (Sin cambiar estado)
   const handleSubmit = async (e) => {
     e.preventDefault();
     await updateCourseData();
   };
 
-  // 🟢 FUNCIÓN PARA ENVIAR A REVISIÓN
+  // FUNCIÓN PARA ENVIAR A REVISIÓN
   const handleSendToReview = async () => {
       if(confirm("¿Estás seguro? Al enviar a revisión, el administrador verificará tu curso para publicarlo.")) {
           // Enviamos estado: 'pendiente'
@@ -95,7 +103,10 @@ function EditCourse() {
       data.append('descripcion_larga', formData.descripcion_larga);
       data.append('categoria', formData.categoria);
       data.append('precio', formData.precio);
-      data.append('duracion', formData.duracion); // 🟢 Se envía como texto
+      data.append('duracion', formData.duracion);
+      
+      // 🟢 Enviar el nombre personalizado del instructor
+      data.append('nombre_instructor_certificado', formData.nombre_instructor_certificado);
       
       // Si mandamos un estado nuevo (ej: pendiente), lo agregamos
       if (nuevoEstado) {
@@ -136,7 +147,7 @@ function EditCourse() {
 
   if (loading) return <div>Cargando datos...</div>;
 
-  // 🟢 BADGES DE ESTADO (Visual)
+  // BADGES DE ESTADO (Visual)
   const getStatusBadge = () => {
       switch(cursoEstado) {
           case 'publicado': return <span style={{background:'#27ae60', color:'white', padding:'5px 10px', borderRadius:'15px', fontSize:'0.8rem'}}>PUBLICADO</span>;
@@ -168,7 +179,6 @@ function EditCourse() {
               <textarea name="descripcion_larga" rows="4" value={formData.descripcion_larga} onChange={handleChange} required></textarea>
             </div>
 
-            {/* 🟢 INPUT DURACIÓN CORREGIDO (TYPE="TEXT") */}
             <div className="form-group">
               <label>Duración (Ej: "10h" o se calculará automáticamente)</label>
               <input 
@@ -202,6 +212,24 @@ function EditCourse() {
             <div className="form-group">
               <label>Precio (Guaraníes)</label>
               <input type="number" name="precio" step="1000" value={formData.precio} onChange={handleChange} required />
+            </div>
+
+            {/* 🟢 NUEVO CAMPO: NOMBRE INSTRUCTOR PARA CERTIFICADO */}
+            <div className="form-group" style={{background: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px dashed #ccc'}}>
+                <label style={{color: '#0b3d91', fontWeight: 'bold'}}>
+                    <i className="fas fa-certificate"></i> Nombre del Instructor para el Certificado (Opcional)
+                </label>
+                <input 
+                    type="text" 
+                    name="nombre_instructor_certificado" 
+                    value={formData.nombre_instructor_certificado} 
+                    onChange={handleChange} 
+                    placeholder="Ej: Ing. Lucas López & Arq. María Pérez"
+                    style={{marginTop: '5px'}}
+                />
+                <small style={{color: '#666', display: 'block', marginTop: '5px'}}>
+                    * Si lo dejas vacío, se usará tu nombre de usuario: <strong>{formData.nombre_instructor_certificado ? '' : '(Nombre de tu cuenta)'}</strong>
+                </small>
             </div>
 
             {/* CAMBIAR PORTADA */}
