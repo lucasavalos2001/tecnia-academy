@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import * as tus from 'tus-js-client'; // 🟢 1. IMPORTAMOS TUS
+import * as tus from 'tus-js-client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -9,7 +9,7 @@ import Footer from '../components/Footer';
 function ManageContent() {
   const { id } = useParams(); 
   const { token } = useAuth();
-  const API_URL = import.meta.env.VITE_API_BASE_URL;
+  const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const [curso, setCurso] = useState(null);
   const [modulos, setModulos] = useState([]);
@@ -19,11 +19,13 @@ function ManageContent() {
   const [newModuleTitle, setNewModuleTitle] = useState('');
   const [selectedModuleId, setSelectedModuleId] = useState('');
   
-  // --- ESTADOS LECCIÓN (Video + Desc) ---
+  // --- ESTADOS LECCIÓN (Video + Desc + Recursos) ---
   const [lessonTitle, setLessonTitle] = useState('');
   const [lessonDescription, setLessonDescription] = useState('');
-  // 🟢 ESTADO PARA DURACIÓN
   const [lessonDuration, setLessonDuration] = useState(''); 
+  
+  // 🟢 NUEVO ESTADO: RECURSOS
+  const [lessonResource, setLessonResource] = useState(''); 
   
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -32,7 +34,6 @@ function ManageContent() {
   // --- ESTADOS QUIZ (Cuestionario) ---
   const [showQuizBuilder, setShowQuizBuilder] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]);
-  // Estado temporal para la pregunta que se está creando
   const [tempQuestion, setTempQuestion] = useState({ 
       pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 
   });
@@ -40,12 +41,11 @@ function ManageContent() {
   // Edición y Control
   const [editingLessonId, setEditingLessonId] = useState(null);
   
-  // 🟢 REFERENCIA PARA SUBIDA TUS
+  // Referencia TUS
   const uploadRef = useRef(null); 
-  const abortControllerRef = useRef(null); // Mantenemos por compatibilidad
 
   // ==========================================
-  //  🟢 FUNCIONES PARA CALCULAR DURACIÓN AUTO
+  //  FUNCIONES PARA CALCULAR DURACIÓN AUTO
   // ==========================================
   
   const getVideoDuration = (file) => {
@@ -83,15 +83,13 @@ function ManageContent() {
       return `${mDisplay}:${sDisplay}`;
   };
 
-  // 🟢 MANEJADOR AL SELECCIONAR ARCHIVO
   const handleVideoSelect = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
 
-      setVideoFile(file); // Guardamos el archivo para subir
+      setVideoFile(file); 
       
       try {
-          // Calculamos duración y actualizamos el input
           const durationInSeconds = await getVideoDuration(file);
           const formattedDuration = formatDuration(durationInSeconds);
           setLessonDuration(formattedDuration); 
@@ -99,8 +97,6 @@ function ManageContent() {
           console.error("Error leyendo duración automática:", error);
       }
   };
-  // ==========================================
-
 
   // --- CARGAR DATOS ---
   const fetchCurriculum = async () => {
@@ -117,7 +113,7 @@ function ManageContent() {
     }
   };
 
-  useEffect(() => { fetchCurriculum(); }, [id]);
+  useEffect(() => { fetchCurriculum(); }, [id, API_URL, token]);
 
   // --- MÓDULOS ---
   const handleAddModule = async (e) => {
@@ -170,7 +166,6 @@ function ManageContent() {
   };
 
   const cancelUpload = () => {
-      // 🟢 Cancelación para TUS
       if (uploadRef.current) {
           uploadRef.current.abort();
           setUploading(false);
@@ -185,6 +180,9 @@ function ManageContent() {
     setLessonTitle(leccion.titulo);
     setLessonDescription(leccion.contenido_texto || '');
     setLessonDuration(leccion.duracion || ''); 
+    // 🟢 CARGAMOS EL RECURSO SI EXISTE
+    setLessonResource(leccion.enlace_recurso || '');
+    
     setSelectedModuleId(moduleId);
     
     if (leccion.contenido_quiz && leccion.contenido_quiz.length > 0) {
@@ -205,6 +203,7 @@ function ManageContent() {
     setLessonTitle('');
     setLessonDescription('');
     setLessonDuration(''); 
+    setLessonResource(''); // Limpiamos recurso
     setVideoFile(null);
     setQuizQuestions([]);
     setShowQuizBuilder(false);
@@ -212,17 +211,20 @@ function ManageContent() {
     setTempQuestion({ pregunta: '', opcion1: '', opcion2: '', opcion3: '', correcta: 0 });
   };
 
-  // --- 🟢 GUARDAR TODO (IMPLEMENTACIÓN TUS) ---
+  // --- GUARDAR TODO ---
   const handleSaveLesson = async (e) => {
     e.preventDefault();
     
     if (!selectedModuleId || !lessonTitle) { alert("Faltan datos (Módulo o Título)."); return; }
     
-    const hasVideo = !!videoFile || (editingLessonId && !videoFile);
+    const hasVideo = !!videoFile || (editingLessonId && !videoFile); // Si editamos, asumimos que ya puede haber video
     const hasQuiz = quizQuestions.length > 0;
+    // Permitimos guardar si hay solo un recurso, o solo video, o solo quiz
+    const hasResource = lessonResource && lessonResource.trim() !== "";
 
-    if (!hasVideo && !hasQuiz) { 
-        alert("Debes subir un video O agregar al menos una pregunta al cuestionario."); 
+    // Validación flexible: Debe tener ALGO de contenido
+    if (!hasVideo && !hasQuiz && !hasResource && !editingLessonId) { 
+        alert("Debes agregar al menos un Video, un Cuestionario o un Recurso."); 
         return; 
     }
 
@@ -232,20 +234,16 @@ function ManageContent() {
     try {
         let finalEmbedUrl = null;
 
-        // 1. Subir Video
+        // 1. Subir Video (Si hay uno nuevo seleccionado)
         if (videoFile) {
-            // Paso A: Pedir firma al backend
             const signRes = await axios.post(`${API_URL}/upload/video/presign`, 
                 { title: lessonTitle }, 
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             
-            // Obtenemos los datos necesarios para TUS
             const { authHeader, expiration, videoId, embedUrl } = signRes.data;
 
-            // 🟢 Paso B: Subir a Bunny usando TUS (Protocolo Seguro)
             await new Promise((resolve, reject) => {
-                // Configuramos la subida TUS
                 const upload = new tus.Upload(videoFile, {
                     endpoint: 'https://video.bunnycdn.com/tusupload',
                     retryDelays: [0, 3000, 5000, 10000, 20000],
@@ -254,11 +252,10 @@ function ManageContent() {
                         title: lessonTitle,
                     },
                     headers: {
-                        // Aquí van las credenciales SEGURAS (Firmas, no AccessKey)
                         'AuthorizationSignature': authHeader, 
                         'AuthorizationExpire': expiration,
                         'VideoId': videoId,
-                        'LibraryId': '550746', // ⚠️ Asegúrate que este sea tu ID real de Bunny
+                        'LibraryId': '550746', 
                     },
                     onError: (error) => {
                         console.error("Error en TUS:", error);
@@ -273,10 +270,7 @@ function ManageContent() {
                     },
                 });
 
-                // Guardamos referencia para poder cancelar
                 uploadRef.current = upload;
-                
-                // Iniciamos la subida
                 upload.start();
             });
             
@@ -287,7 +281,9 @@ function ManageContent() {
         const leccionData = { 
             titulo: lessonTitle, 
             contenido_texto: lessonDescription,
-            duracion: lessonDuration, // 🟢 Se envía lo que calculamos o lo que editó el usuario
+            duracion: lessonDuration,
+            // 🟢 ENVIAMOS EL RECURSO AL BACKEND
+            enlace_recurso: lessonResource, 
             contenido_quiz: quizQuestions.length > 0 ? quizQuestions : null 
         };
         
@@ -295,7 +291,7 @@ function ManageContent() {
             leccionData.url_video = finalEmbedUrl;
         }
 
-        // 3. Guardar en BD (Tu servidor)
+        // 3. Guardar en BD
         if (editingLessonId) {
             await axios.put(`${API_URL}/cursos/lessons/${editingLessonId}`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
             alert("Lección actualizada correctamente.");
@@ -317,7 +313,6 @@ function ManageContent() {
     }
   };
 
-  // --- BORRAR / EDITAR AUXILIARES ---
   const handleDeleteModule = async (mid) => { if(!confirm("¿Borrar módulo y sus lecciones?"))return; try{ await axios.delete(`${API_URL}/cursos/modules/${mid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar módulo");} };
   const handleEditModule = async (mod) => { const t = prompt("Nuevo nombre del módulo:", mod.titulo); if(t && t.trim() !== "") try{ await axios.put(`${API_URL}/cursos/modules/${mod.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al editar módulo");} };
   const handleDeleteLesson = async (lid) => { if(!confirm("¿Borrar esta lección?"))return; try{ await axios.delete(`${API_URL}/cursos/lessons/${lid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar lección");} };
@@ -347,11 +342,15 @@ function ManageContent() {
                             {mod.lecciones?.map(lec => (
                                 <li key={lec.id} style={{justifyContent:'space-between'}}>
                                     <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                                        {/* ÍCONOS SEGÚN TIPO DE CONTENIDO */}
                                         {lec.contenido_quiz && lec.contenido_quiz.length > 0 ? (
                                             <i className="fas fa-tasks" style={{color: '#f39c12'}} title="Cuestionario"></i>
+                                        ) : lec.enlace_recurso ? (
+                                            <i className="fas fa-link" style={{color: '#3498db'}} title="Recurso/Link"></i>
                                         ) : (
                                             <i className="fas fa-film" style={{color: '#00d4d4'}} title="Video"></i>
                                         )}
+                                        
                                         {lec.titulo} 
                                         {lec.duracion && <span style={{fontSize:'0.8rem', color:'#999', marginLeft:'5px'}}>({lec.duracion})</span>}
                                     </div>
@@ -403,7 +402,6 @@ function ManageContent() {
                             <input type="text" placeholder="Ej: Clase 1: Fundamentos..." value={lessonTitle} onChange={e => setLessonTitle(e.target.value)} style={inputStyle} required />
                         </div>
 
-                        {/* 🟢 INPUT DE DURACIÓN (AUTO-RELLENABLE) */}
                         <div className="form-group">
                              <label style={labelStyle}>Duración (Auto-calculada al subir video):</label>
                             <input 
@@ -419,10 +417,23 @@ function ManageContent() {
                             <label style={labelStyle}>Descripción / Notas (Opcional):</label>
                             <textarea rows="3" placeholder="Información adicional para el estudiante..." value={lessonDescription} onChange={e => setLessonDescription(e.target.value)} style={{...inputStyle, resize:'vertical'}}></textarea>
                         </div>
+
+                        {/* 🟢 NUEVO CAMPO: ENLACE DE RECURSO */}
+                        <div className="form-group">
+                            <label style={labelStyle}><i className="fas fa-link"></i> Enlace de Recurso (PDF, Drive, Web):</label>
+                            <input 
+                                type="url" 
+                                placeholder="Ej: https://drive.google.com/..." 
+                                value={lessonResource} 
+                                onChange={e => setLessonResource(e.target.value)} 
+                                style={inputStyle} 
+                            />
+                            <small style={{color:'#888', display:'block', marginTop:'5px'}}>* Opcional: Agrega un link para que los alumnos descarguen material.</small>
+                        </div>
                         
                         {/* SECCIÓN DE VIDEO */}
                         <div className="form-group" style={{marginTop:'20px'}}>
-                            <label style={labelStyle}><i className="fas fa-video"></i> Contenido de Video (Opcional si hay Quiz):</label>
+                            <label style={labelStyle}><i className="fas fa-video"></i> Contenido de Video (Opcional si hay Quiz/Recurso):</label>
                             <label className="file-upload-label" style={fileUploadStyle(videoFile)}>
                                 <div style={{textAlign:'center'}}>
                                     <i className="fas fa-cloud-upload-alt" style={{fontSize:'2rem', color: videoFile ? '#2ecc71' : '#ccc', marginBottom:'10px'}}></i>
@@ -432,7 +443,7 @@ function ManageContent() {
                                     id="videoInput" 
                                     type="file" 
                                     accept="video/*" 
-                                    onChange={handleVideoSelect} /* 🟢 USAMOS LA NUEVA FUNCIÓN */
+                                    onChange={handleVideoSelect} 
                                     style={{display:'none'}} 
                                 />
                             </label>
@@ -519,7 +530,6 @@ function ManageContent() {
                                 </div>
                             </div>
                         )}
-
 
                         {uploading && (
                             <div style={{marginTop:'20px', background:'#eafaf1', padding:'15px', borderRadius:'5px', border:'1px solid #d5f5e3'}}>

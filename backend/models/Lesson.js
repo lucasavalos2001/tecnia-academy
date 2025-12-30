@@ -36,6 +36,12 @@ const Lesson = sequelize.define('Lesson', {
         allowNull: true,
         defaultValue: "00:00"
     },
+    // 🟢 NUEVO CAMPO: ENLACE DE RECURSOS (PDF/DRIVE)
+    enlace_recurso: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: "URL para descargar material (PDF, Drive, etc)"
+    },
     orden: {
         type: DataTypes.INTEGER,
         defaultValue: 0,

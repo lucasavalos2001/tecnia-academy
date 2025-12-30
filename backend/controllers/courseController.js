@@ -268,10 +268,17 @@ const updateModule = async (req, res) => {
 const addLesson = async (req, res) => {
     try {
         const { moduleId } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz, duracion } = req.body;
+        // 🟢 ACEPTAMOS EL NUEVO CAMPO 'enlace_recurso'
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
         
         const nuevaLeccion = await Lesson.create({ 
-            titulo, url_video, contenido_texto, contenido_quiz, duracion, moduleId 
+            titulo, 
+            url_video, 
+            contenido_texto, 
+            contenido_quiz, 
+            duracion, 
+            enlace_recurso, // Guardamos el link
+            moduleId 
         });
 
         const modulo = await Module.findByPk(moduleId);
@@ -302,12 +309,21 @@ const deleteLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz, duracion } = req.body;
+        // 🟢 ACEPTAMOS EL NUEVO CAMPO 'enlace_recurso'
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
         
         const leccion = await Lesson.findByPk(id, { include: [{ model: Module, as: 'modulo' }] });
         if (!leccion) return res.status(404).json({ message: "Lección no encontrada" });
 
-        await leccion.update({ titulo, url_video, contenido_texto, contenido_quiz, duracion });
+        await leccion.update({ 
+            titulo, 
+            url_video, 
+            contenido_texto, 
+            contenido_quiz, 
+            duracion,
+            enlace_recurso // Actualizamos el link
+        });
+        
         if (leccion.modulo) await recalculateCourseDuration(leccion.modulo.courseId);
 
         res.json({ message: "Lección actualizada" });
@@ -357,7 +373,7 @@ const getCourseDetail = async (req, res) => {
                     model: Module, 
                     as: 'modulos', 
                     // ⚠️ AQUÍ ESTÁ EL TRUCO: Solo pedimos titulo y duracion. 
-                    // Excluimos explícitamente 'url_video' para que no viaje por la red.
+                    // Excluimos explícitamente 'url_video' y 'enlace_recurso' (opcional) para que no viaje por la red.
                     include: [{ 
                         model: Lesson, 
                         as: 'lecciones',
