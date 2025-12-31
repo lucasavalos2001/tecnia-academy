@@ -451,6 +451,28 @@ body {
 
     .navbar .search-container { display: none !important; }
 
+    /* ---- LOGIN/REGISTRO FIX ---- */
+    /* Hacemos desaparecer la parte azul y estiramos el formulario */
+    .auth-split-screen {
+        flex-direction: column !important;
+    }
+
+    .auth-banner-side {
+        display: none !important; /* SE OCULTA OBLIGATORIAMENTE */
+    }
+
+    .auth-form-side {
+        width: 100% !important;
+        flex: 1 !important;
+        padding: 30px 20px !important;
+        background-color: white !important;
+    }
+    
+    .auth-form-container {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
     /* ---- AULA VIRTUAL RESPONSIVE ---- */
     .classroom-container {
         height: auto !important; /* Scroll infinito en móvil */
