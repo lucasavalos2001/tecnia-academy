@@ -538,6 +538,27 @@ body {
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
 
+    /* ---- FIX ESPECÍFICO PARA CUESTIONARIOS EN MÓVIL ---- */
+    /* Cuando no hay video, el contenido necesita padding y no estirarse */
+    .video-section > div:not(.video-frame-container) {
+        padding: 30px 20px !important; /* Padding arriba/abajo y lateral */
+        box-sizing: border-box !important;
+        color: #fff !important; /* Asegurar texto blanco sobre fondo oscuro */
+    }
+
+    /* Arreglar las opciones de respuesta que se ven estiradas (los bloques verde/rojo) */
+    /* Usamos un selector genérico para hijos directos del contenedor del cuestionario */
+    .video-section > div:not(.video-frame-container) > div,
+    .video-section > div:not(.video-frame-container) button,
+    .video-section > div:not(.video-frame-container) li {
+        height: auto !important; /* Evitar que se estiren al 100% de altura */
+        min-height: 60px !important; /* Altura mínima razonable para tocar */
+        margin-bottom: 15px !important; /* Espacio entre opciones */
+        padding: 15px !important;
+        display: flex !important;
+        align-items: center !important; /* Centrar texto verticalmente */
+    }
+
     /* ---- CERTIFICADO RESPONSIVE ---- */
     .certificate-document {
         width: 100% !important;
