@@ -354,7 +354,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* En Desktop permitimos que crezca, pero en mobile lo forzamos */
+  /* En Desktop permitimos que crezca */
   min-height: 500px; 
 }
 
@@ -398,8 +398,24 @@ body {
 .toggle-sidebar-btn { position: absolute; right: 0; top: 20px; background: #1c1d1f; color: white; border: 1px solid #fff; padding: 10px; cursor: pointer; z-index: 10; border-right: none; border-radius: 5px 0 0 5px; }
 
 
+/* CERTIFICADO Y OTROS */
+.certificate-viewer-container { display: flex; flex-direction: column; align-items: center; background-color: #e9ebee; padding: 40px 20px; min-height: 100vh; }
+.certificate-document { width: 297mm; height: 210mm; background: white; padding: 40px 60px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 15px double #0b3d91; display: flex; flex-direction: column; justify-content: space-between; text-align: center; box-sizing: border-box; margin-bottom: 30px; }
+.certificate-header .logo-cert { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+.certificate-body .student-name { font-family: 'Times New Roman', serif; font-size: 3.2rem; border-bottom: 1px solid #ddd; display: inline-block; padding: 0 20px 10px 20px; margin: 10px 0 20px 0; }
+.certificate-body .course-name { font-size: 2.5rem; color: #0b3d91; font-weight: 800; text-transform: uppercase; }
+.btn-print { padding: 15px 35px; background-color: #00d4d4; color: white; border: none; border-radius: 50px; font-size: 1.2rem; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4); }
+
+@media print {
+  @page { size: landscape; margin: 0; }
+  body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-print, .btn-print, .navbar, .footer { display: none !important; }
+  .certificate-viewer-container { padding: 0; margin: 0; background: white; display: block; }
+  .certificate-document { width: 100%; height: 100vh; margin: 0; box-shadow: none; border: 15px double #0b3d91 !important; page-break-after: avoid; }
+}
+
 /* =========================================
-   📱 ESTILOS MÓVILES - FIX TOTAL
+   📱 OPTIMIZACIÓN MÓVIL (ANDROID / iOS)
    ========================================= */
 @media only screen and (max-width: 768px) {
     
@@ -439,6 +455,7 @@ body {
     .classroom-container {
         height: auto !important; /* Scroll infinito en móvil */
         overflow: visible !important;
+        flex-direction: column !important;
     }
 
     .classroom-player-wrapper { 
@@ -455,7 +472,7 @@ body {
         z-index: 20;
     }
 
-    /* FORZAR ASPECTO 16:9 EN MÓVIL (Anulamos min-height fijo) */
+    /* FORZAR ASPECTO 16:9 EN MÓVIL */
     .video-frame-container {
         width: 100% !important;
         min-height: 0 !important; /* Anulamos los 500px de escritorio */
@@ -480,36 +497,60 @@ body {
     .curriculum-sidebar { 
         width: 100% !important; 
         height: auto; 
+        max-height: 500px; /* Altura máxima para la lista en móvil */
         border: none; 
         position: relative;
         z-index: 10;
+        overflow-y: scroll;
     }
 
     /* Si está colapsado en móvil, lo ocultamos del todo */
     .curriculum-sidebar.collapsed {
         display: none !important;
     }
-
+    
     .toggle-sidebar-btn {
         top: auto; bottom: 20px; right: 20px;
         border-radius: 50%; width: 50px; height: 50px;
         display: flex; justify-content: center; align-items: center;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-}
 
-/* CERTIFICADO Y OTROS */
-.certificate-viewer-container { display: flex; flex-direction: column; align-items: center; background-color: #e9ebee; padding: 40px 20px; min-height: 100vh; }
-.certificate-document { width: 297mm; height: 210mm; background: white; padding: 40px 60px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 15px double #0b3d91; display: flex; flex-direction: column; justify-content: space-between; text-align: center; box-sizing: border-box; margin-bottom: 30px; }
-.certificate-header .logo-cert { font-size: 2.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
-.certificate-body .student-name { font-family: 'Times New Roman', serif; font-size: 3.2rem; border-bottom: 1px solid #ddd; display: inline-block; padding: 0 20px 10px 20px; margin: 10px 0 20px 0; }
-.certificate-body .course-name { font-size: 2.5rem; color: #0b3d91; font-weight: 800; text-transform: uppercase; }
-.btn-print { padding: 15px 35px; background-color: #00d4d4; color: white; border: none; border-radius: 50px; font-size: 1.2rem; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0, 212, 212, 0.4); }
-
-@media print {
-  @page { size: landscape; margin: 0; }
-  body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .no-print, .btn-print, .navbar, .footer { display: none !important; }
-  .certificate-viewer-container { padding: 0; margin: 0; background: white; display: block; }
-  .certificate-document { width: 100%; height: 100vh; margin: 0; box-shadow: none; border: 15px double #0b3d91 !important; page-break-after: avoid; }
+    /* ---- CERTIFICADO RESPONSIVE ---- */
+    .certificate-document {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1.414 / 1; /* Proporción A4 Landscape */
+        padding: 20px !important;
+        border-width: 5px !important;
+    }
+    
+    .certificate-header .logo-cert { font-size: 1.2rem !important; }
+    .certificate-body .student-name { font-size: 1.5rem !important; }
+    .certificate-body .course-name { font-size: 1.2rem !important; }
+    .certificate-body p { font-size: 0.8rem !important; }
+    
+    /* ---- PERFIL RESPONSIVE ---- */
+    .profile-page-container {
+        flex-direction: column !important;
+    }
+    .profile-sidebar {
+        width: 100% !important;
+        position: relative !important;
+        top: 0 !important;
+        margin-top: 50px !important;
+    }
+    
+    /* ---- PANEL INSTRUCTOR RESPONSIVE ---- */
+    .instructor-dashboard {
+        flex-direction: column !important;
+    }
+    .dashboard-sidebar {
+        width: 100% !important;
+    }
+    
+    /* ---- HERO RESPONSIVE ---- */
+    .hero h1 { font-size: 28px !important; }
+    .search-box { flex-direction: column !important; align-items: center !important; }
+    .search-box input { width: 100% !important; max-width: 300px !important; }
 }
