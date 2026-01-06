@@ -1,6 +1,6 @@
 const { User, Course, Enrollment } = require('../models');
 const { sequelize } = require('../config/db');
-const { Op } = require('sequelize'); // 🟢 Necesario para filtros de fecha
+const { Op } = require('sequelize'); 
 
 // 1. Dashboard: Estadísticas Globales
 const getGlobalStats = async (req, res) => {
@@ -9,7 +9,6 @@ const getGlobalStats = async (req, res) => {
         const totalCourses = await Course.count();
         const totalEnrollments = await Enrollment.count();
         
-        // Ingresos teóricos
         const [results] = await sequelize.query(`
             SELECT SUM(c.precio) as total_ingresos
             FROM enrollments e
@@ -59,8 +58,6 @@ const deleteUser = async (req, res) => {
 };
 
 // 3. Gestión de Cursos (Moderación)
-
-// Ver TODOS los cursos (Catálogo completo)
 const getAllCoursesAdmin = async (req, res) => {
     try {
         const courses = await Course.findAll({
@@ -73,7 +70,6 @@ const getAllCoursesAdmin = async (req, res) => {
     }
 };
 
-// Ver SOLO los cursos PENDIENTES
 const getPendingCourses = async (req, res) => {
     try {
         const courses = await Course.findAll({
@@ -88,11 +84,10 @@ const getPendingCourses = async (req, res) => {
     }
 };
 
-// REVISAR CURSO (Aprobar o Rechazar)
 const reviewCourse = async (req, res) => {
     try {
         const { id } = req.params;
-        const { decision } = req.body; // 'aprobar' o 'rechazar'
+        const { decision } = req.body; 
 
         const curso = await Course.findByPk(id);
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
@@ -143,15 +138,21 @@ const getRecentEnrollments = async (req, res) => {
     }
 };
 
-// 🟢 5. NUEVA FUNCIÓN: CALCULAR PAGOS A INSTRUCTORES
+// 🟢 5. FUNCIÓN CORREGIDA: CALCULAR PAGOS CON FILTRO Y DETALLE
 const getInstructorEarnings = async (req, res) => {
     try {
-        // Obtenemos el mes y año actual (o los que vengan por query)
-        const date = new Date();
-        const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-        const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        // 1. Obtener mes y año de los Query Params (o usar fecha actual)
+        // Ejemplo: /payouts?month=1&year=2024 (Enero 2024)
+        // Nota: Los meses en JS van de 0 a 11 (0=Enero)
+        const currentData = new Date();
+        
+        let month = req.query.month ? parseInt(req.query.month) - 1 : currentData.getMonth();
+        let year = req.query.year ? parseInt(req.query.year) : currentData.getFullYear();
 
-        // 1. Obtener todos los instructores
+        const startOfMonth = new Date(year, month, 1);
+        const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
+
+        // 2. Obtener todos los instructores
         const instructors = await User.findAll({
             where: { rol: 'instructor' },
             attributes: ['id', 'nombre_completo', 'email', 'banco_nombre', 'numero_cuenta', 'titular_cuenta', 'cedula_identidad', 'alias_bancario']
@@ -159,31 +160,40 @@ const getInstructorEarnings = async (req, res) => {
 
         const report = [];
 
-        // 2. Calcular ganancias para cada instructor
         for (const instructor of instructors) {
             // Buscar cursos de este instructor
             const courses = await Course.findAll({ where: { instructorId: instructor.id } });
-            const courseIds = courses.map(c => c.id);
-
-            if (courseIds.length === 0) continue; // Si no tiene cursos, saltar
-
-            // Contar inscripciones de ESTE MES para esos cursos
-            const enrollments = await Enrollment.findAll({
-                where: {
-                    courseId: courseIds,
-                    createdAt: {
-                        [Op.between]: [startOfMonth, endOfMonth]
-                    }
-                },
-                include: [{ model: Course, as: 'curso', attributes: ['precio'] }]
-            });
-
-            // Calcular total bruto
-            const totalBruto = enrollments.reduce((sum, e) => sum + parseFloat(e.curso.precio), 0);
             
-            // Lógica de Comisión: 70% Instructor / 30% Plataforma (Ejemplo)
+            if (courses.length === 0) continue; 
+
+            // Variable para acumular el detalle de ventas por curso
+            let detalleVentas = [];
+            let totalBrutoInstructor = 0;
+
+            // Recorremos cada curso para ver cuánto vendió individualmente
+            for (const curso of courses) {
+                const ventasCurso = await Enrollment.count({
+                    where: {
+                        courseId: curso.id,
+                        createdAt: { [Op.between]: [startOfMonth, endOfMonth] }
+                    }
+                });
+
+                if (ventasCurso > 0) {
+                    const ingresoCurso = ventasCurso * parseFloat(curso.precio);
+                    totalBrutoInstructor += ingresoCurso;
+                    
+                    detalleVentas.push({
+                        titulo: curso.titulo,
+                        cantidad: ventasCurso,
+                        ingreso: ingresoCurso
+                    });
+                }
+            }
+
+            // Lógica de Comisión: 70% Instructor / 30% Plataforma
             const comisionPlataforma = 0.30; 
-            const totalPagar = totalBruto * (1 - comisionPlataforma);
+            const totalPagar = totalBrutoInstructor * (1 - comisionPlataforma);
 
             report.push({
                 instructor: {
@@ -195,13 +205,16 @@ const getInstructorEarnings = async (req, res) => {
                     ci: instructor.cedula_identidad,
                     alias: instructor.alias_bancario
                 },
+                periodo: {
+                    mes: month + 1, // Para mostrar 1=Enero en el frontend
+                    año: year
+                },
                 estadisticas: {
-                    alumnos_mes: enrollments.length,
-                    cursos_activos: courses.length,
-                    total_bruto: totalBruto,
-                    comision_retenida: totalBruto * comisionPlataforma,
+                    total_bruto: totalBrutoInstructor,
+                    comision_retenida: totalBrutoInstructor * comisionPlataforma,
                     total_a_pagar: totalPagar
-                }
+                },
+                detalle: detalleVentas // <--- Aquí va la lista detallada
             });
         }
 
@@ -220,5 +233,5 @@ module.exports = {
     getPendingCourses, 
     reviewCourse, 
     getRecentEnrollments,
-    getInstructorEarnings // <--- ¡Exportada!
+    getInstructorEarnings 
 };

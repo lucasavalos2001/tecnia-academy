@@ -13,12 +13,16 @@ function AdminDashboard() {
   const [courses, setCourses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [pendingCourses, setPendingCourses] = useState([]); 
-  const [payouts, setPayouts] = useState([]); // 🟢 Estado para pagos
+  const [payouts, setPayouts] = useState([]); 
    
   // Estado de Interfaz y Búsqueda
   const [activeTab, setActiveTab] = useState('stats'); 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState(''); 
+
+  // 🟢 ESTADOS PARA FILTRO DE FECHA (PAGOS)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1 = Enero
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // --- Cargas de Datos ---
   const loadStats = async () => {
@@ -47,10 +51,13 @@ function AdminDashboard() {
     } catch (error) { console.error("Error pendientes", error); }
   };
 
-  // 🟢 Cargar reporte de pagos
+  // 🟢 Cargar reporte de pagos CON FILTROS
   const loadPayouts = async () => {
     try {
-        const res = await axios.get(`${API_URL}/admin/payouts`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.get(`${API_URL}/admin/payouts`, { 
+            headers: { Authorization: `Bearer ${token}` },
+            params: { month: selectedMonth, year: selectedYear } // Enviamos los filtros
+        });
         setPayouts(res.data);
     } catch (error) { console.error("Error payouts", error); }
   };
@@ -62,11 +69,11 @@ function AdminDashboard() {
     if (activeTab === 'courses') loadCourses();
     if (activeTab === 'activity') loadActivity();
     if (activeTab === 'requests') loadPendingCourses(); 
-    if (activeTab === 'payouts') loadPayouts(); // 🟢 Cargar al entrar a la tab
+    if (activeTab === 'payouts') loadPayouts(); 
     setLoading(false);
-  }, [activeTab]);
+  }, [activeTab, selectedMonth, selectedYear]); // 🟢 Se recarga si cambia el mes/año
 
-  // --- Acciones Existentes ---
+  // --- Acciones ---
   const handleDeleteUser = async (id) => {
     if(!confirm("¿Estás SEGURO? Esto borrará al usuario y sus datos.")) return;
     await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -100,11 +107,9 @@ function AdminDashboard() {
           loadStats(); 
       } catch (error) {
           alert("Error al procesar la solicitud.");
-          console.error(error);
       }
   };
 
-  // --- LÓGICA DE FILTRADO USUARIOS ---
   const filteredUsers = users.filter(u => {
       const term = searchTerm.toLowerCase();
       return (
@@ -154,8 +159,6 @@ function AdminDashboard() {
                     <li><button onClick={() => setActiveTab('users')} className={activeTab === 'users' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-users"></i> Usuarios</button></li>
                     <li><button onClick={() => setActiveTab('courses')} className={activeTab === 'courses' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-book"></i> Moderar Cursos</button></li>
                     <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad</button></li>
-                    
-                    {/* 🟢 NUEVO BOTÓN: PAGOS */}
                     <li><button onClick={() => setActiveTab('payouts')} className={activeTab === 'payouts' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-money-bill-wave"></i> Liquidación Pagos</button></li>
 
                     <li style={{marginTop:'20px', borderTop:'1px solid #ffffff20', paddingTop:'10px'}}>
@@ -223,14 +226,47 @@ function AdminDashboard() {
                 </div>
             )}
 
-            {/* 🟢 VISTA NUEVA: LIQUIDACIÓN DE PAGOS */}
+            {/* 🟢 VISTA ACTUALIZADA: LIQUIDACIÓN DE PAGOS */}
             {activeTab === 'payouts' && (
                 <div>
-                    <header className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <h2>Liquidación Mensual de Instructores</h2>
-                        <button onClick={() => window.print()} style={{padding:'10px 20px', background:'#2c3e50', color:'white', border:'none', borderRadius:'5px', cursor:'pointer'}}>
-                            <i className="fas fa-print"></i> Imprimir Reporte
-                        </button>
+                    <header className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px'}}>
+                        <h2>Liquidación Mensual</h2>
+                        
+                        {/* 🟢 SELECTORES DE FECHA */}
+                        <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                            <select 
+                                value={selectedMonth} 
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}
+                            >
+                                <option value="1">Enero</option>
+                                <option value="2">Febrero</option>
+                                <option value="3">Marzo</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Mayo</option>
+                                <option value="6">Junio</option>
+                                <option value="7">Julio</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Septiembre</option>
+                                <option value="10">Octubre</option>
+                                <option value="11">Noviembre</option>
+                                <option value="12">Diciembre</option>
+                            </select>
+
+                            <select 
+                                value={selectedYear} 
+                                onChange={(e) => setSelectedYear(e.target.value)}
+                                style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}
+                            >
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                            </select>
+
+                            <button onClick={() => window.print()} style={{padding:'8px 15px', background:'#2c3e50', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', marginLeft:'10px'}}>
+                                <i className="fas fa-print"></i>
+                            </button>
+                        </div>
                     </header>
 
                     <div style={{overflowX: 'auto', background:'white', borderRadius:'8px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
@@ -239,7 +275,7 @@ function AdminDashboard() {
                                 <tr>
                                     <th style={{padding:'15px', textAlign:'left'}}>Instructor</th>
                                     <th style={{padding:'15px', textAlign:'left'}}>Datos Bancarios</th>
-                                    <th style={{padding:'15px', textAlign:'center'}}>Ventas Mes</th>
+                                    <th style={{padding:'15px', textAlign:'left'}}>Ventas del Mes</th>
                                     <th style={{padding:'15px', textAlign:'right'}}>Total Bruto</th>
                                     <th style={{padding:'15px', textAlign:'right', color:'#e74c3c'}}>Comisión (30%)</th>
                                     <th style={{padding:'15px', textAlign:'right', background:'#27ae60', color:'white'}}>A PAGAR</th>
@@ -247,31 +283,42 @@ function AdminDashboard() {
                             </thead>
                             <tbody>
                                 {payouts.length === 0 ? (
-                                    <tr><td colSpan="6" style={{padding:'30px', textAlign:'center', color:'#999'}}>No hay ventas registradas este mes.</td></tr>
+                                    <tr><td colSpan="6" style={{padding:'30px', textAlign:'center', color:'#999'}}>No hay ventas registradas en este periodo.</td></tr>
                                 ) : (
                                     payouts.map((p, idx) => (
                                         <tr key={idx} style={{borderBottom:'1px solid #eee'}}>
+                                            {/* Instructor */}
                                             <td style={{padding:'15px'}}>
                                                 <strong>{p.instructor.nombre}</strong><br/>
                                                 <small style={{color:'#999'}}>ID: {p.instructor.id}</small>
                                             </td>
-                                            <td style={{padding:'15px', fontSize:'0.9em'}}>
+                                            
+                                            {/* Banco */}
+                                            <td style={{padding:'15px', fontSize:'0.85em'}}>
                                                 {p.instructor.banco ? (
                                                     <>
-                                                        <div><strong>Banco:</strong> {p.instructor.banco}</div>
-                                                        <div><strong>Cta:</strong> {p.instructor.cuenta}</div>
-                                                        <div><strong>Titular:</strong> {p.instructor.titular}</div>
-                                                        <div><strong>CI:</strong> {p.instructor.ci}</div>
-                                                        {p.instructor.alias && <div><strong>Alias:</strong> {p.instructor.alias}</div>}
+                                                        <div><strong>{p.instructor.banco}</strong></div>
+                                                        <div>Cta: {p.instructor.cuenta}</div>
+                                                        <div>CI: {p.instructor.ci}</div>
+                                                        {p.instructor.alias && <div>Alias: {p.instructor.alias}</div>}
                                                     </>
                                                 ) : (
-                                                    <span style={{color:'#e74c3c', fontWeight:'bold'}}>Sin datos bancarios</span>
+                                                    <span style={{color:'#e74c3c', fontWeight:'bold'}}>Sin datos</span>
                                                 )}
                                             </td>
-                                            <td style={{padding:'15px', textAlign:'center'}}>
-                                                {p.estadisticas.alumnos_mes} alumnos<br/>
-                                                <small>en {p.estadisticas.cursos_activos} cursos</small>
+
+                                            {/* 🟢 DETALLE DE VENTAS POR CURSO */}
+                                            <td style={{padding:'15px', fontSize:'0.9em'}}>
+                                                <div style={{fontWeight:'bold', marginBottom:'5px'}}>{p.estadisticas.alumnos_mes} ventas totales:</div>
+                                                <ul style={{paddingLeft:'15px', margin:0, color:'#555'}}>
+                                                    {p.detalle && p.detalle.map((d, i) => (
+                                                        <li key={i}>
+                                                            {d.titulo}: {d.cantidad} ({formatMoney(d.ingreso)})
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </td>
+
                                             <td style={{padding:'15px', textAlign:'right'}}>
                                                 {formatMoney(p.estadisticas.total_bruto)}
                                             </td>
@@ -288,7 +335,7 @@ function AdminDashboard() {
                         </table>
                     </div>
                     <p style={{marginTop:'20px', fontSize:'0.9em', color:'#666', textAlign:'center'}}>
-                        * Cálculos basados en inscripciones del mes en curso. La comisión de plataforma es del 30%.
+                        * Mostrando liquidación para el periodo: <strong>{selectedMonth}/{selectedYear}</strong>.
                     </p>
                 </div>
             )}
