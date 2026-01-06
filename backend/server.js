@@ -14,11 +14,12 @@ const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 
+// 🟢 IMPORTAR EL MIDDLEWARE DE MANTENIMIENTO
+const maintenanceMiddleware = require('./middleware/maintenanceMiddleware');
+
 const app = express();
 
 // 🚀 CONFIGURACIÓN CRÍTICA PARA NGINX / DIGITAL OCEAN
-// Soluciona el error "ValidationError: The 'X-Forwarded-For' header..."
-// Le dice a Express que confíe en el proxy reverso (Nginx)
 app.set('trust proxy', 1);
 
 // 🛡️ 1. SEGURIDAD: HELMET
@@ -36,11 +37,10 @@ app.use(limiter);
 const whitelist = ['https://tecniaacademy.com', 'https://www.tecniaacademy.com', 'http://localhost:5173'];
 const corsOptions = {
     origin: function (origin, callback) {
-        // !origin permite peticiones sin origen (como Postman o Webhooks de Pagopar)
         if (whitelist.indexOf(origin) !== -1 || !origin) { 
             callback(null, true);
         } else {
-            console.log("🚫 CORS Bloqueado para:", origin); // Log útil para depurar
+            console.log("🚫 CORS Bloqueado para:", origin); 
             callback(new Error('Bloqueado por CORS'));
         }
     },
@@ -48,11 +48,17 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// --- MIDDLEWARES ESTÁNDAR (CORREGIDO) ---
+// --- MIDDLEWARES ESTÁNDAR ---
 app.use(express.json());
-// 👇 ESTA LÍNEA ES VITAL: Permite recibir datos tipo formulario (x-www-form-urlencoded)
-// Pagopar a veces envía los webhooks en este formato.
 app.use(express.urlencoded({ extended: true }));
+
+// ============================================================
+// 🔒 4. MIDDLEWARE DE MANTENIMIENTO (EL CERROJO)
+// ============================================================
+// Esto verifica en cada petición si el sitio está cerrado.
+// Si está activo, solo dejará pasar al Super Admin y al Login.
+app.use(maintenanceMiddleware);
+
 
 // Rutas
 app.use('/api/auth', authRoutes);
@@ -69,11 +75,10 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 // 🚀 INICIO ROBUSTO DEL SERVIDOR
-// Esperamos a que la BD esté lista antes de recibir peticiones
 const startServer = async () => {
     try {
         await connectDB(); // 1. Conectar
-        await syncDB();    // 2. Crear tablas (Aquí se creará Transactions)
+        await syncDB();    // 2. Crear tablas (Aquí se inicia SystemSettings)
         
         // 3. Solo ahora arrancamos el servidor
         app.listen(PORT, () => {

@@ -10,7 +10,10 @@ const {
     getRecentEnrollments,
     getPendingCourses,
     reviewCourse,
-    getInstructorEarnings // <--- 🟢 IMPORTAMOS LA NUEVA FUNCIÓN
+    getInstructorEarnings,
+    // 🟢 NUEVAS FUNCIONES DE MANTENIMIENTO
+    getMaintenanceStatus,
+    toggleMaintenance
 } = require('../controllers/adminController');
 
 // Importamos el middleware centralizado
@@ -48,9 +51,16 @@ router.get('/pending', getPendingCourses);
 router.post('/review/:id', reviewCourse);
 
 // ==========================================
-// 💰 GESTIÓN DE PAGOS (NUEVO)
+// 💰 GESTIÓN DE PAGOS
 // ==========================================
-// Ruta para ver cuánto hay que pagarle a cada instructor este mes
 router.get('/payouts', getInstructorEarnings);
+
+// ==========================================
+// 🛡️ MODO MANTENIMIENTO (NUEVO)
+// ==========================================
+// 1. Ver si está activo
+router.get('/maintenance/status', getMaintenanceStatus);
+// 2. Encender / Apagar
+router.post('/maintenance/toggle', toggleMaintenance);
 
 module.exports = router;

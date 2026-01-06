@@ -1,4 +1,4 @@
-const { User, Course, Enrollment } = require('../models');
+const { User, Course, Enrollment, SystemSetting } = require('../models'); // 🟢 AGREGADO SystemSetting
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize'); 
 
@@ -138,21 +138,16 @@ const getRecentEnrollments = async (req, res) => {
     }
 };
 
-// 🟢 5. FUNCIÓN CORREGIDA: CALCULAR PAGOS CON FILTRO Y DETALLE
+// 5. Calcular Pagos
 const getInstructorEarnings = async (req, res) => {
     try {
-        // 1. Obtener mes y año de los Query Params (o usar fecha actual)
-        // Ejemplo: /payouts?month=1&year=2024 (Enero 2024)
-        // Nota: Los meses en JS van de 0 a 11 (0=Enero)
         const currentData = new Date();
-        
         let month = req.query.month ? parseInt(req.query.month) - 1 : currentData.getMonth();
         let year = req.query.year ? parseInt(req.query.year) : currentData.getFullYear();
 
         const startOfMonth = new Date(year, month, 1);
         const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59);
 
-        // 2. Obtener todos los instructores
         const instructors = await User.findAll({
             where: { rol: 'instructor' },
             attributes: ['id', 'nombre_completo', 'email', 'banco_nombre', 'numero_cuenta', 'titular_cuenta', 'cedula_identidad', 'alias_bancario']
@@ -161,16 +156,12 @@ const getInstructorEarnings = async (req, res) => {
         const report = [];
 
         for (const instructor of instructors) {
-            // Buscar cursos de este instructor
             const courses = await Course.findAll({ where: { instructorId: instructor.id } });
-            
             if (courses.length === 0) continue; 
 
-            // Variable para acumular el detalle de ventas por curso
             let detalleVentas = [];
             let totalBrutoInstructor = 0;
 
-            // Recorremos cada curso para ver cuánto vendió individualmente
             for (const curso of courses) {
                 const ventasCurso = await Enrollment.count({
                     where: {
@@ -182,7 +173,6 @@ const getInstructorEarnings = async (req, res) => {
                 if (ventasCurso > 0) {
                     const ingresoCurso = ventasCurso * parseFloat(curso.precio);
                     totalBrutoInstructor += ingresoCurso;
-                    
                     detalleVentas.push({
                         titulo: curso.titulo,
                         cantidad: ventasCurso,
@@ -191,7 +181,6 @@ const getInstructorEarnings = async (req, res) => {
                 }
             }
 
-            // Lógica de Comisión: 70% Instructor / 30% Plataforma
             const comisionPlataforma = 0.30; 
             const totalPagar = totalBrutoInstructor * (1 - comisionPlataforma);
 
@@ -205,24 +194,59 @@ const getInstructorEarnings = async (req, res) => {
                     ci: instructor.cedula_identidad,
                     alias: instructor.alias_bancario
                 },
-                periodo: {
-                    mes: month + 1, // Para mostrar 1=Enero en el frontend
-                    año: year
-                },
+                periodo: { mes: month + 1, año: year },
                 estadisticas: {
                     total_bruto: totalBrutoInstructor,
                     comision_retenida: totalBrutoInstructor * comisionPlataforma,
                     total_a_pagar: totalPagar
                 },
-                detalle: detalleVentas // <--- Aquí va la lista detallada
+                detalle: detalleVentas
             });
         }
-
         res.json(report);
-
     } catch (error) {
         console.error("Error calculando pagos:", error);
         res.status(500).json({ message: "Error al calcular pagos a instructores" });
+    }
+};
+
+// 🟢 6. CONTROL DE MANTENIMIENTO (NUEVO)
+
+// Obtener estado actual
+const getMaintenanceStatus = async (req, res) => {
+    try {
+        const setting = await SystemSetting.findOne({ where: { key: 'maintenance_mode' } });
+        // Si no existe, asumimos false
+        const isEnabled = setting ? setting.value === 'true' : false;
+        res.json({ enabled: isEnabled });
+    } catch (error) {
+        res.status(500).json({ message: "Error verificando mantenimiento" });
+    }
+};
+
+// Cambiar estado (ON/OFF)
+const toggleMaintenance = async (req, res) => {
+    try {
+        const { enabled } = req.body; // true o false
+        
+        // Actualizamos o creamos la configuración
+        const [setting, created] = await SystemSetting.findOrCreate({
+            where: { key: 'maintenance_mode' },
+            defaults: { value: enabled ? 'true' : 'false' }
+        });
+
+        if (!created) {
+            await setting.update({ value: enabled ? 'true' : 'false' });
+        }
+
+        res.json({ 
+            message: `Modo Mantenimiento ${enabled ? 'ACTIVADO 🔒' : 'DESACTIVADO ✅'}`,
+            enabled: enabled
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error cambiando modo mantenimiento" });
     }
 };
 
@@ -233,5 +257,7 @@ module.exports = {
     getPendingCourses, 
     reviewCourse, 
     getRecentEnrollments,
-    getInstructorEarnings 
+    getInstructorEarnings,
+    getMaintenanceStatus, // 🟢 Exportar
+    toggleMaintenance     // 🟢 Exportar
 };

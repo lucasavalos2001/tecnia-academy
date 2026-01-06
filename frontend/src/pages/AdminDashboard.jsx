@@ -14,14 +14,17 @@ function AdminDashboard() {
   const [enrollments, setEnrollments] = useState([]);
   const [pendingCourses, setPendingCourses] = useState([]); 
   const [payouts, setPayouts] = useState([]); 
+  
+  // 🟢 ESTADO DE MANTENIMIENTO
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
    
   // Estado de Interfaz y Búsqueda
   const [activeTab, setActiveTab] = useState('stats'); 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState(''); 
 
-  // 🟢 ESTADOS PARA FILTRO DE FECHA (PAGOS)
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1 = Enero
+  // Estados para filtro de fecha (Pagos)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // --- Cargas de Datos ---
@@ -51,19 +54,29 @@ function AdminDashboard() {
     } catch (error) { console.error("Error pendientes", error); }
   };
 
-  // 🟢 Cargar reporte de pagos CON FILTROS
   const loadPayouts = async () => {
     try {
         const res = await axios.get(`${API_URL}/admin/payouts`, { 
             headers: { Authorization: `Bearer ${token}` },
-            params: { month: selectedMonth, year: selectedYear } // Enviamos los filtros
+            params: { month: selectedMonth, year: selectedYear } 
         });
         setPayouts(res.data);
     } catch (error) { console.error("Error payouts", error); }
   };
 
+  // 🟢 Cargar estado de mantenimiento
+  const loadMaintenanceStatus = async () => {
+      try {
+          const res = await axios.get(`${API_URL}/admin/maintenance/status`, { headers: { Authorization: `Bearer ${token}` } });
+          setMaintenanceMode(res.data.enabled);
+      } catch (error) { console.error("Error maintenance status", error); }
+  };
+
   useEffect(() => {
     setLoading(true);
+    // Cargar estado de mantenimiento siempre
+    loadMaintenanceStatus();
+
     if (activeTab === 'stats') loadStats();
     if (activeTab === 'users') loadUsers();
     if (activeTab === 'courses') loadCourses();
@@ -71,7 +84,7 @@ function AdminDashboard() {
     if (activeTab === 'requests') loadPendingCourses(); 
     if (activeTab === 'payouts') loadPayouts(); 
     setLoading(false);
-  }, [activeTab, selectedMonth, selectedYear]); // 🟢 Se recarga si cambia el mes/año
+  }, [activeTab, selectedMonth, selectedYear]); 
 
   // --- Acciones ---
   const handleDeleteUser = async (id) => {
@@ -110,6 +123,29 @@ function AdminDashboard() {
       }
   };
 
+  // 🟢 ACCIÓN: CAMBIAR MODO MANTENIMIENTO
+  const toggleMaintenance = async () => {
+      const nuevoEstado = !maintenanceMode;
+      const mensaje = nuevoEstado 
+          ? "⚠️ ¿ACTIVAR MODO MANTENIMIENTO?\n\nNadie podrá acceder al sitio excepto tú. Úsalo para realizar cambios importantes." 
+          : "✅ ¿DESACTIVAR MANTENIMIENTO?\n\nEl sitio volverá a estar público para todos los usuarios.";
+
+      if (!confirm(mensaje)) return;
+
+      try {
+          await axios.post(
+              `${API_URL}/admin/maintenance/toggle`,
+              { enabled: nuevoEstado },
+              { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setMaintenanceMode(nuevoEstado);
+          alert(nuevoEstado ? "Sitio cerrado al público 🔒" : "Sitio abierto ✅");
+      } catch (error) {
+          console.error(error);
+          alert("Error al cambiar el modo mantenimiento");
+      }
+  };
+
   const filteredUsers = users.filter(u => {
       const term = searchTerm.toLowerCase();
       return (
@@ -139,6 +175,30 @@ function AdminDashboard() {
                 </div>
                 <h4>{user?.nombre_completo}</h4>
                 <p style={{fontSize:'0.8em', color:'#bdc3c7'}}>Super Administrador</p>
+            </div>
+
+            {/* 🟢 PANEL DE CONTROL DE MANTENIMIENTO */}
+            <div style={{padding:'15px', background:'rgba(0,0,0,0.2)', margin:'10px', borderRadius:'8px', textAlign:'center'}}>
+                <p style={{color:'white', fontSize:'0.8em', marginBottom:'10px', fontWeight:'bold'}}>
+                    ESTADO DEL SITIO:
+                </p>
+                <button 
+                    onClick={toggleMaintenance}
+                    style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: 'none',
+                        borderRadius: '20px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        background: maintenanceMode ? '#e74c3c' : '#27ae60',
+                        color: 'white',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                        transition: 'all 0.3s'
+                    }}
+                >
+                    {maintenanceMode ? '🔒 EN MANTENIMIENTO' : '✅ SITIO ONLINE'}
+                </button>
             </div>
 
             <nav className="dashboard-nav">
@@ -171,6 +231,17 @@ function AdminDashboard() {
         {/* CONTENIDO PRINCIPAL */}
         <main className="dashboard-content">
             
+            {/* 🟢 ALERTA VISUAL SI EL MANTENIMIENTO ESTÁ ACTIVO */}
+            {maintenanceMode && (
+                <div style={{background:'#e74c3c', color:'white', padding:'15px', borderRadius:'8px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'15px', boxShadow:'0 4px 15px rgba(231, 76, 60, 0.3)'}}>
+                    <i className="fas fa-exclamation-triangle" style={{fontSize:'1.5em'}}></i>
+                    <div>
+                        <strong>¡ATENCIÓN! EL SITIO ESTÁ CERRADO AL PÚBLICO.</strong><br/>
+                        <small>Solo tú (Super Admin) puedes ver el contenido. Los estudiantes verán la pantalla de mantenimiento.</small>
+                    </div>
+                </div>
+            )}
+
             {/* VISTA 1: DASHBOARD */}
             {activeTab === 'stats' && (
                 <div>
@@ -226,13 +297,12 @@ function AdminDashboard() {
                 </div>
             )}
 
-            {/* 🟢 VISTA ACTUALIZADA: LIQUIDACIÓN DE PAGOS */}
+            {/* VISTA: LIQUIDACIÓN DE PAGOS */}
             {activeTab === 'payouts' && (
                 <div>
                     <header className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px'}}>
                         <h2>Liquidación Mensual</h2>
                         
-                        {/* 🟢 SELECTORES DE FECHA */}
                         <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
                             <select 
                                 value={selectedMonth} 
@@ -307,7 +377,7 @@ function AdminDashboard() {
                                                 )}
                                             </td>
 
-                                            {/* 🟢 DETALLE DE VENTAS POR CURSO */}
+                                            {/* Detalle Ventas */}
                                             <td style={{padding:'15px', fontSize:'0.9em'}}>
                                                 <div style={{fontWeight:'bold', marginBottom:'5px'}}>{p.estadisticas.alumnos_mes} ventas totales:</div>
                                                 <ul style={{paddingLeft:'15px', margin:0, color:'#555'}}>
