@@ -56,13 +56,12 @@ const getUserCertificates = async (req, res) => {
     }
 };
 
-// 🟢 FUNCIÓN DE VERIFICACIÓN CORREGIDA (Sin alias restrictivo)
+// 🟢 FUNCIÓN DE VERIFICACIÓN PÚBLICA
 const verifyCertificatePublic = async (req, res) => {
     try {
         const { id } = req.params;
 
         // Buscamos la inscripción
-        // ⚠️ CAMBIO IMPORTANTE: Quitamos "as: 'usuario'" para evitar choques si la BD no lo tiene definido así.
         const certificado = await Enrollment.findByPk(id, {
             include: [
                 { 
@@ -109,7 +108,7 @@ const verifyCertificatePublic = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error backend:", error); // Esto imprimirá el error real en tu consola PM2
+        console.error("Error backend:", error);
         res.status(500).json({ message: "Error interno al verificar certificado." });
     }
 };
@@ -146,10 +145,37 @@ const updateUserProfile = async (req, res) => {
     }
 };
 
+// 🏦 NUEVA FUNCIÓN: ACTUALIZAR DATOS BANCARIOS
+const updateBankDetails = async (req, res) => {
+    try {
+        const userId = req.usuario.id;
+        // Obtenemos los datos del cuerpo de la petición
+        const { banco_nombre, numero_cuenta, titular_cuenta, cedula_identidad, alias_bancario } = req.body;
+
+        await User.update(
+            { 
+                banco_nombre, 
+                numero_cuenta, 
+                titular_cuenta, 
+                cedula_identidad,
+                alias_bancario 
+            },
+            { where: { id: userId } }
+        );
+
+        res.json({ message: "Datos bancarios guardados correctamente." });
+
+    } catch (error) {
+        console.error("Error guardando datos bancarios:", error);
+        res.status(500).json({ message: "Error al guardar los datos bancarios." });
+    }
+};
+
 module.exports = { 
     getUserProfile, 
     getUserCertificates, 
     becomeInstructor, 
     updateUserProfile, 
-    verifyCertificatePublic 
+    verifyCertificatePublic,
+    updateBankDetails // <--- No olvides exportarla
 };

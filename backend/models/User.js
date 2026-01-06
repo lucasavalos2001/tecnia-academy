@@ -36,7 +36,35 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: true,
     },
-    // ✅ NUEVOS CAMPOS PARA RECUPERACIÓN
+
+    // 🏦 NUEVOS CAMPOS: DATOS BANCARIOS (Para pagos a instructores)
+    banco_nombre: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: ''
+    },
+    numero_cuenta: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: ''
+    },
+    titular_cuenta: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: ''
+    },
+    cedula_identidad: { // Importante para transferencias en Paraguay
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: ''
+    },
+    alias_bancario: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: ''
+    },
+
+    // CAMPOS PARA RECUPERACIÓN
     resetPasswordToken: {
         type: DataTypes.STRING,
         allowNull: true,

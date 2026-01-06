@@ -1,8 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer'); 
-// 🟢 IMPORTAMOS LA NUEVA FUNCIÓN 'verifyCertificatePublic'
-const { getUserProfile, getUserCertificates, becomeInstructor, updateUserProfile, verifyCertificatePublic } = require('../controllers/userController');
+// 🟢 IMPORTAMOS LA NUEVA FUNCIÓN 'updateBankDetails'
+const { 
+    getUserProfile, 
+    getUserCertificates, 
+    becomeInstructor, 
+    updateUserProfile, 
+    verifyCertificatePublic,
+    updateBankDetails // <--- Nueva función para guardar banco
+} = require('../controllers/userController');
+
 const { verifyToken } = require('../middleware/authMiddleware');
 
 // Configurar Multer (Memoria)
@@ -21,6 +29,9 @@ router.get('/verificar/:id', verifyCertificatePublic);
 router.get('/perfil', verifyToken, getUserProfile);
 router.get('/certificados', verifyToken, getUserCertificates);
 router.put('/convertirse-instructor', verifyToken, becomeInstructor);
+
+// 🟢 NUEVA RUTA: GUARDAR DATOS BANCARIOS
+router.put('/datos-bancarios', verifyToken, updateBankDetails);
 
 router.put('/actualizar', verifyToken, upload.single('foto'), updateUserProfile);
 
