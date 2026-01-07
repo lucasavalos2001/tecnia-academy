@@ -16,13 +16,15 @@ const maintenanceMiddleware = async (req, res, next) => {
         // 🚨 MANTENIMIENTO ENCENDIDO - FILTRO DE SEGURIDAD
         // ============================================================
 
-        // A. Permitir siempre el acceso al Login (si no, nadie podrá entrar a desactivarlo)
-        // También permitimos la ruta para cambiar la configuración (por si acaso)
-        if (req.path.includes('/login') || req.path.includes('/admin/maintenance')) {
+        // A. Permitir siempre el acceso al Login y a la ruta de desactivar mantenimiento
+        // IMPORTANTE: Agregamos '/api/auth' para permitir validación de sesión
+        if (req.path.includes('/login') || 
+            req.path.includes('/auth') || 
+            req.path.includes('/admin/maintenance')) {
             return next();
         }
 
-        // B. Verificar si quien intenta entrar es el SUPER ADMINISTRADOR
+        // B. Verificar si quien intenta entrar es ADMINISTRADOR (admin O superadmin)
         const authHeader = req.headers['authorization'];
         if (authHeader) {
             const token = authHeader.split(' ')[1];
@@ -30,8 +32,8 @@ const maintenanceMiddleware = async (req, res, next) => {
                 // Verificamos el token manualmente aquí
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 
-                // Si es Super Admin, tiene "Pase VIP", puede entrar
-                if (decoded.rol === 'superadmin') {
+                // 🟢 CORRECCIÓN: Permitimos 'admin' Y 'superadmin'
+                if (decoded.rol === 'admin' || decoded.rol === 'superadmin') {
                     return next(); 
                 }
             } catch (err) {
