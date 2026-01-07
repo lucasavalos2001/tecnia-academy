@@ -3,17 +3,19 @@ const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
 
 // =========================================================
-// 1. INICIAR PAGO (LÓGICA CORREGIDA: ACTUALIZA EL HASH REAL)
+// 1. INICIAR PAGO (MODIFICADO: DATOS REALES + GENÉRICOS)
 // =========================================================
 const initiatePayment = async (req, res) => {
-    console.log("\n🚀 INICIANDO PAGO");
+    console.log("\n🚀 INICIANDO PAGO (Estrategia Udemy)");
     try {
         const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
-        if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves");
+        if (!PUBLIC_KEY || !PRIVATE_KEY) throw new Error("Faltan claves de Pagopar");
 
         const { courseId } = req.body;
+        
+        // Verificamos que el usuario esté logueado
         if (!req.usuario) return res.status(401).json({message:"Auth requerida"});
         
         const curso = await Course.findByPk(courseId);
@@ -22,8 +24,22 @@ const initiatePayment = async (req, res) => {
         const monto = parseInt(curso.precio);
         const pedidoId = `ORDEN-${Date.now()}`; 
 
-        // 1. CREAMOS LA TRANSACCIÓN (Con ID temporal)
-        // Guardamos 'pedidoId' temporalmente. Luego lo cambiaremos por el Hash real.
+        // 🟢 DATOS DEL COMPRADOR (ESTRATEGIA UDEMY)
+        // 1. Usamos el Nombre y Email REALES de tu base de datos.
+        // 2. Usamos RUC y Teléfono GENÉRICOS para no trabar la venta.
+        const compradorData = {
+            nombre: req.usuario.nombre_completo || "Estudiante",
+            email: req.usuario.email, // ¡CRUCIAL! Aquí llegará el recibo.
+            ruc: "44444401-7",        // RUC Genérico "Sin Nombre" / Consumidor Final
+            documento: "4444440",     // Parte numérica del RUC
+            telefono: "0981000000",   // Teléfono genérico
+            ciudad: 1,                // Asunción (Default)
+            direccion: "Paraguay"     // Dirección genérica
+        };
+
+        console.log(`👤 Comprador: ${compradorData.nombre} (${compradorData.email})`);
+
+        // 1. CREAMOS LA TRANSACCIÓN
         const nuevaTransaccion = await Transaction.create({
             external_reference: pedidoId, 
             amount: monto, 
@@ -34,50 +50,75 @@ const initiatePayment = async (req, res) => {
             payment_method: 'pagopar'
         });
 
-        // Token para firmar el envío (SHA1)
+        // Token SHA1
         const tokenFirma = crypto.createHash('sha1').update(PRIVATE_KEY + pedidoId + monto.toString()).digest('hex');
 
+        // Construimos el objeto para Pagopar
         const orden = {
             "token": tokenFirma, 
             "public_key": PUBLIC_KEY, 
             "monto_total": monto, 
             "tipo_pedido": "VENTA-COMERCIO",
-            "compras_items": [{"ciudad":1,"nombre":curso.titulo.substring(0,40),"cantidad":1,"categoria":"909","public_key":PUBLIC_KEY,"url_imagen":"https://tecniaacademy.com/logo.png","descripcion":"Curso","id_producto":courseId.toString(),"precio_total":monto,"vendedor_telefono":"0981000000","vendedor_direccion":"Asuncion","vendedor_direccion_referencia":"Centro","vendedor_direccion_coordenadas":"-25.2637,-57.5759"}],
-            "fecha_maxima_pago": new Date(Date.now()+48*60*60*1000).toISOString(), 
+            "compras_items": [
+                {
+                    "ciudad": 1,
+                    "nombre": curso.titulo.substring(0, 40),
+                    "cantidad": 1,
+                    "categoria": "909",
+                    "public_key": PUBLIC_KEY,
+                    "url_imagen": "https://tecniaacademy.com/logo.png",
+                    "descripcion": "Curso Online",
+                    "id_producto": courseId.toString(),
+                    "precio_total": monto,
+                    "vendedor_telefono": "0981000000",
+                    "vendedor_direccion": "Asuncion",
+                    "vendedor_direccion_referencia": "Centro",
+                    "vendedor_direccion_coordenadas": "-25.2637,-57.5759"
+                }
+            ],
+            "fecha_maxima_pago": new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), 
             "id_pedido_comercio": pedidoId, 
-            "descripcion_resumen": "Pago curso", 
+            "descripcion_resumen": `Pago por curso: ${curso.titulo}`, 
             "forma_pago": 9,
             "comprador": {
-                "ruc": req.usuario.documento || "4444440-1", "email": req.usuario.email || "cliente@prueba.com", "ciudad": 1,
-                "nombre": req.usuario.nombre_completo || "Cliente", "telefono": req.usuario.telefono || "0981000000",
-                "direccion": "Asuncion", "documento": req.usuario.documento_numero || "4444440", "razon_social": req.usuario.nombre_completo || "Cliente",
-                "tipo_documento": "CI", "coordenadas": "", "direccion_referencia": ""
+                "ruc": compradorData.ruc,
+                "email": compradorData.email,          // ✅ REAL
+                "ciudad": compradorData.ciudad,
+                "nombre": compradorData.nombre,        // ✅ REAL
+                "telefono": compradorData.telefono,
+                "direccion": compradorData.direccion,
+                "documento": compradorData.documento,
+                "razon_social": compradorData.nombre,  // Usamos el nombre como Razón Social
+                "tipo_documento": "RUC",
+                "coordenadas": "",
+                "direccion_referencia": ""
             }
         };
 
         const r = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
         
         if(r.data.respuesta) {
-            // 🚨 EL PASO CLAVE: OBTENER EL HASH REAL DE PAGOPAR 🚨
             const hashRealPagopar = r.data.resultado[0].data; 
             
-            // Actualizamos nuestra BD con el hash que SÍ usará el webhook
+            // Actualizamos Hash
             nuevaTransaccion.external_reference = hashRealPagopar;
             await nuevaTransaccion.save();
-            console.log(`✅ Transacción actualizada con Hash Real: ${hashRealPagopar}`);
-
+            
+            console.log(`✅ Hash obtenido: ${hashRealPagopar}`);
             res.json({success:true, redirectUrl:`https://www.pagopar.com/pagos/${hashRealPagopar}`, pedidoId});
         } else {
-            // Si falla, borramos la transacción pendiente para no dejar basura
             await nuevaTransaccion.destroy();
             res.status(400).json({message:"Error Pagopar:"+r.data.resultado});
         }
 
-    } catch(e){ console.error(e); res.status(500).json({msg:"Error"}); }
+    } catch(e){ 
+        console.error("❌ Error en initiatePayment:", e); 
+        res.status(500).json({msg:"Error al iniciar pago"}); 
+    }
 };
 
 // =========================================================
-// 2. WEBHOOK + CONSULTA (BUSCA POR HASH)
+// 2. WEBHOOK + CONSULTA (IGUAL QUE ANTES, FUNCIONA PERFECTO)
 // =========================================================
 const confirmPaymentWebhook = async (req, res) => {
     console.log("\n🔔 WEBHOOK RECIBIDO");
@@ -90,11 +131,9 @@ const confirmPaymentWebhook = async (req, res) => {
         const hash_pedido = datosPago.hash_pedido; 
         
         res.json(body.resultado);
-        console.log("✅ Paso 2: Respuesta enviada.");
+        console.log("✅ Webhook respondido. Iniciando verificación...");
 
         setTimeout(async () => {
-            console.log("⏳ Ejecutando Paso 3 (Consulta)...");
-            
             const PUBLIC_KEY = (process.env.PAGOPAR_PUBLIC_KEY || "").trim();
             const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
 
@@ -112,19 +151,15 @@ const confirmPaymentWebhook = async (req, res) => {
                 });
 
                 if (consulta.data.respuesta === true) {
-                    console.log("🎉 PASO 3 EXITOSO: Pagopar confirmó el estado.");
-                    
-                    // BUSCAMOS POR HASH (Ahora sí coincidirá porque lo guardamos arriba)
+                    // BUSCAMOS POR HASH
                     const transaccion = await Transaction.findOne({ where: { external_reference: hash_pedido } });
                     
                     if (!transaccion) {
-                        console.error("😱 ERROR: Transacción no encontrada por Hash.");
-                        console.error(`   Hash Buscado (Pagopar): ${hash_pedido}`);
-                        // Si falla aquí, revisa manualmente la tabla 'Transactions' en tu BD
+                        console.error(`😱 Transacción no encontrada para hash: ${hash_pedido}`);
                         return;
                     }
 
-                    console.log(`🔎 Transacción encontrada (ID: ${transaccion.id}). Estado actual: ${transaccion.status}`);
+                    console.log(`🔎 Transacción encontrada (ID: ${transaccion.id}). Estado: ${transaccion.status}`);
 
                     const pagadoEnPagopar = consulta.data.resultado[0].pagado === true;
 
@@ -140,21 +175,21 @@ const confirmPaymentWebhook = async (req, res) => {
                                 lecciones_completadas: [] 
                             } 
                         });
-                        console.log("💾 ¡BD ACTUALIZADA Y CURSO HABILITADO! 🎓");
+                        console.log("🎓 ¡INSCRIPCIÓN COMPLETADA EXITOSAMENTE!");
 
                     } else if (transaccion.status === 'paid') {
-                        console.log("ℹ️ El pedido ya estaba pagado.");
+                        console.log("ℹ️ Ya estaba pagado.");
                     }
                 } else {
-                    console.log("❌ Error en Paso 3:", consulta.data.resultado);
+                    console.log("❌ Error consultando Pagopar:", consulta.data.resultado);
                 }
             } catch (err) {
-                console.log("❌ Error Red Paso 3:", err.message);
+                console.log("❌ Error de red en verificación:", err.message);
             }
         }, 2000);
 
     } catch (error) {
-        console.error("❌ Error Webhook:", error.message);
+        console.error("❌ Error Webhook General:", error.message);
     }
 };
 
