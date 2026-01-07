@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import axios from 'axios'; // 🟢 Importamos axios para configurar el interceptor
 import ProtectedRoute from './components/ProtectedRoute';
 import './style.css'; 
 
@@ -21,10 +22,46 @@ import CourseDetailPublic from './pages/CourseDetailPublic';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
-// ✅ NUEVO COMPONENTE: Verificación Pública
+// ✅ Verificación Pública
 import VerifyCertificate from './pages/VerifyCertificate';
 
+// ✅ PANTALLA DE MANTENIMIENTO
+import Maintenance from './pages/Maintenance';
+
 function App() {
+  // 🟢 Estado para controlar si mostramos la pantalla de mantenimiento
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+
+  useEffect(() => {
+    // 🛡️ INTERCEPTOR DE AXIOS
+    // Esto vigila todas las respuestas que llegan del Backend.
+    const interceptor = axios.interceptors.response.use(
+      (response) => {
+        // Si la respuesta es exitosa (Status 200), todo sigue normal.
+        return response;
+      },
+      (error) => {
+        // Si el Backend responde con error, revisamos si es el 503 de Mantenimiento
+        if (error.response && error.response.status === 503 && error.response.data.maintenance) {
+          // ¡Bingo! El backend nos dijo que está cerrado. Activamos la pantalla.
+          setIsMaintenanceMode(true);
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Limpieza del interceptor al desmontar (buena práctica)
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []);
+
+  // 🔴 SI ESTÁ EN MANTENIMIENTO (y el usuario fue bloqueado por el backend), MOSTRAR ESTO:
+  if (isMaintenanceMode) {
+    return <Maintenance />;
+  }
+
+  // 🟢 SI NO, MOSTRAR LA APP NORMAL (Aquí entrará el Admin porque el backend no le dará error 503)
   return (
     <Routes>
       {/* RUTAS PÚBLICAS */}
