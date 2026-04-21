@@ -7,7 +7,7 @@ function AdminDashboard() {
   const { user, token } = useAuth();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
-  // Estados de Datos
+  // --- ESTADOS DE DATOS ---
   const [stats, setStats] = useState({ totalUsers: 0, totalCourses: 0, totalRevenue: 0 });
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -15,36 +15,45 @@ function AdminDashboard() {
   const [pendingCourses, setPendingCourses] = useState([]); 
   const [payouts, setPayouts] = useState([]); 
   
-  // 🟢 ESTADO DE MANTENIMIENTO
+  // Mantenimiento
   const [maintenanceMode, setMaintenanceMode] = useState(false);
    
-  // Estado de Interfaz y Búsqueda
+  // Interfaz y Búsqueda
   const [activeTab, setActiveTab] = useState('stats'); 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState(''); 
 
-  // Estados para filtro de fecha (Pagos)
+  // Filtro de Pagos
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); 
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // --- Cargas de Datos ---
+  // --- FUNCIONES DE CARGA (FETCHING) ---
   const loadStats = async () => {
     try {
         const res = await axios.get(`${API_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` } });
         setStats(res.data);
     } catch (error) { console.error("Error stats", error); }
   };
+
   const loadUsers = async () => {
-    const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
-    setUsers(res.data);
+    try {
+        const res = await axios.get(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+        setUsers(res.data);
+    } catch (error) { console.error("Error users", error); }
   };
+
   const loadCourses = async () => {
-    const res = await axios.get(`${API_URL}/admin/courses`, { headers: { Authorization: `Bearer ${token}` } });
-    setCourses(res.data);
+    try {
+        const res = await axios.get(`${API_URL}/admin/courses`, { headers: { Authorization: `Bearer ${token}` } });
+        setCourses(res.data);
+    } catch (error) { console.error("Error courses", error); }
   };
+
   const loadActivity = async () => {
-    const res = await axios.get(`${API_URL}/admin/activity`, { headers: { Authorization: `Bearer ${token}` } });
-    setEnrollments(res.data);
+    try {
+        const res = await axios.get(`${API_URL}/admin/activity`, { headers: { Authorization: `Bearer ${token}` } });
+        setEnrollments(res.data);
+    } catch (error) { console.error("Error activity", error); }
   };
   
   const loadPendingCourses = async () => {
@@ -64,7 +73,6 @@ function AdminDashboard() {
     } catch (error) { console.error("Error payouts", error); }
   };
 
-  // 🟢 Cargar estado de mantenimiento
   const loadMaintenanceStatus = async () => {
       try {
           const res = await axios.get(`${API_URL}/admin/maintenance/status`, { headers: { Authorization: `Bearer ${token}` } });
@@ -72,23 +80,31 @@ function AdminDashboard() {
       } catch (error) { console.error("Error maintenance status", error); }
   };
 
+  // Orquestador de carga basado en el Tab activo
   useEffect(() => {
-    setLoading(true);
-    // Cargar estado de mantenimiento siempre
     loadMaintenanceStatus();
-
     if (activeTab === 'stats') loadStats();
     if (activeTab === 'users') loadUsers();
     if (activeTab === 'courses') loadCourses();
     if (activeTab === 'activity') loadActivity();
     if (activeTab === 'requests') loadPendingCourses(); 
     if (activeTab === 'payouts') loadPayouts(); 
-    setLoading(false);
   }, [activeTab, selectedMonth, selectedYear]); 
 
-  // --- Acciones ---
+  // --- ACCIONES ADMINISTRATIVAS ---
+  
+  const handleResetPassword = async (userId, userName) => {
+    const provisoria = `Tecnia.${Math.floor(1000 + Math.random() * 9000)}`;
+    if(!confirm(`¿Resetear clave de ${userName} a: ${provisoria}?`)) return;
+    try {
+        await axios.post(`${API_URL}/admin/users/${userId}/reset-password`, { newPassword: provisoria }, { headers: { Authorization: `Bearer ${token}` } });
+        navigator.clipboard.writeText(provisoria);
+        alert(`✅ Éxito. Clave copiada: ${provisoria}`);
+    } catch (error) { alert("Error al resetear."); }
+  };
+
   const handleDeleteUser = async (id) => {
-    if(!confirm("¿Estás SEGURO? Esto borrará al usuario y sus datos.")) return;
+    if(!confirm("¿Borrar usuario permanentemente?")) return;
     await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     loadUsers();
   };
@@ -100,60 +116,34 @@ function AdminDashboard() {
   };
 
   const handleDeleteCourse = async (id) => {
-    if(!confirm("¿Borrar este curso permanentemente?")) return;
+    if(!confirm("¿Borrar este curso?")) return;
     await axios.delete(`${API_URL}/admin/courses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     loadCourses();
   };
 
   const handleReviewCourse = async (courseId, decision) => {
       const actionText = decision === 'aprobar' ? 'PUBLICAR' : 'RECHAZAR';
-      if(!confirm(`¿Estás seguro de que quieres ${actionText} este curso?`)) return;
-
+      if(!confirm(`¿Deseas ${actionText} este curso?`)) return;
       try {
-          await axios.post(
-              `${API_URL}/admin/review/${courseId}`, 
-              { decision }, 
-              { headers: { Authorization: `Bearer ${token}` } }
-          );
-          alert(`Curso ${decision === 'aprobar' ? 'publicado' : 'rechazado'} con éxito.`);
+          await axios.post(`${API_URL}/admin/review/${courseId}`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
           loadPendingCourses(); 
           loadStats(); 
-      } catch (error) {
-          alert("Error al procesar la solicitud.");
-      }
+      } catch (error) { alert("Error en revisión."); }
   };
 
-  // 🟢 ACCIÓN: CAMBIAR MODO MANTENIMIENTO
   const toggleMaintenance = async () => {
       const nuevoEstado = !maintenanceMode;
-      const mensaje = nuevoEstado 
-          ? "⚠️ ¿ACTIVAR MODO MANTENIMIENTO?\n\nNadie podrá acceder al sitio excepto tú. Úsalo para realizar cambios importantes." 
-          : "✅ ¿DESACTIVAR MANTENIMIENTO?\n\nEl sitio volverá a estar público para todos los usuarios.";
-
-      if (!confirm(mensaje)) return;
-
+      if (!confirm(nuevoEstado ? "🔒 ¿Activar mantenimiento?" : "✅ ¿Abrir sitio?")) return;
       try {
-          await axios.post(
-              `${API_URL}/admin/maintenance/toggle`,
-              { enabled: nuevoEstado },
-              { headers: { Authorization: `Bearer ${token}` } }
-          );
+          await axios.post(`${API_URL}/admin/maintenance/toggle`, { enabled: nuevoEstado }, { headers: { Authorization: `Bearer ${token}` } });
           setMaintenanceMode(nuevoEstado);
-          alert(nuevoEstado ? "Sitio cerrado al público 🔒" : "Sitio abierto ✅");
-      } catch (error) {
-          console.error(error);
-          alert("Error al cambiar el modo mantenimiento");
-      }
+      } catch (error) { alert("Error en mantenimiento."); }
   };
 
+  // --- UTILIDADES ---
   const filteredUsers = users.filter(u => {
       const term = searchTerm.toLowerCase();
-      return (
-          u.nombre_completo.toLowerCase().includes(term) || 
-          u.email.toLowerCase().includes(term) ||            
-          u.id.toString().includes(term) ||                  
-          u.rol.toLowerCase().includes(term)                 
-      );
+      return u.nombre_completo.toLowerCase().includes(term) || u.email.toLowerCase().includes(term) || u.rol.toLowerCase().includes(term);
   });
 
   const formatMoney = (amount) => {
@@ -162,385 +152,225 @@ function AdminDashboard() {
 
   return (
     <div className="instructor-dashboard"> 
-        
-        {/* SIDEBAR DE ADMIN */}
+        {/* SIDEBAR */}
         <aside className="dashboard-sidebar" style={{backgroundColor: '#2c3e50'}}> 
-            <div className="logo" style={{marginBottom: '20px'}}>
-                <span style={{color:'white'}}>Tecnia</span><span style={{color:'#e74c3c'}}>Admin</span>
+            <div className="logo" style={{padding: '20px', textAlign: 'center'}}>
+                <span style={{color:'white', fontWeight:'bold', fontSize:'1.2em'}}>Tecnia</span><span style={{color:'#e74c3c', fontWeight:'bold', fontSize:'1.2em'}}>Admin</span>
             </div>
             
-            <div className="instructor-profile">
-                <div style={{width:'60px', height:'60px', background:'#e74c3c', color:'white', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 10px', fontSize:'1.5em'}}>
-                    <i className="fas fa-user-shield"></i>
-                </div>
-                <h4>{user?.nombre_completo}</h4>
-                <p style={{fontSize:'0.8em', color:'#bdc3c7'}}>Super Administrador</p>
+            <div className="instructor-profile" style={{textAlign:'center', padding:'10px'}}>
+                <div style={{width:'50px', height:'50px', background:'#e74c3c', color:'white', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 10px'}}><i className="fas fa-user-shield"></i></div>
+                <h4 style={{color:'white', margin:0}}>{user?.nombre_completo}</h4>
+                <p style={{fontSize:'0.7em', color:'#bdc3c7'}}>SUPER ADMIN</p>
             </div>
 
-            {/* 🟢 PANEL DE CONTROL DE MANTENIMIENTO */}
-            <div style={{padding:'15px', background:'rgba(0,0,0,0.2)', margin:'10px', borderRadius:'8px', textAlign:'center'}}>
-                <p style={{color:'white', fontSize:'0.8em', marginBottom:'10px', fontWeight:'bold'}}>
-                    ESTADO DEL SITIO:
-                </p>
-                <button 
-                    onClick={toggleMaintenance}
-                    style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: 'none',
-                        borderRadius: '20px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        background: maintenanceMode ? '#e74c3c' : '#27ae60',
-                        color: 'white',
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-                        transition: 'all 0.3s'
-                    }}
-                >
-                    {maintenanceMode ? '🔒 EN MANTENIMIENTO' : '✅ SITIO ONLINE'}
+            <div style={{padding:'10px'}}>
+                <button onClick={toggleMaintenance} style={{width:'100%', padding:'8px', borderRadius:'20px', border:'none', cursor:'pointer', background: maintenanceMode ? '#e74c3c' : '#27ae60', color:'white', fontWeight:'bold'}}>
+                    {maintenanceMode ? '🔒 MANTENIMIENTO' : '✅ ONLINE'}
                 </button>
             </div>
 
-            <nav className="dashboard-nav">
-                <ul>
-                    <li><button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-tachometer-alt"></i> Dashboard</button></li>
-                    
+            <nav className="dashboard-nav" style={{marginTop:'20px'}}>
+                <ul style={{listStyle:'none', padding:0}}>
+                    <li><button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-tachometer-alt"></i> Resumen Global</button></li>
                     <li>
                         <button onClick={() => setActiveTab('requests')} className={activeTab === 'requests' ? 'active' : ''} style={navBtnStyle}>
-                            <i className="fas fa-bell"></i> Solicitudes 
-                            {pendingCourses.length > 0 && (
-                                <span style={{background:'#e74c3c', color:'white', borderRadius:'50%', padding:'2px 6px', fontSize:'0.7em', marginLeft:'auto'}}>
-                                    {pendingCourses.length}
-                                </span>
-                            )}
+                            <i className="fas fa-bell"></i> Solicitudes {pendingCourses.length > 0 && <span style={badgeStyle}>{pendingCourses.length}</span>}
                         </button>
                     </li>
-
                     <li><button onClick={() => setActiveTab('users')} className={activeTab === 'users' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-users"></i> Usuarios</button></li>
                     <li><button onClick={() => setActiveTab('courses')} className={activeTab === 'courses' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-book"></i> Moderar Cursos</button></li>
-                    <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad</button></li>
+                    <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad Reciente</button></li>
                     <li><button onClick={() => setActiveTab('payouts')} className={activeTab === 'payouts' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-money-bill-wave"></i> Liquidación Pagos</button></li>
-
-                    <li style={{marginTop:'20px', borderTop:'1px solid #ffffff20', paddingTop:'10px'}}>
-                        <Link to="/" style={{...navBtnStyle, justifyContent:'flex-start'}}><i className="fas fa-home"></i> Volver a la Web</Link>
-                    </li>
                 </ul>
             </nav>
         </aside>
 
-        {/* CONTENIDO PRINCIPAL */}
-        <main className="dashboard-content">
-            
-            {/* 🟢 ALERTA VISUAL SI EL MANTENIMIENTO ESTÁ ACTIVO */}
-            {maintenanceMode && (
-                <div style={{background:'#e74c3c', color:'white', padding:'15px', borderRadius:'8px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'15px', boxShadow:'0 4px 15px rgba(231, 76, 60, 0.3)'}}>
-                    <i className="fas fa-exclamation-triangle" style={{fontSize:'1.5em'}}></i>
-                    <div>
-                        <strong>¡ATENCIÓN! EL SITIO ESTÁ CERRADO AL PÚBLICO.</strong><br/>
-                        <small>Solo tú (Super Admin) puedes ver el contenido. Los estudiantes verán la pantalla de mantenimiento.</small>
-                    </div>
-                </div>
-            )}
+        {/* CONTENIDO */}
+        <main className="dashboard-content" style={{padding:'20px', flex:1, backgroundColor:'#f4f7f6', minHeight:'100vh'}}>
+            {maintenanceMode && <div style={alertStyle}><i className="fas fa-exclamation-triangle"></i> MODO MANTENIMIENTO ACTIVO</div>}
 
-            {/* VISTA 1: DASHBOARD */}
+            {/* TAB: ESTADÍSTICAS */}
             {activeTab === 'stats' && (
-                <div>
-                    <header className="content-header"><h2>Resumen Global</h2></header>
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px'}}>
-                        <StatCard title="Usuarios" value={stats.totalUsers} icon="fa-users" color="#3498db" />
-                        <StatCard title="Cursos Totales" value={stats.totalCourses} icon="fa-graduation-cap" color="#9b59b6" />
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Dashboard de Control</h2>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px'}}>
+                        <StatCard title="Usuarios Totales" value={stats.totalUsers} icon="fa-users" color="#3498db" />
+                        <StatCard title="Cursos Creados" value={stats.totalCourses} icon="fa-graduation-cap" color="#9b59b6" />
                         <StatCard title="Inscripciones" value={stats.totalEnrollments} icon="fa-clipboard-list" color="#f1c40f" />
-                        <StatCard title="Ingresos (Est.)" value={`$${stats.totalRevenue}`} icon="fa-dollar-sign" color="#27ae60" />
+                        <StatCard title="Ingresos Totales" value={formatMoney(stats.totalRevenue)} icon="fa-coins" color="#27ae60" />
                     </div>
-                </div>
+                </section>
             )}
 
-            {/* VISTA: SOLICITUDES PENDIENTES */}
+            {/* TAB: SOLICITUDES */}
             {activeTab === 'requests' && (
-                <div>
-                    <header className="content-header"><h2>Solicitudes de Publicación</h2></header>
-                    {pendingCourses.length === 0 ? (
-                        <div style={{textAlign:'center', padding:'40px', color:'#7f8c8d'}}>
-                            <i className="fas fa-check-circle" style={{fontSize:'3em', color:'#2ecc71', marginBottom:'10px'}}></i>
-                            <p>¡Todo al día! No hay cursos pendientes de revisión.</p>
-                        </div>
-                    ) : (
-                        <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
-                            {pendingCourses.map(curso => (
-                                <div key={curso.id} style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px', borderLeft:'5px solid #f39c12'}}>
-                                    <div style={{flex:'1'}}>
-                                        <h3 style={{margin:'0 0 5px 0', color:'#2c3e50'}}>{curso.titulo}</h3>
-                                        <p style={{margin:0, color:'#7f8c8d', fontSize:'0.9em'}}>
-                                            Instructor: <strong>{curso.instructor?.nombre_completo}</strong> | 
-                                            Duración: <strong>{curso.duracion}</strong> | 
-                                            Precio: {formatMoney(curso.precio)}
-                                        </p>
-                                        <p style={{margin:'5px 0 0 0', fontSize:'0.85em', color:'#95a5a6'}}>
-                                            Enviado el: {new Date(curso.updatedAt).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    <div style={{display:'flex', gap:'10px'}}>
-                                        <Link to={`/curso/${curso.id}`} target="_blank" style={{textDecoration:'none', padding:'8px 15px', border:'1px solid #3498db', borderRadius:'4px', color:'#3498db', fontSize:'0.9em'}}>
-                                            <i className="fas fa-eye"></i> Ver Contenido
-                                        </Link>
-                                        <button onClick={() => handleReviewCourse(curso.id, 'rechazado')} style={{padding:'8px 15px', background:'#e74c3c', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>
-                                            <i className="fas fa-times"></i> Rechazar
-                                        </button>
-                                        <button onClick={() => handleReviewCourse(curso.id, 'aprobar')} style={{padding:'8px 15px', background:'#27ae60', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>
-                                            <i className="fas fa-check"></i> Aprobar
-                                        </button>
-                                    </div>
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Cursos Pendientes de Revisión</h2>
+                    {pendingCourses.length === 0 ? <p>No hay solicitudes.</p> : 
+                        pendingCourses.map(curso => (
+                            <div key={curso.id} style={itemBoxStyle}>
+                                <div>
+                                    <h4 style={{margin:0}}>{curso.titulo}</h4>
+                                    <small>Instructor: {curso.instructor?.nombre_completo} | Precio: {formatMoney(curso.precio)}</small>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <button onClick={() => handleReviewCourse(curso.id, 'aprobar')} style={{...btnSmall, background:'#27ae60', color:'white'}}>Aprobar</button>
+                                    <button onClick={() => handleReviewCourse(curso.id, 'rechazado')} style={{...btnSmall, background:'#e74c3c', color:'white'}}>Rechazar</button>
+                                </div>
+                            </div>
+                        ))
+                    }
+                </section>
             )}
 
-            {/* VISTA: LIQUIDACIÓN DE PAGOS */}
-            {activeTab === 'payouts' && (
-                <div>
-                    <header className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px'}}>
-                        <h2>Liquidación Mensual</h2>
-                        
-                        <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
-                            <select 
-                                value={selectedMonth} 
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}
-                            >
-                                <option value="1">Enero</option>
-                                <option value="2">Febrero</option>
-                                <option value="3">Marzo</option>
-                                <option value="4">Abril</option>
-                                <option value="5">Mayo</option>
-                                <option value="6">Junio</option>
-                                <option value="7">Julio</option>
-                                <option value="8">Agosto</option>
-                                <option value="9">Septiembre</option>
-                                <option value="10">Octubre</option>
-                                <option value="11">Noviembre</option>
-                                <option value="12">Diciembre</option>
-                            </select>
-
-                            <select 
-                                value={selectedYear} 
-                                onChange={(e) => setSelectedYear(e.target.value)}
-                                style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}
-                            >
-                                <option value="2024">2024</option>
-                                <option value="2025">2025</option>
-                                <option value="2026">2026</option>
-                            </select>
-
-                            <button onClick={() => window.print()} style={{padding:'8px 15px', background:'#2c3e50', color:'white', border:'none', borderRadius:'5px', cursor:'pointer', marginLeft:'10px'}}>
-                                <i className="fas fa-print"></i>
-                            </button>
-                        </div>
-                    </header>
-
-                    <div style={{overflowX: 'auto', background:'white', borderRadius:'8px', boxShadow:'0 2px 10px rgba(0,0,0,0.05)'}}>
-                        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'800px'}}>
-                            <thead style={{background:'#f8f9fa', color:'#2c3e50'}}>
-                                <tr>
-                                    <th style={{padding:'15px', textAlign:'left'}}>Instructor</th>
-                                    <th style={{padding:'15px', textAlign:'left'}}>Datos Bancarios</th>
-                                    <th style={{padding:'15px', textAlign:'left'}}>Ventas del Mes</th>
-                                    <th style={{padding:'15px', textAlign:'right'}}>Total Bruto</th>
-                                    <th style={{padding:'15px', textAlign:'right', color:'#e74c3c'}}>Comisión (30%)</th>
-                                    <th style={{padding:'15px', textAlign:'right', background:'#27ae60', color:'white'}}>A PAGAR</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {payouts.length === 0 ? (
-                                    <tr><td colSpan="6" style={{padding:'30px', textAlign:'center', color:'#999'}}>No hay ventas registradas en este periodo.</td></tr>
-                                ) : (
-                                    payouts.map((p, idx) => (
-                                        <tr key={idx} style={{borderBottom:'1px solid #eee'}}>
-                                            {/* Instructor */}
-                                            <td style={{padding:'15px'}}>
-                                                <strong>{p.instructor.nombre}</strong><br/>
-                                                <small style={{color:'#999'}}>ID: {p.instructor.id}</small>
-                                            </td>
-                                            
-                                            {/* Banco */}
-                                            <td style={{padding:'15px', fontSize:'0.85em'}}>
-                                                {p.instructor.banco ? (
-                                                    <>
-                                                        <div><strong>{p.instructor.banco}</strong></div>
-                                                        <div>Cta: {p.instructor.cuenta}</div>
-                                                        <div>CI: {p.instructor.ci}</div>
-                                                        {p.instructor.alias && <div>Alias: {p.instructor.alias}</div>}
-                                                    </>
-                                                ) : (
-                                                    <span style={{color:'#e74c3c', fontWeight:'bold'}}>Sin datos</span>
-                                                )}
-                                            </td>
-
-                                            {/* Detalle Ventas */}
-                                            <td style={{padding:'15px', fontSize:'0.9em'}}>
-                                                <div style={{fontWeight:'bold', marginBottom:'5px'}}>{p.estadisticas.alumnos_mes} ventas totales:</div>
-                                                <ul style={{paddingLeft:'15px', margin:0, color:'#555'}}>
-                                                    {p.detalle && p.detalle.map((d, i) => (
-                                                        <li key={i}>
-                                                            {d.titulo}: {d.cantidad} ({formatMoney(d.ingreso)})
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </td>
-
-                                            <td style={{padding:'15px', textAlign:'right'}}>
-                                                {formatMoney(p.estadisticas.total_bruto)}
-                                            </td>
-                                            <td style={{padding:'15px', textAlign:'right', color:'#e74c3c'}}>
-                                                - {formatMoney(p.estadisticas.comision_retenida)}
-                                            </td>
-                                            <td style={{padding:'15px', textAlign:'right', fontWeight:'bold', color:'#27ae60', fontSize:'1.1em'}}>
-                                                {formatMoney(p.estadisticas.total_a_pagar)}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p style={{marginTop:'20px', fontSize:'0.9em', color:'#666', textAlign:'center'}}>
-                        * Mostrando liquidación para el periodo: <strong>{selectedMonth}/{selectedYear}</strong>.
-                    </p>
-                </div>
-            )}
-
-            {/* VISTA: USUARIOS */}
+            {/* TAB: USUARIOS (INCLUYE RESET PASSWORD) */}
             {activeTab === 'users' && (
-                <div>
-                    <header className="content-header" style={{display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'10px'}}>
-                        <h2>Control de Usuarios</h2>
-                        <div style={{position: 'relative'}}>
-                            <input 
-                                type="text" 
-                                placeholder="Buscar por nombre, email o rol..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{
-                                    padding: '10px 15px 10px 35px',
-                                    borderRadius: '20px',
-                                    border: '1px solid #ccc',
-                                    width: '300px',
-                                    outline: 'none'
-                                }}
-                            />
-                            <i className="fas fa-search" style={{position:'absolute', left:'12px', top:'50%', transform:'translateY(-50%)', color:'#999'}}></i>
-                        </div>
-                    </header>
-
-                    <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                <section>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                        <h2>Gestión de Usuarios</h2>
+                        <input type="text" placeholder="Buscar usuario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={searchStyle} />
+                    </div>
+                    <div style={tableWrapper}>
                         <table style={{width:'100%', borderCollapse:'collapse'}}>
-                            <thead>
-                                <tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}>
-                                    <th style={{padding:'10px'}}>ID</th>
-                                    <th style={{padding:'10px'}}>Nombre</th>
-                                    <th style={{padding:'10px'}}>Email</th>
-                                    <th style={{padding:'10px'}}>Rol</th>
-                                    <th style={{padding:'10px'}}>Acciones</th>
+                            <thead style={{background:'#eee'}}>
+                                <tr>
+                                    <th style={thStyle}>ID</th>
+                                    <th style={thStyle}>Nombre / Email</th>
+                                    <th style={thStyle}>Rol</th>
+                                    <th style={thStyle}>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredUsers.map(u => (
                                     <tr key={u.id} style={{borderBottom:'1px solid #eee'}}>
-                                        <td style={{padding:'10px'}}>{u.id}</td>
-                                        <td style={{padding:'10px'}}>{u.nombre_completo}</td>
-                                        <td style={{padding:'10px'}}>{u.email}</td>
-                                        <td style={{padding:'10px'}}>
-                                            <span style={{padding:'3px 8px', borderRadius:'10px', fontSize:'0.8em', background: u.rol==='admin'?'#e74c3c':u.rol==='instructor'?'#f39c12':'#ecf0f1', color: u.rol==='admin'?'white':u.rol==='instructor'?'white':'black'}}>
-                                                {u.rol}
-                                            </span>
-                                        </td>
-                                        <td style={{padding:'10px'}}>
-                                            {u.rol !== 'admin' && (
-                                                <>
-                                                    {u.rol !== 'instructor' && <button onClick={() => handleChangeRole(u.id, 'instructor')} style={btnActionStyle}>⬇ Instructor</button>}
-                                                    {u.rol === 'instructor' && <button onClick={() => handleChangeRole(u.id, 'student')} style={btnActionStyle}>⬇ Estudiante</button>}
-                                                    <button onClick={() => handleDeleteUser(u.id)} style={{...btnActionStyle, background:'#e74c3c', color:'white', marginLeft:'5px'}}>Eliminar</button>
-                                                </>
-                                            )}
+                                        <td style={tdStyle}>{u.id}</td>
+                                        <td style={tdStyle}><strong>{u.nombre_completo}</strong><br/><small>{u.email}</small></td>
+                                        <td style={tdStyle}><span style={{...roleBadge, background: u.rol==='admin'?'#e74c3c':u.rol==='instructor'?'#f39c12':'#bdc3c7'}}>{u.rol}</span></td>
+                                        <td style={tdStyle}>
+                                            <div style={{display:'flex', gap:'5px'}}>
+                                                <button onClick={() => handleResetPassword(u.id, u.nombre_completo)} style={{...btnSmall, background:'#3498db', color:'white'}} title="Resetear Clave"><i className="fas fa-key"></i></button>
+                                                {u.rol !== 'admin' && (
+                                                    <>
+                                                        <button onClick={() => handleChangeRole(u.id, u.rol==='instructor'?'student':'instructor')} style={btnSmall} title="Cambiar Rol"><i className="fas fa-user-edit"></i></button>
+                                                        <button onClick={() => handleDeleteUser(u.id)} style={{...btnSmall, color:'#e74c3c'}} title="Eliminar"><i className="fas fa-trash-alt"></i></button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </section>
             )}
 
-            {/* VISTA: CURSOS */}
-            {activeTab === 'courses' && (
-                <div>
-                    <header className="content-header"><h2>Todos los Cursos (Catálogo)</h2></header>
-                    <div className="course-list">
-                        {courses.map(c => (
-                            <div className="course-item" key={c.id}>
-                                <div className="course-info">
-                                    <h3>{c.titulo}</h3>
-                                    <p style={{fontSize:'0.9em', color:'#666'}}>
-                                        Instructor: <strong>{c.instructor?.nombre_completo}</strong> | 
-                                        Duración: <strong>{c.duracion}</strong> |
-                                        Estado: 
-                                        <strong style={{color: c.estado === 'publicado' ? '#27ae60' : '#f39c12', marginLeft: '5px'}}>
-                                            {c.estado.toUpperCase()}
-                                        </strong>
-                                    </p>
-                                </div>
-                                <div className="course-actions">
-                                    <button onClick={() => handleDeleteCourse(c.id)} className="btn-action delete">Eliminar Curso</button>
-                                </div>
+            {/* TAB: LIQUIDACIÓN (COMPLETA) */}
+            {activeTab === 'payouts' && (
+                <section>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                        <h2>Liquidación a Instructores</h2>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <select value={selectedMonth} onChange={(e)=>setSelectedMonth(e.target.value)} style={selectStyle}>
+                                {[...Array(12).keys()].map(m => <option key={m+1} value={m+1}>{new Date(0, m).toLocaleString('es', {month:'long'})}</option>)}
+                            </select>
+                            <select value={selectedYear} onChange={(e)=>setSelectedYear(e.target.value)} style={selectStyle}>
+                                {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div style={tableWrapper}>
+                        <table style={{width:'100%', borderCollapse:'collapse'}}>
+                            <thead style={{background:'#2c3e50', color:'white'}}>
+                                <tr>
+                                    <th style={thStyle}>Instructor / Datos Banco (PY)</th>
+                                    <th style={thStyle}>Ventas</th>
+                                    <th style={thStyle}>Total Bruto</th>
+                                    <th style={thStyle}>Neto (70%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {payouts.length === 0 ? <tr><td colSpan="4" style={{padding:'20px', textAlign:'center'}}>No hay pagos este mes.</td></tr> : 
+                                    payouts.map((p, idx) => (
+                                        <tr key={idx} style={{borderBottom:'1px solid #eee'}}>
+                                            <td style={tdStyle}>
+                                                <strong>{p.instructor.nombre}</strong><br/>
+                                                <small>{p.instructor.banco} - {p.instructor.cuenta} (CI: {p.instructor.ci})</small>
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <ul style={{margin:0, paddingLeft:'15px', fontSize:'0.8em'}}>
+                                                    {p.detalle.map((d, i) => <li key={i}>{d.titulo}: {d.cantidad}</li>)}
+                                                </ul>
+                                            </td>
+                                            <td style={tdStyle}>{formatMoney(p.estadisticas.total_bruto)}</td>
+                                            <td style={{...tdStyle, fontWeight:'bold', color:'#27ae60'}}>{formatMoney(p.estadisticas.total_a_pagar)}</td>
+                                        </tr>
+                                    ))
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {/* TAB: ACTIVIDAD RECIENTE */}
+            {activeTab === 'activity' && (
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Historial de Inscripciones</h2>
+                    <div style={tableWrapper}>
+                        {enrollments.map(e => (
+                            <div key={e.id} style={{padding:'12px', borderBottom:'1px solid #eee', display:'flex', justifyContent:'space-between'}}>
+                                <span><strong>{e.User?.nombre_completo}</strong> compró <strong>{e.curso?.titulo}</strong></span>
+                                <span style={{color:'#999'}}>{new Date(e.createdAt).toLocaleDateString()}</span>
                             </div>
                         ))}
                     </div>
-                </div>
+                </section>
             )}
 
-            {/* VISTA: ACTIVIDAD */}
-            {activeTab === 'activity' && (
-                <div>
-                    <header className="content-header"><h2>Últimas Inscripciones</h2></header>
-                    <div style={{background:'white', padding:'20px', borderRadius:'8px'}}>
-                        <ul style={{listStyle:'none', padding:0}}>
-                            {enrollments.map(e => (
-                                <li key={e.id} style={{padding:'15px', borderBottom:'1px solid #eee', display:'flex', justifyContent:'space-between'}}>
-                                    <div>
-                                        <strong>{e.User?.nombre_completo}</strong> se inscribió en <span style={{color:'#0b3d91'}}>{e.curso?.titulo}</span>
-                                    </div>
-                                    <div style={{color:'#999', fontSize:'0.9em'}}>
-                                        {new Date(e.createdAt).toLocaleDateString()}
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
+            {/* TAB: MODERACIÓN DE CURSOS */}
+            {activeTab === 'courses' && (
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Catálogo Maestro</h2>
+                    <div style={{display:'grid', gap:'15px'}}>
+                        {courses.map(c => (
+                            <div key={c.id} style={itemBoxStyle}>
+                                <div>
+                                    <h4 style={{margin:0}}>{c.titulo}</h4>
+                                    <p style={{margin:0, fontSize:'0.8em', color:'#666'}}>
+                                        Instructor: {c.instructor?.nombre_completo} | Estado: <span style={{color: c.estado==='publicado'?'#27ae60':'#f39c12'}}>{c.estado.toUpperCase()}</span>
+                                    </p>
+                                </div>
+                                <button onClick={() => handleDeleteCourse(c.id)} style={{...btnSmall, color:'#e74c3c', border:'1px solid #e74c3c'}}>Eliminar</button>
+                            </div>
+                        ))}
                     </div>
-                </div>
+                </section>
             )}
-
         </main>
     </div>
   );
 }
 
+// --- ESTILOS (SISTEMA DE DISEÑO) ---
+const navBtnStyle = { background: 'none', border: 'none', color: 'white', width: '100%', textAlign: 'left', padding: '12px 20px', cursor: 'pointer', display: 'flex', gap: '10px', fontSize: '0.9em', alignItems: 'center', transition: '0.3s' };
+const badgeStyle = { background: '#e74c3c', color: 'white', borderRadius: '50%', padding: '2px 7px', fontSize: '0.7em', marginLeft: 'auto' };
+const alertStyle = { background: '#e74c3c', color: 'white', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', textAlign: 'center' };
+const itemBoxStyle = { background: 'white', padding: '15px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' };
+const tableWrapper = { background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' };
+const thStyle = { padding: '12px', textAlign: 'left', fontSize: '0.9em' };
+const tdStyle = { padding: '12px', fontSize: '0.9em' };
+const btnSmall = { padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', border: '1px solid #ddd', background: 'white', fontSize: '0.8em' };
+const roleBadge = { color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7em', fontWeight: 'bold' };
+const searchStyle = { padding: '8px 15px', borderRadius: '20px', border: '1px solid #ddd', width: '250px', outline: 'none' };
+const selectStyle = { padding: '8px', borderRadius: '5px', border: '1px solid #ddd' };
+
 const StatCard = ({ title, value, icon, color }) => (
-    <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:'20px'}}>
-        <div style={{fontSize:'2em', color: color, width:'50px', textAlign:'center'}}><i className={`fas ${icon}`}></i></div>
-        <div>
-            <h4 style={{margin:0, color:'#7f8c8d'}}>{title}</h4>
-            <div style={{fontSize:'1.8em', fontWeight:'bold', color:'#2c3e50'}}>{value}</div>
-        </div>
+    <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)', display:'flex', alignItems:'center', gap:'15px'}}>
+        <i className={`fas ${icon}`} style={{fontSize:'2em', color: color}}></i>
+        <div><h4 style={{margin:0, color:'#7f8c8d', fontSize:'0.8em'}}>{title}</h4><div style={{fontSize:'1.4em', fontWeight:'bold'}}>{value}</div></div>
     </div>
 );
-
-const navBtnStyle = {
-    background: 'none', border: 'none', color: 'white', width: '100%', textAlign: 'left', padding: '15px', cursor: 'pointer', display: 'flex', gap: '10px', fontSize: '1em', alignItems: 'center'
-};
-
-const btnActionStyle = {
-    border: '1px solid #ccc', background: 'white', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8em'
-};
 
 export default AdminDashboard;

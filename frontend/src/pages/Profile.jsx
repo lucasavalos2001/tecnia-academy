@@ -17,21 +17,25 @@ function Profile() {
     contactEmail: '' 
   });
   
-  // Estados para la foto
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: ''
+  });
+
   const [fotoFile, setFotoFile] = useState(null); 
   const [fotoActual, setFotoActual] = useState(null); 
   const [uploading, setUploading] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     const fetchData = async () => {
         try {
-            // Cargar Certificados
             const resCert = await axios.get(`${API_URL}/usuario/certificados`, { headers: { Authorization: `Bearer ${token}` } });
             setCertificados(resCert.data.certificados);
 
-            // Cargar Datos de Perfil
             const resPerfil = await axios.get(`${API_URL}/usuario/perfil`, { headers: { Authorization: `Bearer ${token}` } });
             setFormData({
                 nombre: resPerfil.data.nombre_completo,
@@ -44,44 +48,45 @@ function Profile() {
     if (token) fetchData();
   }, [token]);
 
-  const handleBecomeInstructor = async () => {
-    if (!confirm("¿Estás seguro?")) return;
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) {
+        alert("La nueva contraseña y su confirmación no coinciden.");
+        return;
+    }
+    
+    setChangingPassword(true);
     try {
-        await axios.put(`${API_URL}/usuario/convertirse-instructor`, {}, { headers: { Authorization: `Bearer ${token}` } });
-        alert("¡Ahora eres Instructor! Inicia sesión de nuevo.");
-        logout(); navigate('/login');
-    } catch (error) { alert("Error."); }
+        await axios.put(`${API_URL}/usuario/update-password`, {
+            currentPassword: passwords.current,
+            newPassword: passwords.new
+        }, { headers: { Authorization: `Bearer ${token}` } });
+        
+        alert("✅ Contraseña actualizada con éxito.");
+        setPasswords({ current: '', new: '', confirm: '' });
+    } catch (error) {
+        alert(error.response?.data?.message || "Error al cambiar contraseña.");
+    } finally {
+        setChangingPassword(false);
+    }
   };
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setUploading(true);
-
     try {
         const data = new FormData();
         data.append('nombre_completo', formData.nombre);
         data.append('biografia', formData.biografia);
         data.append('email_contacto', formData.contactEmail);
-        
-        if (fotoFile) {
-            data.append('foto', fotoFile); 
-        }
+        if (fotoFile) data.append('foto', fotoFile);
 
         await axios.put(`${API_URL}/usuario/actualizar`, data, { 
-            headers: { 
-                Authorization: `Bearer ${token}`, 
-                'Content-Type': 'multipart/form-data' 
-            } 
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } 
         });
-        
-        alert("Perfil actualizado. Recarga para ver los cambios.");
+        alert("✅ Perfil actualizado correctamente.");
         window.location.reload(); 
-    } catch (error) { 
-        console.error(error);
-        alert("Error al actualizar."); 
-    } finally {
-        setUploading(false);
-    }
+    } catch (error) { alert("Error al actualizar."); } finally { setUploading(false); }
   };
 
   const renderTabContent = () => {
@@ -89,39 +94,32 @@ function Profile() {
       case 'profile-overview':
         return (
           <div className="profile-details">
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                <div>
-                    <h2 style={{margin:0, color: '#0b3d91'}}>{user?.nombre_completo}</h2>
-                    <p style={{color: '#666', margin:'5px 0'}}><i className="fas fa-envelope"></i> {user?.email}</p>
-                    {formData.contactEmail && <p style={{color: '#00d4d4', fontWeight: 'bold', margin:'5px 0'}}><i className="fas fa-paper-plane"></i> {formData.contactEmail}</p>}
-                    <span style={{background: user?.rol === 'admin' ? '#e74c3c' : '#00d4d4', color: 'white', padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 'bold'}}>{user?.rol}</span>
-                </div>
-            </div>
-            <div style={{marginTop:'30px', background:'#f9f9f9', padding:'20px', borderRadius:'10px', borderLeft: '5px solid #00d4d4'}}>
-                <h3 style={{marginTop:0, fontSize:'1.1rem'}}>Sobre mí</h3>
+            <h2 style={{color: '#0b3d91', marginBottom: '10px'}}>{user?.nombre_completo}</h2>
+            <p style={{marginBottom: '10px'}}><i className="fas fa-envelope"></i> {user?.email}</p>
+            <span style={{background: '#00d4d4', color: 'white', padding: '5px 15px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold'}}>
+                {user?.rol?.toUpperCase()}
+            </span>
+            <div style={{marginTop:'30px', background:'#f9f9f9', padding:'25px', borderRadius:'15px', borderLeft: '6px solid #00d4d4'}}>
+                <h3 style={{marginTop: 0, fontSize: '1.2rem'}}><i className="fas fa-id-card"></i> Sobre mí</h3>
                 <p style={{lineHeight: '1.6', color: '#444'}}>{formData.biografia || "Aún no has escrito tu biografía."}</p>
             </div>
-            {user?.rol === 'student' && <div style={{marginTop: '30px', textAlign: 'center'}}><button onClick={handleBecomeInstructor} style={{backgroundColor: '#f39c12', color: 'white', padding: '12px 25px', border: 'none', borderRadius: '30px', cursor: 'pointer', fontWeight: 'bold'}}>¡Quiero ser Instructor!</button></div>}
           </div>
         );
 
       case 'profile-certificates':
-        // Filtramos los certificados válidos antes de mostrar
-        const certificadosValidos = certificados.filter(cert => cert.curso !== null);
-
         return (
           <div className="certificates-list">
-            {certificadosValidos.length === 0 ? (
-                <p>Aún no tienes certificados. ¡Completa un curso al 100% para obtener uno!</p>
+            <h2 style={{marginBottom: '20px'}}><i className="fas fa-award"></i> Mis Certificados</h2>
+            {certificados.length === 0 ? (
+                <p style={{textAlign: 'center', padding: '40px', color: '#777'}}>Aún no tienes certificados. ¡Termina un curso al 100%!</p>
             ) : (
-                certificadosValidos.map((cert) => (
-                    <div className="certificate-card" key={cert.id}>
-                        <div className="certificate-thumbnail"><i className="fas fa-trophy"></i></div>
+                certificados.filter(c => c.curso).map((cert) => (
+                    <div className="certificate-card" key={cert.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '15px', border: '1px solid #eee'}}>
                         <div className="certificate-info">
-                            <h4>{cert.curso.titulo}</h4>
-                            <p>Completado el: {new Date(cert.updatedAt).toLocaleDateString()}</p>
+                            <h4 style={{color: '#0b3d91', margin: '0 0 5px 0'}}>{cert.curso.titulo}</h4>
+                            <p style={{fontSize: '0.85rem', color: '#666'}}>Completado: {new Date(cert.updatedAt).toLocaleDateString()}</p>
                         </div>
-                        <button className="btn-view-certificate" onClick={() => navigate(`/certificado/${cert.id}`, { state: { certificado: cert, usuario: user.nombre_completo } })}>Ver</button>
+                        <button className="btn-save-settings" onClick={() => navigate(`/certificado/${cert.id}`)} style={{padding: '8px 20px', fontSize: '0.9rem'}}>Ver</button>
                     </div>
                 ))
             )}
@@ -130,34 +128,91 @@ function Profile() {
 
       case 'profile-settings':
         return (
-             <form onSubmit={handleUpdateProfile}>
+            <div className="settings-wrapper">
+                {/* SECCIÓN 1: DATOS PERSONALES */}
                 <div className="settings-section">
-                    <h3><i className="fas fa-camera"></i> Foto de Perfil</h3>
-                    <div className="form-group">
-                        <label className="file-upload-label" style={{display:'block', border:'2px dashed #ccc', padding:'20px', textAlign:'center', cursor:'pointer', background: 'white', borderRadius:'8px'}}>
-                            {fotoFile ? (
-                                <span style={{fontWeight:'bold', color:'#0b3d91'}}><i className="fas fa-check-circle"></i> Nueva: {fotoFile.name}</span>
-                            ) : (
-                                <span><i className="fas fa-image" style={{fontSize:'1.5rem', color:'#00d4d4'}}></i> Clic para cambiar foto (JPG/PNG)</span>
-                            )}
-                            <input type="file" accept="image/*" onChange={e => setFotoFile(e.target.files[0])} style={{display:'none'}} />
-                        </label>
-                    </div>
+                    <h3><i className="fas fa-user-circle"></i> Configuración de Perfil</h3>
+                    <form onSubmit={handleUpdateProfile}>
+                        <div className="form-group">
+                            <label className="custom-file-upload">
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={e => setFotoFile(e.target.files[0])} 
+                                    style={{display: 'none'}} 
+                                />
+                                <i className="fas fa-cloud-upload-alt"></i>
+                                <div>
+                                    <span style={{display: 'block', fontWeight: 'bold'}}>
+                                        {fotoFile ? fotoFile.name : "Subir nueva foto de perfil"}
+                                    </span>
+                                    <small style={{color: '#64748b'}}>Haz clic para cambiar tu imagen</small>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div className="form-group" style={{marginTop: '20px'}}>
+                            <label>Nombre Completo</label>
+                            <input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+                        </div>
+                        
+                        <div className="form-group">
+                            <label>Biografía</label>
+                            <textarea value={formData.biografia} onChange={e => setFormData({...formData, biografia: e.target.value})} placeholder="Cuéntanos un poco sobre ti..."></textarea>
+                        </div>
+
+                        <button className="btn-save-settings" disabled={uploading}>
+                            {uploading ? <><i className="fas fa-spinner fa-spin"></i> Guardando...</> : <><i className="fas fa-save"></i> Guardar Cambios</>}
+                        </button>
+                    </form>
                 </div>
 
+                {/* SECCIÓN 2: SEGURIDAD */}
                 <div className="settings-section">
-                    <h3><i className="fas fa-globe"></i> Información Pública</h3>
-                    <div className="settings-grid">
-                        <div className="form-group"><label>Nombre Visible</label><input type="text" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} /></div>
-                        <div className="form-group"><label>Email de Contacto</label><input type="email" value={formData.contactEmail} onChange={e => setFormData({...formData, contactEmail: e.target.value})} /></div>
-                        <div className="form-group full-width"><label>Biografía</label><textarea rows="4" value={formData.biografia} onChange={e => setFormData({...formData, biografia: e.target.value})}></textarea></div>
-                    </div>
+                    <h3 style={{color: '#e74c3c', borderColor: '#ffe5e5'}}><i className="fas fa-shield-alt"></i> Seguridad y Contraseña</h3>
+                    <form onSubmit={handleUpdatePassword}>
+                        <div className="form-group">
+                            <label>Contraseña Actual</label>
+                            <input 
+                                type="password" 
+                                required 
+                                value={passwords.current} 
+                                onChange={e => setPasswords({...passwords, current: e.target.value})}
+                                placeholder="Tu clave actual"
+                            />
+                        </div>
+                        <div className="security-grid">
+                            <div className="form-group">
+                                <label>Nueva Contraseña</label>
+                                <input 
+                                    type="password" 
+                                    required 
+                                    value={passwords.new} 
+                                    onChange={e => setPasswords({...passwords, new: e.target.value})}
+                                    placeholder="Mínimo 6 caracteres"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Confirmar Nueva</label>
+                                <input 
+                                    type="password" 
+                                    required 
+                                    value={passwords.confirm} 
+                                    onChange={e => setPasswords({...passwords, confirm: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                        <button 
+                            type="submit" 
+                            className="btn-save-settings" 
+                            disabled={changingPassword} 
+                            style={{background: '#2c3e50', width: 'auto'}}
+                        >
+                            {changingPassword ? <><i className="fas fa-sync fa-spin"></i> Procesando...</> : <><i className="fas fa-lock"></i> Cambiar Contraseña</>}
+                        </button>
+                    </form>
                 </div>
-                
-                <button className="btn-save-settings" disabled={uploading} style={{width:'100%'}}>
-                    {uploading ? 'Guardando...' : 'Guardar Cambios'}
-                </button>
-            </form>
+            </div>
         );
       default: return null;
     }
@@ -169,18 +224,21 @@ function Profile() {
       <main className="main-content">
         <div className="profile-page-container">
             <aside className="profile-sidebar">
-                <div className="profile-avatar-container" style={{overflow:'hidden', background: fotoActual ? 'transparent' : 'var(--color-secundario)', border: fotoActual ? '2px solid var(--color-primario)' : 'none'}}>
+                <div className="profile-avatar-container" style={{background: '#0b3d91'}}>
                     {fotoActual ? (
                         <img src={fotoActual} alt="Perfil" style={{width:'100%', height:'100%', objectFit:'cover'}} />
                     ) : (
-                        user?.nombre_completo?.charAt(0).toUpperCase()
+                        <span style={{color: 'white'}}>{user?.nombre_completo?.charAt(0)}</span>
                     )}
                 </div>
-                <div className="profile-info"><h3>{user?.nombre_completo}</h3><p>{user?.email}</p></div>
+                <div className="profile-info">
+                    <h3>{user?.nombre_completo}</h3>
+                    <p style={{fontSize: '0.8rem', opacity: 0.7}}>{user?.email}</p>
+                </div>
                 <nav className="profile-tabs">
-                    <button className={`profile-tab-button ${activeTab==='profile-overview'?'active':''}`} onClick={()=>setActiveTab('profile-overview')}><i className="fas fa-user"></i> Mi Perfil</button>
-                    <button className={`profile-tab-button ${activeTab==='profile-certificates'?'active':''}`} onClick={()=>setActiveTab('profile-certificates')}><i className="fas fa-certificate"></i> Mis Certificados</button>
-                    <button className={`profile-tab-button ${activeTab==='profile-settings'?'active':''}`} onClick={()=>setActiveTab('profile-settings')}><i className="fas fa-cog"></i> Configuración</button>
+                    <button className={`profile-tab-button ${activeTab==='profile-overview'?'active':''}`} onClick={()=>setActiveTab('profile-overview')}><i className="fas fa-user-shield"></i> Resumen</button>
+                    <button className={`profile-tab-button ${activeTab==='profile-certificates'?'active':''}`} onClick={()=>setActiveTab('profile-certificates')}><i className="fas fa-certificate"></i> Logros</button>
+                    <button className={`profile-tab-button ${activeTab==='profile-settings'?'active':''}`} onClick={()=>setActiveTab('profile-settings')}><i className="fas fa-user-cog"></i> Ajustes</button>
                 </nav>
             </aside>
             <section className="profile-main-content">

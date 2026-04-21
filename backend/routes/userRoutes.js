@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer'); 
-// 🟢 IMPORTAMOS LA NUEVA FUNCIÓN 'updateBankDetails'
 const { 
     getUserProfile, 
     getUserCertificates, 
     becomeInstructor, 
     updateUserProfile, 
     verifyCertificatePublic,
-    updateBankDetails // <--- Nueva función para guardar banco
+    updateBankDetails,
+    updatePassword // 🟢 1. IMPORTAMOS LA NUEVA FUNCIÓN
 } = require('../controllers/userController');
 
 const { verifyToken } = require('../middleware/authMiddleware');
@@ -19,7 +19,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ==========================================
 // 🟢 RUTA PÚBLICA (ACCESO LIBRE)
 // ==========================================
-// Permite verificar la autenticidad de un certificado sin iniciar sesión
 router.get('/verificar/:id', verifyCertificatePublic);
 
 
@@ -29,6 +28,10 @@ router.get('/verificar/:id', verifyCertificatePublic);
 router.get('/perfil', verifyToken, getUserProfile);
 router.get('/certificados', verifyToken, getUserCertificates);
 router.put('/convertirse-instructor', verifyToken, becomeInstructor);
+
+// 🟢 NUEVA RUTA: SEGURIDAD (CAMBIO DE CONTRASEÑA)
+// Esta es la ruta que el frontend está intentando llamar
+router.put('/update-password', verifyToken, updatePassword); 
 
 // 🟢 NUEVA RUTA: GUARDAR DATOS BANCARIOS
 router.put('/datos-bancarios', verifyToken, updateBankDetails);

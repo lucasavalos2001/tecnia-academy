@@ -1,6 +1,7 @@
-const { User, Course, Enrollment, SystemSetting } = require('../models'); // 🟢 AGREGADO SystemSetting
+const { User, Course, Enrollment, SystemSetting } = require('../models');
 const { sequelize } = require('../config/db');
-const { Op } = require('sequelize'); 
+const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para el reseteo de claves
 
 // 1. Dashboard: Estadísticas Globales
 const getGlobalStats = async (req, res) => {
@@ -15,7 +16,7 @@ const getGlobalStats = async (req, res) => {
             JOIN courses c ON e."courseId" = c.id
         `);
         
-        const totalRevenue = results[0].total_ingresos || 0;
+        const totalRevenue = results[0]?.total_ingresos || 0;
 
         res.json({ totalUsers, totalCourses, totalEnrollments, totalRevenue });
     } catch (error) {
@@ -33,6 +34,35 @@ const getAllUsers = async (req, res) => {
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener usuarios" });
+    }
+};
+
+// 🟢 NUEVA FUNCIÓN: Reseteo de contraseña por Superadmin
+const resetUserPassword = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { newPassword } = req.body; // El admin envía la clave provisoria
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ message: "La contraseña provisoria debe tener al menos 6 caracteres." });
+        }
+
+        const user = await User.findByPk(userId);
+        if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        // Hashear la nueva contraseña
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        await user.update({ contraseña_hash: hashedPassword });
+
+        res.json({ 
+            message: `Contraseña de ${user.nombre_completo} reseteada con éxito.`,
+            provisoria: newPassword 
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al resetear la contraseña" });
     }
 };
 
@@ -79,7 +109,6 @@ const getPendingCourses = async (req, res) => {
         });
         res.json(courses);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Error al obtener cursos pendientes" });
     }
 };
@@ -105,7 +134,6 @@ const reviewCourse = async (req, res) => {
         return res.status(400).json({ message: "Decisión no válida." });
 
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Error al procesar la revisión" });
     }
 };
@@ -133,12 +161,11 @@ const getRecentEnrollments = async (req, res) => {
         });
         res.json(enrollments);
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Error al obtener actividad" });
     }
 };
 
-// 5. Calcular Pagos
+// 5. Calcular Pagos (Liquidación a Instructores en Paraguay)
 const getInstructorEarnings = async (req, res) => {
     try {
         const currentData = new Date();
@@ -205,18 +232,14 @@ const getInstructorEarnings = async (req, res) => {
         }
         res.json(report);
     } catch (error) {
-        console.error("Error calculando pagos:", error);
-        res.status(500).json({ message: "Error al calcular pagos a instructores" });
+        res.status(500).json({ message: "Error al calcular pagos" });
     }
 };
 
-// 🟢 6. CONTROL DE MANTENIMIENTO (NUEVO)
-
-// Obtener estado actual
+// 6. CONTROL DE MANTENIMIENTO
 const getMaintenanceStatus = async (req, res) => {
     try {
         const setting = await SystemSetting.findOne({ where: { key: 'maintenance_mode' } });
-        // Si no existe, asumimos false
         const isEnabled = setting ? setting.value === 'true' : false;
         res.json({ enabled: isEnabled });
     } catch (error) {
@@ -224,12 +247,9 @@ const getMaintenanceStatus = async (req, res) => {
     }
 };
 
-// Cambiar estado (ON/OFF)
 const toggleMaintenance = async (req, res) => {
     try {
-        const { enabled } = req.body; // true o false
-        
-        // Actualizamos o creamos la configuración
+        const { enabled } = req.body; 
         const [setting, created] = await SystemSetting.findOrCreate({
             where: { key: 'maintenance_mode' },
             defaults: { value: enabled ? 'true' : 'false' }
@@ -243,21 +263,23 @@ const toggleMaintenance = async (req, res) => {
             message: `Modo Mantenimiento ${enabled ? 'ACTIVADO 🔒' : 'DESACTIVADO ✅'}`,
             enabled: enabled
         });
-
     } catch (error) {
-        console.error(error);
         res.status(500).json({ message: "Error cambiando modo mantenimiento" });
     }
 };
 
 module.exports = { 
     getGlobalStats, 
-    getAllUsers, updateUserRole, deleteUser, 
-    getAllCoursesAdmin, deleteCourseAdmin,
+    getAllUsers, 
+    updateUserRole, 
+    deleteUser, 
+    resetUserPassword, // 🟢 NUEVA EXPORTACIÓN
+    getAllCoursesAdmin, 
+    deleteCourseAdmin,
     getPendingCourses, 
     reviewCourse, 
     getRecentEnrollments,
     getInstructorEarnings,
-    getMaintenanceStatus, // 🟢 Exportar
-    toggleMaintenance     // 🟢 Exportar
+    getMaintenanceStatus,
+    toggleMaintenance 
 };

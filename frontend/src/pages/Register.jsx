@@ -6,17 +6,25 @@ function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // 🟢 Nuevo estado para el Checkbox
+  // 🟢 NUEVO: Estado para confirmar contraseña
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const { register, isLoading, error } = useAuth();
   const navigate = useNavigate();
 
+  // 🟢 Lógica de validación: ¿Coinciden las contraseñas?
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = acceptedTerms && passwordsMatch && password.length >= 6;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Doble validación de seguridad
+    if (!passwordsMatch) {
+      alert("Las contraseñas no coinciden.");
+      return;
+    }
+
     if (!acceptedTerms) {
       alert("Debes aceptar los términos y condiciones para continuar.");
       return;
@@ -31,7 +39,6 @@ function Register() {
 
   return (
     <div className="auth-split-screen">
-        {/* LADO IZQUIERDO (Visual) */}
         <div className="auth-banner-side" style={{backgroundImage: "url('https://images.unsplash.com/photo-1531482615713-2afd69097998?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')"}}>
             <div className="auth-overlay">
                 <h1>
@@ -43,7 +50,6 @@ function Register() {
             </div>
         </div>
 
-        {/* LADO DERECHO (Formulario) */}
         <div className="auth-form-side">
             <Link to="/" className="auth-back-link"><i className="fas fa-arrow-left"></i> Volver al inicio</Link>
             
@@ -90,7 +96,27 @@ function Register() {
                         />
                     </div>
 
-                    {/* 🟢 CHECKBOX DE TÉRMINOS LEGALES */}
+                    {/* 🟢 NUEVO: Campo de Confirmar Contraseña */}
+                    <div className="form-group">
+                        <label htmlFor="confirmPassword">Repetir Contraseña</label>
+                        <input
+                            type="password"
+                            id="confirmPassword"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repite tu contraseña"
+                            required
+                            style={{
+                                borderColor: confirmPassword && !passwordsMatch ? '#ff4d4d' : ''
+                            }}
+                        />
+                        {confirmPassword && !passwordsMatch && (
+                            <span style={{color: '#ff4d4d', fontSize: '0.8rem', marginTop: '5px'}}>
+                                ⚠️ Las contraseñas no coinciden
+                            </span>
+                        )}
+                    </div>
+
                     <div className="form-group" style={{flexDirection: 'row', alignItems: 'flex-start', gap: '10px', marginTop: '10px'}}>
                         <input 
                             type="checkbox" 
@@ -105,12 +131,15 @@ function Register() {
                         </label>
                     </div>
 
-                    {/* El botón se deshabilita visualmente si no aceptan */}
                     <button 
                         type="submit" 
                         className="btn-auth" 
-                        disabled={isLoading || !acceptedTerms}
-                        style={{opacity: acceptedTerms ? 1 : 0.6, cursor: acceptedTerms ? 'pointer' : 'not-allowed'}}
+                        disabled={isLoading || !canSubmit}
+                        style={{
+                            opacity: canSubmit ? 1 : 0.6, 
+                            cursor: canSubmit ? 'pointer' : 'not-allowed',
+                            backgroundColor: canSubmit ? '#003366' : '#cccccc'
+                        }}
                     >
                         {isLoading ? 'Creando cuenta...' : 'Registrarse'}
                     </button>

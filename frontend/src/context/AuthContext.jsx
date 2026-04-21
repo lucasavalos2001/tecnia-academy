@@ -1,106 +1,125 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import PropTypes from 'prop-types'; 
 
-// 1. Crear el contexto
 const AuthContext = createContext();
-
-// URL base desde .env
 const API_URL = import.meta.env.VITE_API_BASE_URL; 
 
-// 2. Crear el Proveedor del Contexto
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(() => {
-        const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : null;
+        try {
+            const storedUser = localStorage.getItem('user');
+            return storedUser ? JSON.parse(storedUser) : null;
+        } catch (error) {
+            return null;
+        }
     });
 
     const [token, setToken] = useState(() => localStorage.getItem('token') || null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // 3. Configurar Axios
+    // 🟢 INTERCEPTOR Y CONFIGURACIÓN DE AXIOS
     useEffect(() => {
+        const requestInterceptor = axios.interceptors.request.use((config) => {
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            return config;
+        });
+
+        const responseInterceptor = axios.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response?.status === 401) {
+                    logout(); // Auto-logout si el token vence
+                }
+                return Promise.reject(error);
+            }
+        );
+
         if (token) {
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
             localStorage.setItem('token', token);
         } else {
-            delete axios.defaults.headers.common['Authorization'];
             localStorage.removeItem('token');
+            localStorage.removeItem('user');
         }
+
+        return () => {
+            axios.interceptors.request.eject(requestInterceptor);
+            axios.interceptors.response.eject(responseInterceptor);
+        };
     }, [token]);
 
-    // 4. Función de Login (CORREGIDA)
+    // 🟢 SINCRONIZACIÓN ENTRE PESTAÑAS (Imprescindible para calidad)
+    useEffect(() => {
+        const handleStorageChange = (e) => {
+            if (e.key === 'token' && !e.newValue) logout();
+        };
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
+
     const login = async (email, password) => {
         setIsLoading(true);
         setError(null);
         try {
-            // CAMBIO: Se envía 'password' en lugar de 'contraseña'
-            const res = await axios.post(`${API_URL}/auth/login`, { 
-                email, 
-                password // Esto equivale a password: password
-            });
-            
+            const res = await axios.post(`${API_URL}/auth/login`, { email, password });
             const { token: newToken, user: userData } = res.data;
 
             setToken(newToken);
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData));
             
-            setIsLoading(false);
-            return { success: true, message: res.data.message };
+            return { success: true };
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Error de red o servidor al iniciar sesión.';
+            const errorMessage = err.response?.data?.message || 'Error de conexión.';
             setError(errorMessage);
-            setIsLoading(false);
             return { success: false, message: errorMessage };
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // 5. Función de Registro (CORREGIDA)
     const register = async (name, email, password) => {
         setIsLoading(true);
         setError(null);
         try {
-            // CAMBIO: Se envía 'password' en lugar de 'contraseña'
             const res = await axios.post(`${API_URL}/auth/registro`, { 
                 nombre_completo: name, 
                 email, 
-                password // Esto equivale a password: password
+                password 
             });
-
-            setIsLoading(false);
             return { success: true, message: res.data.message }; 
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Error de red o servidor al registrar.';
+            const errorMessage = err.response?.data?.message || 'Error al registrar.';
             setError(errorMessage);
-            setIsLoading(false);
             return { success: false, message: errorMessage };
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // 6. Función de Logout
     const logout = () => {
         setToken(null);
         setUser(null);
+        localStorage.clear();
+        window.location.href = '/login'; // Fuerza limpieza de estado
     };
     
-    // Validar roles
-    const userIsAdmin = user?.rol === 'admin' || user?.rol === 'superadmin';
-    const userIsInstructor = user?.rol === 'instructor' || userIsAdmin;
-
-    const contextValue = {
+    // Optimizamos el valor del contexto para evitar re-renders innecesarios
+    const contextValue = useMemo(() => ({
         user,
         token,
         isLoading,
         error,
         isLoggedIn: !!token, 
-        isAdmin: userIsAdmin,
-        isInstructor: userIsInstructor,
+        isAdmin: user?.rol === 'admin' || user?.rol === 'superadmin',
+        isInstructor: user?.rol === 'instructor' || user?.rol === 'admin' || user?.rol === 'superadmin',
         login,
         register,
         logout,
-    };
+    }), [user, token, isLoading, error]);
 
     return (
         <AuthContext.Provider value={contextValue}>
@@ -109,11 +128,5 @@ export const AuthProvider = ({ children }) => {
     );
 };
 
-AuthProvider.propTypes = {
-    children: PropTypes.node.isRequired,
-};
-
-// 7. Hook personalizado
-export const useAuth = () => {
-    return useContext(AuthContext);
-};
+AuthProvider.propTypes = { children: PropTypes.node.isRequired };
+export const useAuth = () => useContext(AuthContext);

@@ -597,3 +597,91 @@ body {
     .search-box { flex-direction: column !important; align-items: center !important; }
     .search-box input { width: 100% !important; max-width: 300px !important; }
 }
+/* =========================================
+   PERFIL Y CONFIGURACIÓN (REDISEÑO)
+   ========================================= */
+
+/* Contenedor de Secciones */
+.settings-section {
+    background: #ffffff;
+    padding: 25px;
+    border-radius: var(--border-radius-md);
+    margin-bottom: 25px;
+    border: 1px solid #eef2f7;
+    box-shadow: var(--shadow-sm);
+}
+
+.settings-section h3 {
+    color: var(--color-primario);
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid var(--color-fondo);
+    padding-bottom: 10px;
+}
+
+/* Botones Modernos */
+.btn-save-settings {
+    background: linear-gradient(135deg, var(--color-primario) 0%, #1a56b9 100%);
+    color: white !important;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 12px rgba(11, 61, 145, 0.2);
+}
+
+.btn-save-settings:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(11, 61, 145, 0.3);
+    filter: brightness(1.1);
+}
+
+.btn-save-settings:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Custom File Input (El botón de foto) */
+.custom-file-upload {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #f8fafc;
+    padding: 15px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.custom-file-upload:hover {
+    border-color: var(--color-secundario);
+    background: #f1f5f9;
+}
+
+.custom-file-upload i {
+    font-size: 1.5rem;
+    color: var(--color-secundario);
+}
+
+/* Inputs de Seguridad (Password) */
+.security-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 768px) {
+    .security-grid { grid-template-columns: 1fr; }
+}
