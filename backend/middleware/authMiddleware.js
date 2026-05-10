@@ -1,35 +1,44 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
-    const header = req.headers['authorization'];
+    const authHeader = req.headers['authorization'];
     
-    if (typeof header !== 'undefined') {
-        const bearerToken = header.split(' ')[1];
-        
-        jwt.verify(bearerToken, process.env.JWT_SECRET, (err, authData) => {
-            if (err) {
-                return res.status(403).json({ message: "Token inválido o expirado" });
-            }
-            
-            // 🔍 RAYOS X: Vamos a ver qué tiene el token por dentro
-            console.log("🎟️ TOKEN DECODIFICADO:", authData);
-            
-            // VERIFICACIÓN CRÍTICA:
-            // Si authData no tiene .id, el pago fallará.
-            if (!authData.id) {
-                console.error("⚠️ ALERTA: El token no tiene campo 'id'. El pago fallará.");
-            }
-
-            req.usuario = authData; 
-            next();
-        });
-    } else {
-        res.status(403).json({ message: "Acceso denegado, se requiere token" });
+    // 1. Verificación de existencia del Header
+    if (!authHeader) {
+        return res.status(403).json({ message: "Acceso denegado, se requiere token" });
     }
+
+    // 2. Extraer el token (Soporta: "Bearer <token>" o solo "<token>")
+    const parts = authHeader.split(' ');
+    const token = parts.length === 2 ? parts[1] : parts[0];
+
+    // 3. Verificación del JWT
+    jwt.verify(token, process.env.JWT_SECRET, (err, authData) => {
+        if (err) {
+            // Log clave para debuguear en DigitalOcean: nos dirá si es 'invalid signature' o 'jwt expired'
+            console.error("🚨 [Auth] Error de validación:", err.name, "|", err.message);
+            
+            return res.status(403).json({ 
+                message: "Token inválido o expirado",
+                error_detail: err.name // Esto ayuda al frontend a saber si debe forzar un logout
+            });
+        }
+        
+        // 4. Verificación de integridad del Payload
+        if (!authData || !authData.id) {
+            console.error("⚠️ [Auth] El token decodificado no contiene un ID de usuario.");
+            return res.status(403).json({ message: "Token corrupto: Falta información de usuario" });
+        }
+
+        // 5. Inyectar datos en la petición para los siguientes controladores
+        req.usuario = authData; 
+        next();
+    });
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.usuario && req.usuario.rol === 'admin') {
+    // Permitimos tanto 'admin' como 'superadmin' para no bloquear gestiones críticas
+    if (req.usuario && (req.usuario.rol === 'admin' || req.usuario.rol === 'superadmin')) {
         next(); 
     } else {
         return res.status(403).json({ 

@@ -26,21 +26,23 @@ const initiatePayment = async (req, res) => {
 
         if (!usuarioDB || !curso) return res.status(404).json({ message: "Datos no encontrados." });
 
-        // IMPORTANTE: Pagopar espera el monto como entero para el token (Gs no tiene decimales)
         const monto = parseInt(curso.precio);
         const pedidoId = `ORDEN-${Date.now()}-${userId}`;
 
-        // Limpieza de nombre (Evitar caracteres especiales que rompan el JSON)
+        // Limpieza robusta de nombre
         const nombreLimpio = (usuarioDB.nombre_completo || usuarioDB.nombre || "Estudiante")
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 45);
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 45);
 
-        // --- 1. GENERACIÓN DEL TOKEN (ORDEN ESTRICTO SEGÚN DOCS) ---
-        // Formula: sha1(private_key + id_pedido + monto_total_como_string)
+        // --- 1. GENERACIÓN DEL TOKEN ---
         const tokenFirma = crypto.createHash('sha1')
             .update(PRIVATE_KEY + pedidoId + monto.toString())
             .digest('hex');
 
-        // --- 2. ESTRUCTURA PARA API v2.0 ---
+        // --- 2. AJUSTE DE FECHA (Formato YYYY-MM-DD HH:mm:ss requerido por Pagopar) ---
+        const fechaActual = new Date();
+        fechaActual.setHours(fechaActual.getHours() + 48); // 48 horas de validez
+        const fechaMaxima = fechaActual.toISOString().slice(0, 19).replace('T', ' ');
+
         const orden = {
             "token": tokenFirma,
             "public_key": PUBLIC_KEY,
@@ -56,31 +58,30 @@ const initiatePayment = async (req, res) => {
                 "descripcion": "Acceso a plataforma educativa",
                 "id_producto": courseId.toString(),
                 "precio_total": monto,
-                "vendedor_telefono": "",
+                "vendedor_telefono": "0981000000",
                 "vendedor_direccion": "Asunción",
                 "vendedor_direccion_referencia": "",
                 "vendedor_direccion_coordenadas": ""
             }],
-            "fecha_maxima_pago": new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().replace('T', ' ').substring(0, 19), 
+            "fecha_maxima_pago": fechaMaxima, 
             "id_pedido_comercio": pedidoId,
             "descripcion_resumen": `Curso: ${curso.titulo}`,
             "forma_pago": 9,
             "comprador": {
-                "ruc": usuarioDB.ruc || "",
+                "ruc": usuarioDB.ruc || "44444401-7",
                 "email": usuarioDB.email.trim(),
                 "ciudad": 1,
                 "nombre": nombreLimpio,
                 "telefono": usuarioDB.telefono || "0981000000",
-                "direccion": "",
-                "documento": usuarioDB.documento || "0",
+                "direccion": "Paraguay",
+                "documento": usuarioDB.documento || "4444440",
                 "razon_social": nombreLimpio,
-                "tipo_documento": "CI", // Segun docs, siempre enviar CI por ahora
+                "tipo_documento": "CI", 
                 "coordenadas": "",
                 "direccion_referencia": ""
             }
         };
 
-        // 3. REGISTRO EN TU DB
         const nuevaTransaccion = await Transaction.create({
             external_reference: pedidoId, 
             amount: monto,
@@ -91,7 +92,6 @@ const initiatePayment = async (req, res) => {
             payment_method: 'pagopar'
         });
 
-        // 4. ENVÍO A PAGOPAR
         const response = await axios.post('https://api.pagopar.com/api/comercios/2.0/iniciar-transaccion', orden);
 
         if (response.data.respuesta) {
@@ -104,23 +104,24 @@ const initiatePayment = async (req, res) => {
                 redirectUrl: `https://www.pagopar.com/pagos/${hashReal}`
             });
         } else {
-            console.error("❌ ERROR API PAGOPAR:", response.data.resultado);
+            console.error("❌ ERROR API PAGOPAR:", JSON.stringify(response.data.resultado));
             await nuevaTransaccion.destroy();
-            res.status(400).json({ message: "Error en la pasarela", details: response.data.resultado });
+            res.status(400).json({ 
+                message: "Error en la pasarela", 
+                details: response.data.resultado 
+            });
         }
 
     } catch (error) {
-        console.error("❌ ERROR GENERAL:", error.message);
-        res.status(500).json({ message: "Error interno del servidor." });
+        console.error("❌ ERROR GENERAL CONTROLADOR:", error.message);
+        res.status(500).json({ message: "Error interno del servidor al procesar pago." });
     }
 };
 
 // =========================================================
-// 2. WEBHOOK DE CONFIRMACIÓN (CORREGIDO SEGÚN STEP #3)
+// 2. WEBHOOK DE CONFIRMACIÓN
 // =========================================================
 const confirmPaymentWebhook = async (req, res) => {
-    console.log("\n🔔 [NOTIFICACIÓN] WEBHOOK RECIBIDO");
-
     try {
         const { resultado, respuesta } = req.body;
         const PRIVATE_KEY = (process.env.PAGOPAR_PRIVATE_KEY || "").trim();
@@ -133,22 +134,18 @@ const confirmPaymentWebhook = async (req, res) => {
         const hashPedido = datosPago.hash_pedido;
         const tokenRecibido = datosPago.token;
 
-        // --- VALIDACIÓN DE SEGURIDAD (OBLIGATORIO) ---
-        // Segun docs Step #3: sha1(private_key + hash_pedido)
         const tokenValidacion = crypto.createHash('sha1')
             .update(PRIVATE_KEY + hashPedido)
             .digest('hex');
 
         if (tokenRecibido !== tokenValidacion) {
-            console.error("❌ TOKEN DE WEBHOOK NO COINCIDE");
+            console.error("❌ WEBHOOK: TOKEN INVÁLIDO");
             return res.status(401).send("No autorizado");
         }
 
-        // Si la firma es correcta, respondemos OK a Pagopar inmediatamente
-        // Esto evita que Pagopar nos siga llamando cada 10 minutos.
+        // RESPUESTA INMEDIATA A PAGOPAR
         res.json(resultado); 
 
-        // Procesamiento en segundo plano
         if (datosPago.pagado === true) {
             const transaccion = await Transaction.findOne({ where: { external_reference: hashPedido } });
             
@@ -158,12 +155,15 @@ const confirmPaymentWebhook = async (req, res) => {
 
                 await Enrollment.findOrCreate({
                     where: { userId: transaccion.userId, courseId: transaccion.courseId },
-                    defaults: { progreso_porcentaje: 0, fecha_inscripcion: new Date() }
+                    defaults: { 
+                        progreso_porcentaje: 0, 
+                        fecha_inscripcion: new Date(),
+                        lecciones_completadas: []
+                    }
                 });
-                console.log(`✅ Alumno ${transaccion.userId} inscrito con éxito.`);
+                console.log(`🎓 Alumno ${transaccion.userId} inscrito con éxito.`);
             }
         }
-
     } catch (error) {
         console.error("❌ ERROR WEBHOOK:", error.message);
         if (!res.headersSent) res.status(500).send("Error");

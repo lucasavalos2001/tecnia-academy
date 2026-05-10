@@ -3,54 +3,58 @@ const jwt = require('jsonwebtoken');
 
 const maintenanceMiddleware = async (req, res, next) => {
     try {
-        // 1. Consultar si el Mantenimiento está ACTIVO en la Base de Datos
+        // 1. Consultar estado del mantenimiento en la DB
         const setting = await SystemSetting.findOne({ where: { key: 'maintenance_mode' } });
         const isMaintenanceOn = setting && setting.value === 'true';
 
-        // Si el mantenimiento está APAGADO, dejar pasar a todo el mundo
+        // Si está apagado, dejar pasar a todo el mundo sin más vueltas
         if (!isMaintenanceOn) {
             return next();
         }
 
         // ============================================================
-        // 🚨 MANTENIMIENTO ENCENDIDO - FILTRO DE SEGURIDAD
+        // 🚨 MANTENIMIENTO ENCENDIDO - EXCEPCIONES CRÍTICAS
         // ============================================================
 
-        // A. Permitir siempre el acceso al Login y a la ruta de desactivar mantenimiento
-        // IMPORTANTE: Agregamos '/api/auth' para permitir validación de sesión
-        if (req.path.includes('/login') || 
+        // A. Permitir acceso a Login, Auth, Admin y WEBHOOK DE PAGOPAR
+        if (
+            req.path.includes('/login') || 
             req.path.includes('/auth') || 
-            req.path.includes('/admin/maintenance')) {
+            req.path.includes('/admin/maintenance') ||
+            req.path.includes('/pagos/confirmar') // 👈 Vital para inscripciones automáticas
+        ) {
             return next();
         }
 
-        // B. Verificar si quien intenta entrar es ADMINISTRADOR (admin O superadmin)
+        // B. Verificar si es ADMINISTRADOR para darle "llave maestra"
         const authHeader = req.headers['authorization'];
         if (authHeader) {
-            const token = authHeader.split(' ')[1];
-            try {
-                // Verificamos el token manualmente aquí
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                
-                // 🟢 CORRECCIÓN: Permitimos 'admin' Y 'superadmin'
-                if (decoded.rol === 'admin' || decoded.rol === 'superadmin') {
-                    return next(); 
+            const parts = authHeader.split(' ');
+            if (parts.length === 2) {
+                const token = parts[1];
+                try {
+                    // Verificamos el token con el secreto del servidor
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                    
+                    if (decoded.rol === 'admin' || decoded.rol === 'superadmin') {
+                        return next(); 
+                    }
+                } catch (err) {
+                    // Log detallado para que veas el error real en tu consola de DigitalOcean
+                    console.error("🚨 [Mantenimiento] Fallo de token:", err.name, "-", err.message);
                 }
-            } catch (err) {
-                // Si el token está vencido o es inválido, se bloquea abajo
             }
         }
 
-        // C. BLOQUEAR A TODOS LOS DEMÁS (Estudiantes, Instructores, Públicos)
+        // C. BLOQUEAR RESTO (Estudiantes e Instructores)
         return res.status(503).json({ 
             message: "⚠️ El sistema está en mantenimiento programado. Volvemos en breve.",
-            maintenance: true // Bandera para que el Frontend sepa mostrar la pantalla de espera
+            maintenance: true 
         });
 
     } catch (error) {
-        console.error("Error en middleware de mantenimiento:", error);
-        // Si falla la base de datos, dejamos pasar por seguridad para no tumbar el sitio accidentalmente
-        next(); 
+        console.error("❌ Error crítico en maintenanceMiddleware:", error);
+        next(); // Dejamos pasar si hay error de DB para evitar caída total
     }
 };
 
