@@ -153,8 +153,18 @@ const deleteCourse = async (req, res) => {
     try {
         const { id } = req.params;
         const instructorId = req.usuario.id;
-        const resultado = await Course.destroy({ where: { id, instructorId } });
-        if (!resultado) return res.status(404).json({ message: "Curso no encontrado" });
+
+        const curso = await Course.findOne({ where: { id, instructorId } });
+        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        const alumnosInscritos = await Enrollment.count({ where: { courseId: id } });
+        if (alumnosInscritos > 0) {
+            return res.status(400).json({
+                message: `No se puede eliminar: el curso tiene ${alumnosInscritos} alumno(s) inscrito(s). Solo un superadministrador puede forzar esta eliminación.`
+            });
+        }
+
+        await curso.destroy();
         res.json({ message: "Curso eliminado con éxito" });
     } catch (error) { res.status(500).json({ message: "Error al eliminar" }); }
 };

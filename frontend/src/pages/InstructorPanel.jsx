@@ -67,7 +67,7 @@ function InstructorPanel() {
             setCursos(cursos.filter(c => c.id !== cursoId));
             alert("Curso eliminado.");
           } catch (error) {
-            alert("Error al eliminar.");
+            alert(error.response?.data?.message || "Error al eliminar.");
           }
       }
   };

@@ -117,8 +117,12 @@ function AdminDashboard() {
 
   const handleDeleteCourse = async (id) => {
     if(!confirm("¿Borrar este curso?")) return;
-    await axios.delete(`${API_URL}/admin/courses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    loadCourses();
+    try {
+      await axios.delete(`${API_URL}/admin/courses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      loadCourses();
+    } catch (error) {
+      alert(error.response?.data?.message || "Error al eliminar el curso.");
+    }
   };
 
   const handleReviewCourse = async (courseId, decision) => {

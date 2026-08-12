@@ -153,9 +153,28 @@ const reviewCourse = async (req, res) => {
 const deleteCourseAdmin = async (req, res) => {
     try {
         const { courseId } = req.params;
-        await Course.destroy({ where: { id: courseId } });
+        const esSuperadmin = req.usuario.rol === 'superadmin';
+
+        const curso = await Course.findByPk(courseId);
+        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        const alumnosInscritos = await Enrollment.count({ where: { courseId } });
+
+        if (alumnosInscritos > 0 && !esSuperadmin) {
+            return res.status(400).json({
+                message: `No se puede eliminar: el curso tiene ${alumnosInscritos} alumno(s) inscrito(s). Solo un superadministrador puede forzar esta eliminación.`
+            });
+        }
+
+        if (alumnosInscritos > 0 && esSuperadmin) {
+            await Enrollment.destroy({ where: { courseId } });
+            await Transaction.destroy({ where: { courseId } });
+        }
+
+        await curso.destroy();
         res.json({ message: "Curso eliminado por el administrador." });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Error al eliminar curso" });
     }
 };
