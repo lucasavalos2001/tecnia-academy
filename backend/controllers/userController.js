@@ -1,28 +1,6 @@
 const { Enrollment, Course, User } = require('../models');
-const axios = require('axios'); 
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para validar y cifrar contraseñas
-
-// --- HELPER: SUBIR A BUNNY ---
-const uploadToBunny = async (file) => {
-    try {
-        const STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
-        const ACCESS_KEY = process.env.BUNNY_STORAGE_PASSWORD;
-        const PULL_ZONE = process.env.BUNNY_PULL_ZONE;
-        const REGION = process.env.BUNNY_STORAGE_REGION ? `${process.env.BUNNY_STORAGE_REGION}.` : ''; 
-
-        const filename = `avatar_${Date.now()}_${file.originalname.replace(/\s+/g, '-')}`;
-        const bunnyUrl = `https://${REGION}storage.bunnycdn.com/${STORAGE_NAME}/${filename}`;
-
-        await axios.put(bunnyUrl, file.buffer, {
-            headers: { AccessKey: ACCESS_KEY, 'Content-Type': file.mimetype }
-        });
-
-        return `${PULL_ZONE}/${filename}`;
-    } catch (error) {
-        console.error("Error subiendo a Bunny:", error);
-        return null;
-    }
-};
+const { uploadToBunny } = require('../utils/bunny');
 
 const getUserProfile = async (req, res) => {
     try {
@@ -137,8 +115,11 @@ const updateUserProfile = async (req, res) => {
         let nueva_foto = user.foto_perfil;
 
         if (req.file) {
-            const url = await uploadToBunny(req.file);
-            if (url) nueva_foto = url;
+            try {
+                nueva_foto = await uploadToBunny(req.file, 'avatar_');
+            } catch (error) {
+                console.error("Error subiendo avatar a Bunny:", error.message);
+            }
         }
 
         await user.update({ nombre_completo, biografia, email_contacto, foto_perfil: nueva_foto });

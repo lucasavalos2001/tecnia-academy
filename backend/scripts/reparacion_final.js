@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sequelize, Transaction, Enrollment } = require('./models');
+const { sequelize, Transaction, Enrollment } = require('../models');
 
 const repararSistema = async () => {
     try {

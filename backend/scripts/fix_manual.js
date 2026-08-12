@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { sequelize, User, Course, Enrollment, Transaction } = require('./models');
+const { sequelize, User, Course, Enrollment, Transaction } = require('../models');
 
 const arreglarCurso = async () => {
     try {

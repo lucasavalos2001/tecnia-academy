@@ -1,4 +1,4 @@
-const { User, Course, Enrollment, SystemSetting } = require('../models');
+const { User, Course, Enrollment, Transaction, SystemSetting } = require('../models');
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para el reseteo de claves
@@ -80,9 +80,21 @@ const updateUserRole = async (req, res) => {
 const deleteUser = async (req, res) => {
     try {
         const { userId } = req.params;
+
+        const cursosCreados = await Course.count({ where: { instructorId: userId } });
+        if (cursosCreados > 0) {
+            return res.status(400).json({
+                message: `No se puede eliminar: el usuario tiene ${cursosCreados} curso(s) creado(s). Reasigná o eliminá esos cursos primero.`
+            });
+        }
+
+        await Enrollment.destroy({ where: { userId } });
+        await Transaction.destroy({ where: { userId } });
         await User.destroy({ where: { id: userId } });
+
         res.json({ message: "Usuario eliminado permanentemente." });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Error al eliminar usuario" });
     }
 };

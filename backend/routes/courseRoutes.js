@@ -5,12 +5,11 @@ const {
     createCourse, getInstructorCourses, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
     getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getInstructorStats,
-    getPendingCourses, reviewCourse // Funciones de Admin
+    getInstructorStats
 } = require('../controllers/courseController');
 
 // Importamos middleware
-const { verifyToken, isAdmin } = require('../middleware/authMiddleware');
+const { verifyToken } = require('../middleware/authMiddleware');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -21,14 +20,7 @@ router.get('/', getAllCourses);
 router.get('/:id/detalle', getCourseDetail);
 
 // ==========================================
-//  2. RUTAS DE ADMINISTRADOR (PRIORIDAD ALTA) 🟢
-// ==========================================
-// Las ponemos aquí ARRIBA para evitar conflictos con rutas dinámicas
-router.get('/admin/pending', verifyToken, isAdmin, getPendingCourses);
-router.post('/admin/review/:id', verifyToken, isAdmin, reviewCourse);
-
-// ==========================================
-//  3. RUTAS PROTEGIDAS (ALUMNOS/INSTRUCTORES)
+//  2. RUTAS PROTEGIDAS (ALUMNOS/INSTRUCTORES)
 // ==========================================
 
 // --- Estudiante ---

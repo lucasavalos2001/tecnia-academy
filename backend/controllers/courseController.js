@@ -1,32 +1,6 @@
-const { Op } = require('sequelize'); 
+const { Op } = require('sequelize');
 const { Course, Module, Lesson, User, Enrollment } = require('../models');
-const axios = require('axios');
-
-// --- FUNCIÓN AUXILIAR: SUBIR IMAGEN A BUNNY STORAGE ---
-const uploadToBunny = async (file) => {
-    try {
-        const STORAGE_NAME = process.env.BUNNY_STORAGE_NAME;
-        const ACCESS_KEY = process.env.BUNNY_STORAGE_PASSWORD;
-        const PULL_ZONE = process.env.BUNNY_PULL_ZONE; 
-        const REGION = process.env.BUNNY_STORAGE_REGION ? `${process.env.BUNNY_STORAGE_REGION}.` : ''; 
-
-        const filename = `${Date.now()}_${file.originalname.replace(/\s+/g, '-')}`;
-        const bunnyUrl = `https://${REGION}storage.bunnycdn.com/${STORAGE_NAME}/${filename}`;
-
-        await axios.put(bunnyUrl, file.buffer, {
-            headers: { 
-                AccessKey: ACCESS_KEY,
-                'Content-Type': file.mimetype 
-            }
-        });
-
-        return `${PULL_ZONE}/${filename}`;
-
-    } catch (error) {
-        console.error("Error interno subiendo a Bunny:", error.message);
-        throw new Error("Falló la subida de imagen");
-    }
-};
+const { uploadToBunny } = require('../utils/bunny');
 
 // ==========================================
 // 🟢 FUNCIÓN AUXILIAR: RECALCULAR DURACIÓN TOTAL
@@ -444,49 +418,8 @@ const markLessonAsComplete = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al actualizar progreso" }); }
 };
 
-// ==========================================
-//  ÁREA DEL ADMINISTRADOR (APROBACIÓN)
-// ==========================================
-
-const getPendingCourses = async (req, res) => {
-    try {
-        const cursosPendientes = await Course.findAll({
-            where: { estado: 'pendiente' },
-            include: [{ model: User, as: 'instructor', attributes: ['nombre_completo', 'email'] }],
-            order: [['updatedAt', 'ASC']] 
-        });
-        res.json(cursosPendientes);
-    } catch (error) { console.error(error); res.status(500).json({ message: "Error al obtener pendientes" }); }
-};
-
-const reviewCourse = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { decision } = req.body; 
-
-        const curso = await Course.findByPk(id);
-        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
-
-        if (decision === 'aprobar') {
-            curso.estado = 'publicado';
-            await curso.save();
-            return res.json({ message: `Curso '${curso.titulo}' publicado exitosamente.` });
-        } 
-        
-        if (decision === 'rechazado') {
-            curso.estado = 'rechazado';
-            await curso.save();
-            return res.json({ message: "Curso rechazado. Se devolvió al instructor." });
-        }
-
-        return res.status(400).json({ message: "Decisión inválida" });
-
-    } catch (error) { console.error(error); res.status(500).json({ message: "Error al procesar revisión" }); }
-};
-
-module.exports = { 
-    createCourse, getInstructorCourses, getInstructorStats, updateCourse, deleteCourse, 
+module.exports = {
+    createCourse, getInstructorCourses, getInstructorStats, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
-    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getPendingCourses, reviewCourse
+    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete
 };
