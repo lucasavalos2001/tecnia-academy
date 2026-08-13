@@ -76,6 +76,18 @@ body {
 .nav-links a { color: var(--color-blanco); text-decoration: none; font-size: 15px; font-weight: 500; transition: var(--transition-fast); }
 .nav-links a:hover { color: var(--color-secundario); }
 
+/* Botón hamburguesa: oculto en escritorio, se activa por media query en móvil */
+.navbar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--color-blanco);
+    font-size: 1.6rem;
+    cursor: pointer;
+    padding: 5px 10px;
+    line-height: 1;
+}
+
 .btn-registrarse {
   background-color: var(--color-secundario);
   color: var(--color-primario) !important;
@@ -426,30 +438,64 @@ body {
         position: relative;
     }
 
-    /* Navbar en columna */
+    /* Navbar: logo + botón hamburguesa en una fila, menú desplegable debajo */
     .navbar {
-        flex-direction: column !important;
-        align-items: center !important;
-        padding: 15px 10px !important;
+        flex-wrap: wrap !important;
+        justify-content: space-between !important;
+        padding: 12px 15px !important;
         height: auto !important;
     }
-    
+
+    .navbar-toggle {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* El menú está oculto por defecto y se despliega con la clase .open (JS) */
     .nav-links {
+        display: none;
         flex-direction: column !important;
+        align-items: stretch !important;
         width: 100% !important;
         gap: 10px !important;
+        order: 3;
+        margin-top: 15px !important;
+    }
+
+    .nav-links.open {
+        display: flex !important;
     }
 
     .nav-links a {
         display: block !important;
         width: 100% !important;
+        box-sizing: border-box !important;
         text-align: center;
         background-color: rgba(255, 255, 255, 0.1);
         padding: 10px !important;
         border-radius: 8px;
     }
 
-    .navbar .search-container { display: none !important; }
+    /* Los grupos de links públicos/privados también pasan a columna */
+    .nav-privado, .nav-public {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+
+    /* El buscador queda visible y accesible dentro del menú desplegable */
+    .navbar .search-container {
+        display: block !important;
+        width: 100% !important;
+        order: -1;
+    }
+
+    .navbar .search-bar {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
 
     /* ---- LOGIN/REGISTRO FIX ---- */
     /* Hacemos desaparecer la parte azul y estiramos el formulario */
@@ -584,18 +630,35 @@ body {
         margin-top: 50px !important;
     }
     
-    /* ---- PANEL INSTRUCTOR RESPONSIVE ---- */
+    /* ---- PANEL INSTRUCTOR / ADMIN RESPONSIVE ---- */
     .instructor-dashboard {
         flex-direction: column !important;
     }
     .dashboard-sidebar {
         width: 100% !important;
     }
+    .dashboard-content {
+        padding: 15px !important;
+    }
+    .content-header {
+        flex-wrap: wrap !important;
+        gap: 15px !important;
+    }
+    .content-header > input {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
     
     /* ---- HERO RESPONSIVE ---- */
     .hero h1 { font-size: 28px !important; }
     .search-box { flex-direction: column !important; align-items: center !important; }
     .search-box input { width: 100% !important; max-width: 300px !important; }
+
+    /* ---- SECCIÓN "CARACTERÍSTICAS" (INICIO) ---- */
+    .features-grid {
+        grid-template-columns: 1fr !important;
+        gap: 35px !important;
+    }
 }
 /* =========================================
    PERFIL Y CONFIGURACIÓN (REDISEÑO)

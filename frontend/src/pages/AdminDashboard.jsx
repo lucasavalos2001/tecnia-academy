@@ -231,12 +231,12 @@ function AdminDashboard() {
             {/* TAB: USUARIOS (INCLUYE RESET PASSWORD) */}
             {activeTab === 'users' && (
                 <section>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                    <div className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                         <h2>Gestión de Usuarios</h2>
                         <input type="text" placeholder="Buscar usuario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={searchStyle} />
                     </div>
                     <div style={tableWrapper}>
-                        <table style={{width:'100%', borderCollapse:'collapse'}}>
+                        <table style={{width:'100%', minWidth: '600px', borderCollapse:'collapse'}}>
                             <thead style={{background:'#eee'}}>
                                 <tr>
                                     <th style={thStyle}>ID</th>
@@ -273,7 +273,7 @@ function AdminDashboard() {
             {/* TAB: LIQUIDACIÓN (COMPLETA) */}
             {activeTab === 'payouts' && (
                 <section>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                    <div className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                         <h2>Liquidación a Instructores</h2>
                         <div style={{display:'flex', gap:'10px'}}>
                             <select value={selectedMonth} onChange={(e)=>setSelectedMonth(e.target.value)} style={selectStyle}>
@@ -285,7 +285,7 @@ function AdminDashboard() {
                         </div>
                     </div>
                     <div style={tableWrapper}>
-                        <table style={{width:'100%', borderCollapse:'collapse'}}>
+                        <table style={{width:'100%', minWidth: '600px', borderCollapse:'collapse'}}>
                             <thead style={{background:'#2c3e50', color:'white'}}>
                                 <tr>
                                     <th style={thStyle}>Instructor / Datos Banco (PY)</th>
@@ -362,8 +362,8 @@ const navBtnStyle = { background: 'none', border: 'none', color: 'white', width:
 const badgeStyle = { background: '#e74c3c', color: 'white', borderRadius: '50%', padding: '2px 7px', fontSize: '0.7em', marginLeft: 'auto' };
 const alertStyle = { background: '#e74c3c', color: 'white', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontWeight: 'bold', textAlign: 'center' };
 const itemBoxStyle = { background: 'white', padding: '15px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' };
-const tableWrapper = { background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' };
-const thStyle = { padding: '12px', textAlign: 'left', fontSize: '0.9em' };
+const tableWrapper = { background: 'white', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' };
+const thStyle = { padding: '12px', textAlign: 'left', fontSize: '0.9em', whiteSpace: 'nowrap' };
 const tdStyle = { padding: '12px', fontSize: '0.9em' };
 const btnSmall = { padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', border: '1px solid #ddd', background: 'white', fontSize: '0.8em' };
 const roleBadge = { color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7em', fontWeight: 'bold' };

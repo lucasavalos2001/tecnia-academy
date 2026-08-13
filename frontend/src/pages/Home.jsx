@@ -209,7 +209,7 @@ function Home() {
 
         {/* SECCIÓN DE CARACTERÍSTICAS */}
         <section style={{background:'#f7f9fa', padding:'60px 20px', textAlign:'center'}}>
-            <div style={{maxWidth:'1000px', margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'30px'}}>
+            <div className="features-grid" style={{maxWidth:'1000px', margin:'0 auto', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'30px'}}>
                 <div>
                     <i className="fas fa-laptop-code" style={{fontSize:'3rem', color:'#00d4d4', marginBottom:'20px'}}></i>
                     <h3>Aprende haciendo</h3>

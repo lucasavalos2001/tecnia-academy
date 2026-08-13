@@ -164,24 +164,26 @@ function InstructorPanel() {
                     
                     <div style={{background:'white', padding:'20px', borderRadius:'8px'}}>
                         <h3>Desglose por Curso</h3>
-                        <table style={{width:'100%', marginTop:'15px', borderCollapse:'collapse'}}>
-                            <thead>
-                                <tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}>
-                                    <th style={{padding:'10px'}}>Curso</th>
-                                    <th style={{padding:'10px'}}>Alumnos</th>
-                                    <th style={{padding:'10px'}}>Ingresos</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {stats.desglose.map((d, i) => (
-                                    <tr key={i} style={{borderBottom:'1px solid #eee'}}>
-                                        <td style={{padding:'10px'}}>{d.titulo}</td>
-                                        <td style={{padding:'10px'}}>{d.alumnos}</td>
-                                        <td style={{padding:'10px', color:'#27ae60', fontWeight:'bold'}}>{formatCurrency(d.ingresos)}</td>
+                        <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop:'15px'}}>
+                            <table style={{width:'100%', minWidth: '400px', borderCollapse:'collapse'}}>
+                                <thead>
+                                    <tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}>
+                                        <th style={{padding:'10px', whiteSpace:'nowrap'}}>Curso</th>
+                                        <th style={{padding:'10px', whiteSpace:'nowrap'}}>Alumnos</th>
+                                        <th style={{padding:'10px', whiteSpace:'nowrap'}}>Ingresos</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {stats.desglose.map((d, i) => (
+                                        <tr key={i} style={{borderBottom:'1px solid #eee'}}>
+                                            <td style={{padding:'10px'}}>{d.titulo}</td>
+                                            <td style={{padding:'10px'}}>{d.alumnos}</td>
+                                            <td style={{padding:'10px', color:'#27ae60', fontWeight:'bold'}}>{formatCurrency(d.ingresos)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </>
             )}

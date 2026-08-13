@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -8,7 +8,14 @@ function Navbar() {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]); // Guardar resultados
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // Menú hamburguesa (móvil)
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Cerrar el menú móvil automáticamente al navegar a otra página
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
   
   const API_URL = import.meta.env.VITE_API_BASE_URL;
   
@@ -67,7 +74,16 @@ function Navbar() {
         </div>
       </Link>
       
-      <nav className="nav-links">
+      <button
+        className="navbar-toggle"
+        onClick={() => setMenuOpen(!menuOpen)}
+        aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+        aria-expanded={menuOpen}
+      >
+        <i className={`fas ${menuOpen ? 'fa-times' : 'fa-bars'}`}></i>
+      </button>
+
+      <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
         {/* --- BUSCADOR INTELIGENTE --- */}
         <div className="search-container" ref={searchRef}>
           <input 
