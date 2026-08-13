@@ -3,11 +3,13 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
 
 function Profile() {
   const navigate = useNavigate();
   const { user, token, logout } = useAuth();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('profile-overview');
   
   const [certificados, setCertificados] = useState([]);
@@ -51,21 +53,21 @@ function Profile() {
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     if (passwords.new !== passwords.confirm) {
-        alert("La nueva contraseña y su confirmación no coinciden.");
+        toast.error("La nueva contraseña y su confirmación no coinciden.");
         return;
     }
-    
+
     setChangingPassword(true);
     try {
         await axios.put(`${API_URL}/usuario/update-password`, {
             currentPassword: passwords.current,
             newPassword: passwords.new
         }, { headers: { Authorization: `Bearer ${token}` } });
-        
-        alert("✅ Contraseña actualizada con éxito.");
+
+        toast.success("Contraseña actualizada con éxito.");
         setPasswords({ current: '', new: '', confirm: '' });
     } catch (error) {
-        alert(error.response?.data?.message || "Error al cambiar contraseña.");
+        toast.error(error.response?.data?.message || "Error al cambiar contraseña.");
     } finally {
         setChangingPassword(false);
     }
@@ -81,12 +83,12 @@ function Profile() {
         data.append('email_contacto', formData.contactEmail);
         if (fotoFile) data.append('foto', fotoFile);
 
-        await axios.put(`${API_URL}/usuario/actualizar`, data, { 
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } 
+        await axios.put(`${API_URL}/usuario/actualizar`, data, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
         });
-        alert("✅ Perfil actualizado correctamente.");
-        window.location.reload(); 
-    } catch (error) { alert("Error al actualizar."); } finally { setUploading(false); }
+        toast.success("Perfil actualizado correctamente.");
+        setTimeout(() => window.location.reload(), 1200);
+    } catch (error) { toast.error("Error al actualizar."); } finally { setUploading(false); }
   };
 
   const renderTabContent = () => {

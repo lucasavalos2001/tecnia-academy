@@ -3,10 +3,12 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { useToast } from '../context/ToastContext';
 
 function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
   const [password, setPassword] = useState('');
@@ -30,7 +32,7 @@ function ResetPassword() {
 
     try {
       await axios.post(`${API_URL}/auth/reset-password/${token}`, { password });
-      alert("¡Contraseña actualizada! Ahora puedes iniciar sesión.");
+      toast.success("¡Contraseña actualizada! Ahora podés iniciar sesión.");
       navigate('/login');
     } catch (err) {
       setError(err.response?.data?.message || "El enlace es inválido o ha expirado.");

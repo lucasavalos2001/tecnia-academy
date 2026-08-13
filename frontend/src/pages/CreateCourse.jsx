@@ -2,19 +2,22 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 function CreateCourse() {
   const navigate = useNavigate();
-  const { token } = useAuth(); 
+  const { token } = useAuth();
+  const toast = useToast();
   
   const [formData, setFormData] = useState({
     titulo: '',
     descripcion_larga: '',
     categoria: 'diseno',
     precio: '',
-    duracion: '' // 🟢 NUEVO
+    duracion: '', // 🟢 NUEVO
+    nombre_instructor_certificado: ''
   });
   
   const [imagenFile, setImagenFile] = useState(null); 
@@ -44,7 +47,7 @@ function CreateCourse() {
           abortControllerRef.current.abort();
           setLoading(false);
           setUploadProgress(0);
-          alert("Subida cancelada.");
+          toast.info("Subida cancelada.");
       }
   };
 
@@ -63,7 +66,8 @@ function CreateCourse() {
       data.append('categoria', formData.categoria);
       data.append('precio', formData.precio);
       data.append('duracion', formData.duracion); // 🟢 ENVIAR DURACIÓN
-      
+      data.append('nombre_instructor_certificado', formData.nombre_instructor_certificado);
+
       if (imagenFile) {
           data.append('imagen', imagenFile); 
       }
@@ -84,8 +88,8 @@ function CreateCourse() {
         }
       );
 
-      alert('¡Curso creado con éxito! Ahora agrega el contenido.');
-      navigate('/panel-instructor'); 
+      toast.success('¡Curso creado con éxito! Ahora agrega el contenido.');
+      navigate('/panel-instructor');
     } catch (err) {
       if (axios.isCancel(err)) {
           console.log('Cancelado por usuario');
@@ -154,6 +158,24 @@ function CreateCourse() {
             <div className="form-group">
               <label>Precio (Guaraníes)</label>
               <input type="number" name="precio" step="1000" value={formData.precio} onChange={handleChange} required />
+            </div>
+
+            {/* 🟢 NOMBRE DEL INSTRUCTOR PARA EL CERTIFICADO */}
+            <div className="form-group" style={{background: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px dashed #ccc'}}>
+                <label style={{color: '#0b3d91', fontWeight: 'bold'}}>
+                    <i className="fas fa-certificate"></i> Nombre del Instructor para el Certificado (Opcional)
+                </label>
+                <input
+                    type="text"
+                    name="nombre_instructor_certificado"
+                    value={formData.nombre_instructor_certificado}
+                    onChange={handleChange}
+                    placeholder="Ej: Ing. Lucas López & Arq. María Pérez"
+                    style={{marginTop: '5px'}}
+                />
+                <small style={{color: '#666', display: 'block', marginTop: '5px'}}>
+                    * Si lo dejás vacío, se usará tu nombre de usuario. Podés cambiarlo después desde "Editar curso".
+                </small>
             </div>
 
             <div className="form-group">

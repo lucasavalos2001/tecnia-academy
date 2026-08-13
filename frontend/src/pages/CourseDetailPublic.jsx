@@ -4,12 +4,16 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatCurrency } from '../utils/formatCurrency';
 
 function CourseDetailPublic() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+  const toast = useToast();
+  const confirmAction = useConfirm();
+
   // 🟢 IMPORTANTE: Traemos 'user' y token para lógica de compra y admin
   const { isLoggedIn, token, user } = useAuth();
   
@@ -47,19 +51,20 @@ function CourseDetailPublic() {
 
   // 🟢 FUNCIÓN DE ADMIN: APROBAR/RECHAZAR
   const handleAdminReview = async (decision) => {
-      if(!confirm(`¿Estás seguro de que deseas ${decision.toUpperCase()} este curso?`)) return;
-      
+      const ok = await confirmAction(`¿Estás seguro de que deseas ${decision.toUpperCase()} este curso?`);
+      if (!ok) return;
+
       try {
           await axios.post(
-              `${API_URL}/admin/review/${curso.id}`, 
-              { decision }, 
+              `${API_URL}/admin/review/${curso.id}`,
+              { decision },
               { headers: { Authorization: `Bearer ${token}` } }
           );
-          alert(`Curso ${decision === 'aprobar' ? 'PUBLICADO' : 'RECHAZADO'} con éxito.`);
-          navigate('/admin-dashboard'); 
+          toast.success(`Curso ${decision === 'aprobar' ? 'PUBLICADO' : 'RECHAZADO'} con éxito.`);
+          navigate('/admin-dashboard');
       } catch (error) {
           console.error(error);
-          alert("Error al procesar la solicitud de revisión.");
+          toast.error("Error al procesar la solicitud de revisión.");
       }
   };
 
@@ -67,14 +72,14 @@ function CourseDetailPublic() {
   const handleComprar = async () => {
     // A. Verificar Login
     if (!isLoggedIn) {
-        alert("Debes iniciar sesión para comprar este curso.");
+        toast.info("Debes iniciar sesión para comprar este curso.");
         navigate('/login');
         return;
     }
-    
+
     // Evitar que el instructor compre su propio curso (redundante con FreePass pero seguridad extra)
     if (isInstructor) {
-        alert("Eres el instructor, ya tienes acceso.");
+        toast.info("Eres el instructor, ya tienes acceso.");
         return;
     }
 
@@ -94,7 +99,7 @@ function CourseDetailPublic() {
             console.log("Redirigiendo a Pagopar...", response.data.redirectUrl);
             window.location.href = response.data.redirectUrl;
         } else {
-            alert("Error: El servidor no devolvió el link de pago.");
+            toast.error("Error: El servidor no devolvió el link de pago.");
             if(botonCompra) {
                 botonCompra.innerText = `Pagar ${formatCurrency(curso.precio)}`;
                 botonCompra.disabled = false;
@@ -103,8 +108,8 @@ function CourseDetailPublic() {
 
     } catch (error) {
         console.error("Error en pago:", error);
-        alert(error.response?.data?.message || "Hubo un error al conectar con la pasarela de pagos.");
-        
+        toast.error(error.response?.data?.message || "Hubo un error al conectar con la pasarela de pagos.");
+
         const botonCompra = document.getElementById('btn-comprar');
         if(botonCompra) {
             botonCompra.innerText = `Pagar ${formatCurrency(curso.precio)}`;

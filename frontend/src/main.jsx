@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom' // Necesario para que las rutas
 import App from './App.jsx'
 import './style.css' // Importar los estilos
 import { AuthProvider } from './context/AuthContext.jsx' // Importar el Proveedor de Autenticación
+import { ToastProvider } from './context/ToastContext.jsx'
+import { ConfirmProvider } from './context/ConfirmContext.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -11,7 +13,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       {/* Envolvemos toda la App en el AuthProvider para que todos los componentes
           puedan usar el hook useAuth() */}
       <AuthProvider>
-        <App />
+        <ToastProvider>
+          <ConfirmProvider>
+            <App />
+          </ConfirmProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,

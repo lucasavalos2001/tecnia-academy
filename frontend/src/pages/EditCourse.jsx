@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -9,6 +11,8 @@ function EditCourse() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token } = useAuth();
+  const toast = useToast();
+  const confirmAction = useConfirm();
   const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const [formData, setFormData] = useState({
@@ -48,7 +52,7 @@ function EditCourse() {
         });
         setCursoEstado(c.estado); 
       } catch (error) {
-        alert("Error al cargar datos.");
+        toast.error("Error al cargar datos.");
         navigate('/panel-instructor');
       } finally {
         setLoading(false);
@@ -73,7 +77,7 @@ function EditCourse() {
           abortControllerRef.current.abort();
           setSubmitting(false);
           setUploadProgress(0);
-          alert("Cancelado.");
+          toast.info("Cancelado.");
       }
   };
 
@@ -85,7 +89,8 @@ function EditCourse() {
 
   // FUNCIÓN PARA ENVIAR A REVISIÓN
   const handleSendToReview = async () => {
-      if(confirm("¿Estás seguro? Al enviar a revisión, el administrador verificará tu curso para publicarlo.")) {
+      const ok = await confirmAction("¿Estás seguro? Al enviar a revisión, el administrador verificará tu curso para publicarlo.");
+      if (ok) {
           // Enviamos estado: 'pendiente'
           await updateCourseData('pendiente');
       }
@@ -130,15 +135,15 @@ function EditCourse() {
       });
       
       if (nuevoEstado === 'pendiente') {
-          alert('¡Curso enviado a revisión con éxito!');
+          toast.success('¡Curso enviado a revisión con éxito!');
       } else {
-          alert('¡Cambios guardados!');
+          toast.success('¡Cambios guardados!');
       }
       navigate('/panel-instructor');
     } catch (err) {
       if (!axios.isCancel(err)) {
           console.error(err);
-          alert('Error al actualizar.');
+          toast.error('Error al actualizar.');
       }
     } finally {
       setSubmitting(false);

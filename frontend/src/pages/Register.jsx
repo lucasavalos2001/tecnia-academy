@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Link, useNavigate } from 'react-router-dom';
 
 function Register() {
+  const toast = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,18 +23,18 @@ function Register() {
     e.preventDefault();
 
     if (!passwordsMatch) {
-      alert("Las contraseñas no coinciden.");
+      toast.error("Las contraseñas no coinciden.");
       return;
     }
 
     if (!acceptedTerms) {
-      alert("Debes aceptar los términos y condiciones para continuar.");
+      toast.error("Debes aceptar los términos y condiciones para continuar.");
       return;
     }
 
     const result = await register(name, email, password);
     if (result.success) {
-      alert('¡Cuenta creada con éxito! Ahora puedes iniciar sesión.');
+      toast.success('¡Cuenta creada con éxito! Ahora podés iniciar sesión.');
       navigate('/login');
     }
   };

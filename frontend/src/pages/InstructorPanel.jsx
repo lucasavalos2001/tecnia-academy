@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatCurrency } from '../utils/formatCurrency';
 
 function InstructorPanel() {
   const { user, logout, token } = useAuth();
+  const toast = useToast();
+  const confirmAction = useConfirm();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
   
   const [activeTab, setActiveTab] = useState('cursos');
@@ -61,14 +65,14 @@ function InstructorPanel() {
   }, [token, API_URL]);
 
   const handleDelete = async (cursoId) => {
-      if (confirm("¿Estás seguro de que quieres eliminar este curso?")) {
-          try {
-            await axios.delete(`${API_URL}/cursos/${cursoId}`, { headers: { Authorization: `Bearer ${token}` } });
-            setCursos(cursos.filter(c => c.id !== cursoId));
-            alert("Curso eliminado.");
-          } catch (error) {
-            alert(error.response?.data?.message || "Error al eliminar.");
-          }
+      const ok = await confirmAction("¿Estás seguro de que quieres eliminar este curso?");
+      if (!ok) return;
+      try {
+        await axios.delete(`${API_URL}/cursos/${cursoId}`, { headers: { Authorization: `Bearer ${token}` } });
+        setCursos(cursos.filter(c => c.id !== cursoId));
+        toast.success("Curso eliminado.");
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Error al eliminar.");
       }
   };
 
@@ -79,10 +83,10 @@ function InstructorPanel() {
         await axios.put(`${API_URL}/usuario/datos-bancarios`, bankData, {
             headers: { Authorization: `Bearer ${token}` }
         });
-        alert("¡Datos bancarios actualizados con éxito!");
+        toast.success("¡Datos bancarios actualizados con éxito!");
     } catch (error) {
         console.error(error);
-        alert("Error al guardar los datos bancarios.");
+        toast.error("Error al guardar los datos bancarios.");
     }
   };
 

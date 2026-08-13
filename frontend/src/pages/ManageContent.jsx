@@ -3,12 +3,17 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import * as tus from 'tus-js-client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm, usePrompt } from '../context/ConfirmContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 function ManageContent() {
-  const { id } = useParams(); 
+  const { id } = useParams();
   const { token } = useAuth();
+  const toast = useToast();
+  const confirmAction = useConfirm();
+  const promptAction = usePrompt();
   const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
   const [curso, setCurso] = useState(null);
@@ -123,13 +128,13 @@ function ManageContent() {
       await axios.post(`${API_URL}/cursos/${id}/modules`, { titulo: newModuleTitle }, { headers: { Authorization: `Bearer ${token}` } });
       setNewModuleTitle('');
       fetchCurriculum();
-    } catch (error) { alert("Error al crear módulo"); }
+    } catch (error) { toast.error("Error al crear módulo"); }
   };
 
   // --- FUNCIONES QUIZ ---
   const addQuestionToQuiz = () => {
       if(!tempQuestion.pregunta.trim() || !tempQuestion.opcion1.trim() || !tempQuestion.opcion2.trim()) {
-          alert("Por favor, completa la pregunta y al menos las opciones A y B.");
+          toast.error("Por favor, completa la pregunta y al menos las opciones A y B.");
           return;
       }
       
@@ -144,7 +149,7 @@ function ManageContent() {
       };
 
       if(nuevaPregunta.correcta >= nuevaPregunta.opciones.length) {
-          alert("La respuesta correcta seleccionada no es válida para las opciones ingresadas.");
+          toast.error("La respuesta correcta seleccionada no es válida para las opciones ingresadas.");
           return;
       }
 
@@ -170,7 +175,7 @@ function ManageContent() {
           uploadRef.current.abort();
           setUploading(false);
           setUploadProgress(0);
-          alert("Subida cancelada.");
+          toast.info("Subida cancelada.");
       }
   };
 
@@ -215,7 +220,7 @@ function ManageContent() {
   const handleSaveLesson = async (e) => {
     e.preventDefault();
     
-    if (!selectedModuleId || !lessonTitle) { alert("Faltan datos (Módulo o Título)."); return; }
+    if (!selectedModuleId || !lessonTitle) { toast.error("Faltan datos (Módulo o Título)."); return; }
     
     const hasVideo = !!videoFile || (editingLessonId && !videoFile); // Si editamos, asumimos que ya puede haber video
     const hasQuiz = quizQuestions.length > 0;
@@ -223,9 +228,9 @@ function ManageContent() {
     const hasResource = lessonResource && lessonResource.trim() !== "";
 
     // Validación flexible: Debe tener ALGO de contenido
-    if (!hasVideo && !hasQuiz && !hasResource && !editingLessonId) { 
-        alert("Debes agregar al menos un Video, un Cuestionario o un Recurso."); 
-        return; 
+    if (!hasVideo && !hasQuiz && !hasResource && !editingLessonId) {
+        toast.error("Debes agregar al menos un Video, un Cuestionario o un Recurso.");
+        return;
     }
 
     setUploading(true);
@@ -294,10 +299,10 @@ function ManageContent() {
         // 3. Guardar en BD
         if (editingLessonId) {
             await axios.put(`${API_URL}/cursos/lessons/${editingLessonId}`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Lección actualizada correctamente.");
+            toast.success("Lección actualizada correctamente.");
         } else {
             await axios.post(`${API_URL}/cursos/modules/${selectedModuleId}/lessons`, leccionData, { headers: { Authorization: `Bearer ${token}` } });
-            alert("Lección creada exitosamente.");
+            toast.success("Lección creada exitosamente.");
         }
 
         cancelEditing();
@@ -306,16 +311,32 @@ function ManageContent() {
     } catch (error) {
         if (!axios.isCancel(error)) {
             console.error("Error:", error);
-            alert("Error al guardar la lección: " + (error.message || "Revisa la consola"));
+            toast.error("Error al guardar la lección: " + (error.message || "Revisa la consola"));
         }
     } finally {
         setUploading(false);
     }
   };
 
-  const handleDeleteModule = async (mid) => { if(!confirm("¿Borrar módulo y sus lecciones?"))return; try{ await axios.delete(`${API_URL}/cursos/modules/${mid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar módulo");} };
-  const handleEditModule = async (mod) => { const t = prompt("Nuevo nombre del módulo:", mod.titulo); if(t && t.trim() !== "") try{ await axios.put(`${API_URL}/cursos/modules/${mod.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al editar módulo");} };
-  const handleDeleteLesson = async (lid) => { if(!confirm("¿Borrar esta lección?"))return; try{ await axios.delete(`${API_URL}/cursos/lessons/${lid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }catch(e){alert("Error al borrar lección");} };
+  const handleDeleteModule = async (mid) => {
+      const ok = await confirmAction("¿Borrar módulo y sus lecciones?");
+      if (!ok) return;
+      try { await axios.delete(`${API_URL}/cursos/modules/${mid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }
+      catch(e){ toast.error("Error al borrar módulo"); }
+  };
+  const handleEditModule = async (mod) => {
+      const t = await promptAction("Nuevo nombre del módulo:", mod.titulo);
+      if (t && t.trim() !== "") {
+          try { await axios.put(`${API_URL}/cursos/modules/${mod.id}`, {titulo:t}, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }
+          catch(e){ toast.error("Error al editar módulo"); }
+      }
+  };
+  const handleDeleteLesson = async (lid) => {
+      const ok = await confirmAction("¿Borrar esta lección?");
+      if (!ok) return;
+      try { await axios.delete(`${API_URL}/cursos/lessons/${lid}`, {headers:{Authorization:`Bearer ${token}`}}); fetchCurriculum(); }
+      catch(e){ toast.error("Error al borrar lección"); }
+  };
 
   if (loading) return <div style={{padding:'20px', textAlign:'center'}}>Cargando contenido...</div>;
 

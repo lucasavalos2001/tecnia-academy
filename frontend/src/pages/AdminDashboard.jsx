@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 function AdminDashboard() {
   const { user, token } = useAuth();
+  const toast = useToast();
+  const confirmAction = useConfirm();
   const API_URL = import.meta.env.VITE_API_BASE_URL;
 
   // --- ESTADOS DE DATOS ---
@@ -95,53 +99,72 @@ function AdminDashboard() {
   
   const handleResetPassword = async (userId, userName) => {
     const provisoria = `Tecnia.${Math.floor(1000 + Math.random() * 9000)}`;
-    if(!confirm(`¿Resetear clave de ${userName} a: ${provisoria}?`)) return;
+    const ok = await confirmAction(`¿Resetear clave de ${userName} a: ${provisoria}?`);
+    if (!ok) return;
     try {
         await axios.post(`${API_URL}/admin/users/${userId}/reset-password`, { newPassword: provisoria }, { headers: { Authorization: `Bearer ${token}` } });
         navigator.clipboard.writeText(provisoria);
-        alert(`✅ Éxito. Clave copiada: ${provisoria}`);
-    } catch (error) { alert("Error al resetear."); }
+        toast.success(`Éxito. Clave copiada al portapapeles: ${provisoria}`, 8000);
+    } catch (error) { toast.error("Error al resetear."); }
   };
 
   const handleDeleteUser = async (id) => {
-    if(!confirm("¿Borrar usuario permanentemente?")) return;
-    await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-    loadUsers();
+    const ok = await confirmAction("¿Borrar usuario permanentemente?");
+    if (!ok) return;
+    try {
+        await axios.delete(`${API_URL}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        loadUsers();
+        toast.success("Usuario eliminado.");
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al eliminar usuario.");
+    }
   };
 
   const handleChangeRole = async (id, newRole) => {
-    if(!confirm(`¿Cambiar rol a ${newRole}?`)) return;
-    await axios.put(`${API_URL}/admin/users/${id}/role`, { rol: newRole }, { headers: { Authorization: `Bearer ${token}` } });
-    loadUsers();
+    const ok = await confirmAction(`¿Cambiar rol a ${newRole}?`);
+    if (!ok) return;
+    try {
+        await axios.put(`${API_URL}/admin/users/${id}/role`, { rol: newRole }, { headers: { Authorization: `Bearer ${token}` } });
+        loadUsers();
+        toast.success("Rol actualizado.");
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al cambiar el rol.");
+    }
   };
 
   const handleDeleteCourse = async (id) => {
-    if(!confirm("¿Borrar este curso?")) return;
+    const ok = await confirmAction("¿Borrar este curso?");
+    if (!ok) return;
     try {
       await axios.delete(`${API_URL}/admin/courses/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       loadCourses();
+      toast.success("Curso eliminado.");
     } catch (error) {
-      alert(error.response?.data?.message || "Error al eliminar el curso.");
+      toast.error(error.response?.data?.message || "Error al eliminar el curso.");
     }
   };
 
   const handleReviewCourse = async (courseId, decision) => {
       const actionText = decision === 'aprobar' ? 'PUBLICAR' : 'RECHAZAR';
-      if(!confirm(`¿Deseas ${actionText} este curso?`)) return;
+      const ok = await confirmAction(`¿Deseas ${actionText} este curso?`);
+      if (!ok) return;
       try {
           await axios.post(`${API_URL}/admin/review/${courseId}`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
-          loadPendingCourses(); 
-          loadStats(); 
-      } catch (error) { alert("Error en revisión."); }
+          loadPendingCourses();
+          loadStats();
+          toast.success(`Curso ${decision === 'aprobar' ? 'publicado' : 'rechazado'} con éxito.`);
+      } catch (error) { toast.error("Error en revisión."); }
   };
 
   const toggleMaintenance = async () => {
       const nuevoEstado = !maintenanceMode;
-      if (!confirm(nuevoEstado ? "🔒 ¿Activar mantenimiento?" : "✅ ¿Abrir sitio?")) return;
+      const ok = await confirmAction(nuevoEstado ? "🔒 ¿Activar mantenimiento?" : "✅ ¿Abrir sitio?");
+      if (!ok) return;
       try {
           await axios.post(`${API_URL}/admin/maintenance/toggle`, { enabled: nuevoEstado }, { headers: { Authorization: `Bearer ${token}` } });
           setMaintenanceMode(nuevoEstado);
-      } catch (error) { alert("Error en mantenimiento."); }
+          toast.success(nuevoEstado ? "Modo mantenimiento activado." : "Sitio abierto nuevamente.");
+      } catch (error) { toast.error("Error en mantenimiento."); }
   };
 
   // --- UTILIDADES ---
