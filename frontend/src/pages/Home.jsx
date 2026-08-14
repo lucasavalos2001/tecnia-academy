@@ -187,8 +187,8 @@ function Home() {
                                     <span style={{color:'#666', fontSize:'0.8rem'}}>
                                         <i className="fas fa-user-tie"></i> {curso.instructor?.nombre_completo}
                                     </span>
-                                    <span style={{fontWeight:'bold', color:'#0b3d91', fontSize:'1.1rem'}}>
-                                        {formatCurrency(curso.precio)}
+                                    <span style={{fontWeight:'bold', color: (!curso.precio || parseFloat(curso.precio) === 0) ? '#27ae60' : '#0b3d91', fontSize:'1.1rem'}}>
+                                        {(!curso.precio || parseFloat(curso.precio) === 0) ? 'GRATIS' : formatCurrency(curso.precio)}
                                     </span>
                                 </div>
                             </div>

@@ -381,6 +381,16 @@ const enrollInCourse = async (req, res) => {
     try {
         const { courseId } = req.params;
         const userId = req.usuario.id;
+
+        const curso = await Course.findByPk(courseId);
+        if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        // Esta ruta es solo para inscripción directa a cursos GRATUITOS.
+        // Los cursos pagos deben pasar por /pagos/iniciar (Pagopar).
+        if (parseFloat(curso.precio) > 0) {
+            return res.status(400).json({ message: "Este curso es pago. Iniciá el pago desde la página del curso." });
+        }
+
         const existe = await Enrollment.findOne({ where: { userId, courseId } });
         if (existe) return res.status(400).json({ message: "Ya estás inscrito." });
         await Enrollment.create({ userId, courseId });

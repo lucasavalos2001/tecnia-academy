@@ -83,8 +83,25 @@ function CourseDetailPublic() {
         return;
     }
 
+    const botonCompra = document.getElementById('btn-comprar');
+
+    // 🟢 CURSO GRATUITO: inscripción directa, sin pasar por la pasarela de pago
+    if (esGratis) {
+        try {
+            if (botonCompra) { botonCompra.innerText = "Inscribiendo..."; botonCompra.disabled = true; }
+            await axios.post(`${API_URL}/cursos/${curso.id}/inscribirse`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success("¡Inscripción exitosa! Ya podés empezar el curso.");
+            navigate(`/aula-virtual/${curso.id}`);
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Error al inscribirte.");
+            if (botonCompra) { botonCompra.innerText = "Inscribirme Gratis"; botonCompra.disabled = false; }
+        }
+        return;
+    }
+
     try {
-        const botonCompra = document.getElementById('btn-comprar');
         if(botonCompra) botonCompra.innerText = "Procesando...";
         if(botonCompra) botonCompra.disabled = true;
 
@@ -110,7 +127,6 @@ function CourseDetailPublic() {
         console.error("Error en pago:", error);
         toast.error(error.response?.data?.message || "Hubo un error al conectar con la pasarela de pagos.");
 
-        const botonCompra = document.getElementById('btn-comprar');
         if(botonCompra) {
             botonCompra.innerText = `Pagar ${formatCurrency(curso.precio)}`;
             botonCompra.disabled = false;
@@ -121,6 +137,7 @@ function CourseDetailPublic() {
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Cargando información del curso...</div>;
   if (!curso) return <div style={{padding:'50px', textAlign:'center'}}>Curso no encontrado o no disponible.</div>;
 
+  const esGratis = !curso.precio || parseFloat(curso.precio) === 0;
   const totalLecciones = curso.modulos?.reduce((acc, m) => acc + m.lecciones.length, 0) || 0;
 
   return (
@@ -364,8 +381,8 @@ function CourseDetailPublic() {
                   </div>
                   
                   <div style={{padding: '20px'}}>
-                      <h2 style={{fontSize:'2rem', margin:'0 0 10px 0', fontWeight:'800'}}>
-                          {formatCurrency(curso.precio)}
+                      <h2 style={{fontSize:'2rem', margin:'0 0 10px 0', fontWeight:'800', color: esGratis ? '#27ae60' : 'inherit'}}>
+                          {esGratis ? 'GRATIS' : formatCurrency(curso.precio)}
                       </h2>
                       
                       {/* 🟢 2. BOTÓN "PASE LIBRE" PARA ADMIN E INSTRUCTOR */}
@@ -388,29 +405,31 @@ function CourseDetailPublic() {
                           </div>
                       ) : (
                           /* BOTÓN DE COMPRA NORMAL */
-                          <button 
+                          <button
                             id="btn-comprar"
                             onClick={handleComprar}
                             style={{
-                                width:'100%', 
-                                padding:'15px', 
-                                background:'#a435f0', 
-                                color:'white', 
-                                border:'none', 
-                                fontWeight:'bold', 
-                                fontSize:'1rem', 
-                                cursor:'pointer', 
+                                width:'100%',
+                                padding:'15px',
+                                background: esGratis ? '#27ae60' : '#a435f0',
+                                color:'white',
+                                border:'none',
+                                fontWeight:'bold',
+                                fontSize:'1rem',
+                                cursor:'pointer',
                                 marginBottom:'10px',
                                 transition: 'background 0.3s'
                             }}
-                            onMouseOver={(e) => e.target.style.background = '#8710d8'}
-                            onMouseOut={(e) => e.target.style.background = '#a435f0'}
+                            onMouseOver={(e) => e.target.style.background = esGratis ? '#219150' : '#8710d8'}
+                            onMouseOut={(e) => e.target.style.background = esGratis ? '#27ae60' : '#a435f0'}
                           >
-                            Pagar {formatCurrency(curso.precio)}
+                            {esGratis ? 'Inscribirme Gratis' : `Pagar ${formatCurrency(curso.precio)}`}
                           </button>
                       )}
-                      
-                      <p style={{textAlign:'center', fontSize:'0.75rem', color:'#666', marginTop:'15px'}}>Garantía de reembolso de 30 días</p>
+
+                      {!esGratis && (
+                          <p style={{textAlign:'center', fontSize:'0.75rem', color:'#666', marginTop:'15px'}}>Garantía de reembolso de 30 días</p>
+                      )}
                       
                       <div style={{marginTop:'20px'}}>
                           <h4 style={{fontSize:'0.9rem', marginBottom:'5px'}}>Este curso incluye:</h4>

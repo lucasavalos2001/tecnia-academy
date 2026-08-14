@@ -1,6 +1,38 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const TermsInstructors = () => {
+  const navigate = useNavigate();
+  const { user, token, updateSession, isLoggedIn } = useAuth();
+  const toast = useToast();
+  const [loading, setLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
+
+  const yaEsInstructor = user?.rol === 'instructor' || user?.rol === 'admin' || user?.rol === 'superadmin';
+
+  const handleAceptar = async () => {
+    if (!isLoggedIn) {
+        navigate('/login');
+        return;
+    }
+    setLoading(true);
+    try {
+        const res = await axios.put(`${API_URL}/usuario/convertirse-instructor`, {}, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        updateSession(res.data.token, res.data.user);
+        toast.success('¡Felicidades! Ya sos instructor de Tecnia Academy.');
+        navigate('/panel-instructor');
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Error al procesar la solicitud.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.content}>
@@ -80,6 +112,28 @@ const TermsInstructors = () => {
           </p>
         </section>
 
+        <div style={styles.acceptBox}>
+            {yaEsInstructor ? (
+                <>
+                    <p style={{margin: '0 0 15px 0', color: '#27ae60', fontWeight: 'bold'}}>
+                        <i className="fas fa-check-circle"></i> Ya sos instructor en Tecnia Academy.
+                    </p>
+                    <button style={styles.acceptButton} onClick={() => navigate('/panel-instructor')}>
+                        Ir a mi Panel de Instructor
+                    </button>
+                </>
+            ) : (
+                <>
+                    <p style={{margin: '0 0 15px 0', color: '#444'}}>
+                        Al continuar, confirmás que leíste y aceptás estos términos y condiciones.
+                    </p>
+                    <button style={styles.acceptButton} onClick={handleAceptar} disabled={loading}>
+                        {loading ? 'Procesando...' : (isLoggedIn ? 'Acepto y quiero ser Instructor' : 'Iniciar sesión para continuar')}
+                    </button>
+                </>
+            )}
+        </div>
+
         <div style={{marginTop: '40px', textAlign: 'center', fontSize: '0.9em', color: '#7f8c8d'}}>
           <p>Tecnia Academy Paraguay - Todos los derechos reservados.</p>
         </div>
@@ -89,6 +143,24 @@ const TermsInstructors = () => {
 };
 
 const styles = {
+  acceptBox: {
+    marginTop: '30px',
+    padding: '25px',
+    textAlign: 'center',
+    background: '#f0fbfa',
+    border: '1px solid #b8ebe8',
+    borderRadius: '10px',
+  },
+  acceptButton: {
+    background: '#0b3d91',
+    color: 'white',
+    border: 'none',
+    padding: '14px 30px',
+    borderRadius: '30px',
+    fontWeight: 'bold',
+    fontSize: '1rem',
+    cursor: 'pointer',
+  },
   container: {
     padding: '40px 20px',
     backgroundColor: '#f4f6f8',

@@ -141,7 +141,7 @@ function InstructorPanel() {
                                     <img src={curso.imagen_url || `https://placehold.co/150x90/9b59b6/ffffff?text=${curso.categoria}`} alt="Miniatura" />
                                     <div className="course-info">
                                         <h3>{curso.titulo}</h3>
-                                        <p className="course-status published">Precio: {formatCurrency(curso.precio)}</p>
+                                        <p className="course-status published">Precio: {(!curso.precio || parseFloat(curso.precio) === 0) ? 'Gratuito' : formatCurrency(curso.precio)}</p>
                                         <div className="stats"><span>{curso.categoria}</span></div>
                                     </div>
                                     <div className="course-actions">

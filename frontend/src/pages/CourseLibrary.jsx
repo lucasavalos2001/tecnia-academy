@@ -69,8 +69,8 @@ function CourseLibrary() {
                             <p>{curso.descripcion_larga.substring(0, 100)}...</p>
                             
                             {/* ✅ CORRECCIÓN DE PRECIO A GUARANÍES */}
-                            <p style={{fontWeight: 'bold', color: '#0b3d91', fontSize: '1.1rem'}}>
-                                {formatCurrency(curso.precio)}
+                            <p style={{fontWeight: 'bold', color: (!curso.precio || parseFloat(curso.precio) === 0) ? '#27ae60' : '#0b3d91', fontSize: '1.1rem'}}>
+                                {(!curso.precio || parseFloat(curso.precio) === 0) ? 'GRATIS' : formatCurrency(curso.precio)}
                             </p>
                             
                             <p style={{fontSize:'0.8em', color:'#666'}}>Por: {curso.instructor?.nombre_completo}</p>

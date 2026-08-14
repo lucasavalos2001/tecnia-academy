@@ -105,6 +105,18 @@ function Profile() {
                 <h3 style={{marginTop: 0, fontSize: '1.2rem'}}><i className="fas fa-id-card"></i> Sobre mí</h3>
                 <p style={{lineHeight: '1.6', color: '#444'}}>{formData.biografia || "Aún no has escrito tu biografía."}</p>
             </div>
+
+            {user?.rol === 'student' && (
+                <div style={{marginTop:'20px', background:'#fff9f0', padding:'25px', borderRadius:'15px', borderLeft: '6px solid #f39c12', display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'15px'}}>
+                    <div>
+                        <h3 style={{marginTop: 0, fontSize: '1.2rem'}}><i className="fas fa-chalkboard-teacher"></i> ¿Querés enseñar en Tecnia Academy?</h3>
+                        <p style={{lineHeight: '1.6', color: '#444', margin: 0}}>Convertite en instructor y empezá a crear tus propios cursos.</p>
+                    </div>
+                    <button className="btn-save-settings" onClick={() => navigate('/terminos-instructores')} style={{whiteSpace:'nowrap'}}>
+                        <i className="fas fa-arrow-right"></i> Convertirme en Instructor
+                    </button>
+                </div>
+            )}
           </div>
         );
 

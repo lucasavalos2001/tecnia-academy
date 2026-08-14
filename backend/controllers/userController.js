@@ -1,5 +1,6 @@
 const { Enrollment, Course, User } = require('../models');
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para validar y cifrar contraseñas
+const jwt = require('jsonwebtoken');
 const { uploadToBunny } = require('../utils/bunny');
 
 const getUserProfile = async (req, res) => {
@@ -101,8 +102,30 @@ const verifyCertificatePublic = async (req, res) => {
 
 const becomeInstructor = async (req, res) => {
     try {
-        await User.update({ rol: 'instructor' }, { where: { id: req.usuario.id } });
-        res.json({ message: "¡Felicidades! Ahora eres instructor." });
+        const userId = req.usuario.id;
+        await User.update({ rol: 'instructor' }, { where: { id: userId } });
+
+        const usuario = await User.findByPk(userId);
+
+        // Emitimos un token nuevo con el rol actualizado, para que el cambio
+        // se refleje al instante sin tener que cerrar sesión y volver a entrar.
+        const token = jwt.sign(
+            { id: usuario.id, rol: usuario.rol, nombre_completo: usuario.nombre_completo },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            message: "¡Felicidades! Ahora eres instructor.",
+            token,
+            user: {
+                id: usuario.id,
+                nombre_completo: usuario.nombre_completo,
+                email: usuario.email,
+                rol: usuario.rol,
+                foto_perfil: usuario.foto_perfil
+            }
+        });
     } catch (error) { res.status(500).json({ message: "Error al actualizar" }); }
 };
 

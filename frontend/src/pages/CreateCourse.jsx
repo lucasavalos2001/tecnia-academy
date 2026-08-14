@@ -20,7 +20,8 @@ function CreateCourse() {
     nombre_instructor_certificado: ''
   });
   
-  const [imagenFile, setImagenFile] = useState(null); 
+  const [esGratis, setEsGratis] = useState(false);
+  const [imagenFile, setImagenFile] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -156,8 +157,32 @@ function CreateCourse() {
             </div>
 
             <div className="form-group">
+                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontWeight:'normal'}}>
+                    <input
+                        type="checkbox"
+                        checked={esGratis}
+                        onChange={(e) => {
+                            const checked = e.target.checked;
+                            setEsGratis(checked);
+                            setFormData({ ...formData, precio: checked ? '0' : '' });
+                        }}
+                    />
+                    Curso gratuito (no requiere pago para inscribirse)
+                </label>
+            </div>
+
+            <div className="form-group">
               <label>Precio (Guaraníes)</label>
-              <input type="number" name="precio" step="1000" value={formData.precio} onChange={handleChange} required />
+              <input
+                type="number"
+                name="precio"
+                step="1000"
+                value={formData.precio}
+                onChange={handleChange}
+                disabled={esGratis}
+                required={!esGratis}
+                style={esGratis ? { background: '#f0f0f0', color: '#888' } : undefined}
+              />
             </div>
 
             {/* 🟢 NOMBRE DEL INSTRUCTOR PARA EL CERTIFICADO */}

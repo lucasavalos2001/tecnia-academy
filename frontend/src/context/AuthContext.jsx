@@ -106,19 +106,29 @@ export const AuthProvider = ({ children }) => {
         localStorage.clear();
         window.location.href = '/login'; // Fuerza limpieza de estado
     };
-    
+
+    // Actualiza la sesión activa (token + usuario) sin pasar por logout/login.
+    // Se usa cuando el rol del usuario cambia en el servidor (ej: se vuelve instructor)
+    // y necesitamos que el cambio se refleje al instante en esta pestaña.
+    const updateSession = (newToken, newUser) => {
+        setToken(newToken);
+        setUser(newUser);
+        localStorage.setItem('user', JSON.stringify(newUser));
+    };
+
     // Optimizamos el valor del contexto para evitar re-renders innecesarios
     const contextValue = useMemo(() => ({
         user,
         token,
         isLoading,
         error,
-        isLoggedIn: !!token, 
+        isLoggedIn: !!token,
         isAdmin: user?.rol === 'admin' || user?.rol === 'superadmin',
         isInstructor: user?.rol === 'instructor' || user?.rol === 'admin' || user?.rol === 'superadmin',
         login,
         register,
         logout,
+        updateSession,
     }), [user, token, isLoading, error]);
 
     return (

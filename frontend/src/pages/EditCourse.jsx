@@ -27,6 +27,7 @@ function EditCourse() {
   
   // ESTADO DEL CURSO (Para saber si mostrar botón de revisión)
   const [cursoEstado, setCursoEstado] = useState('borrador');
+  const [esGratis, setEsGratis] = useState(false);
 
   const [imagenFile, setImagenFile] = useState(null);
   
@@ -50,7 +51,8 @@ function EditCourse() {
             // Cargar nombre personalizado si existe, o dejar vacío
             nombre_instructor_certificado: c.nombre_instructor_certificado || '' 
         });
-        setCursoEstado(c.estado); 
+        setCursoEstado(c.estado);
+        setEsGratis(!c.precio || parseFloat(c.precio) === 0);
       } catch (error) {
         toast.error("Error al cargar datos.");
         navigate('/panel-instructor');
@@ -215,8 +217,32 @@ function EditCourse() {
             </div>
 
             <div className="form-group">
+                <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontWeight:'normal'}}>
+                    <input
+                        type="checkbox"
+                        checked={esGratis}
+                        onChange={(e) => {
+                            const checked = e.target.checked;
+                            setEsGratis(checked);
+                            setFormData({ ...formData, precio: checked ? '0' : '' });
+                        }}
+                    />
+                    Curso gratuito (no requiere pago para inscribirse)
+                </label>
+            </div>
+
+            <div className="form-group">
               <label>Precio (Guaraníes)</label>
-              <input type="number" name="precio" step="1000" value={formData.precio} onChange={handleChange} required />
+              <input
+                type="number"
+                name="precio"
+                step="1000"
+                value={formData.precio}
+                onChange={handleChange}
+                disabled={esGratis}
+                required={!esGratis}
+                style={esGratis ? { background: '#f0f0f0', color: '#888' } : undefined}
+              />
             </div>
 
             {/* 🟢 NUEVO CAMPO: NOMBRE INSTRUCTOR PARA CERTIFICADO */}
