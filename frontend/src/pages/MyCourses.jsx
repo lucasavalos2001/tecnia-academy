@@ -78,8 +78,8 @@ function MyCourses() {
                                 </span>
                             </div>
 
-                            <Link 
-                                to={`/aula-virtual/${inscripcion.curso.id}`} 
+                            <Link
+                                to={inscripcion.progreso_porcentaje === 100 ? `/certificado/${inscripcion.id}` : `/aula-virtual/${inscripcion.curso.id}`}
                                 className="btn-inscribirse btn-continuar"
                                 style={{textAlign:'center', display:'block'}}
                             >

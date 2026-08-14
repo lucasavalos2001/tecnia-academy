@@ -1,22 +1,52 @@
-import React, { useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useRef, useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { QRCodeCanvas } from 'qrcode.react';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 function CertificateView() {
-  const location = useLocation();
+  const { id } = useParams();
   const navigate = useNavigate();
+  const { user, token } = useAuth();
   const toast = useToast();
   const certRef = useRef(null);
   const [generating, setGenerating] = useState(false);
+  const [certificado, setCertificado] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Recibimos los datos del certificado y del usuario
-  const { certificado, usuario } = location.state || {};
+  const API_URL = import.meta.env.VITE_API_BASE_URL;
 
-  // Si alguien entra directo sin datos, lo mandamos al perfil
+  // Pedimos el certificado directo al servidor usando el ID de la URL,
+  // en vez de depender de datos de navegación que se pierden al refrescar o entrar directo.
+  useEffect(() => {
+    const fetchCertificado = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/usuario/certificados`, { headers: { Authorization: `Bearer ${token}` } });
+        const encontrado = res.data.certificados.find((c) => String(c.id) === String(id));
+        setCertificado(encontrado || null);
+      } catch (error) {
+        console.error('Error cargando certificado:', error);
+        setCertificado(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (token) fetchCertificado();
+  }, [id, token, API_URL]);
+
+  if (loading) {
+    return (
+        <div style={{textAlign: 'center', padding: '80px 20px'}}>
+            <i className="fas fa-spinner fa-spin" style={{fontSize: '2rem', color: '#0b3d91'}}></i>
+            <p>Cargando certificado...</p>
+        </div>
+    );
+  }
+
   if (!certificado) {
       return (
           <div style={{textAlign: 'center', padding: '50px'}}>
@@ -81,7 +111,7 @@ function CertificateView() {
             <div className="certificate-body">
                 <p className="subtitle">SE OTORGA EL PRESENTE CERTIFICADO A:</p>
 
-                <h1 className="student-name">{usuario.nombre_completo || usuario.nombre || usuario}</h1>
+                <h1 className="student-name">{user?.nombre_completo}</h1>
 
                 <p className="subtitle">POR HABER COMPLETADO SATISFACTORIAMENTE EL CURSO:</p>
 
