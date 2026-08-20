@@ -64,6 +64,14 @@ const User = sequelize.define('User', {
         defaultValue: ''
     },
 
+    // 💰 Condición fiscal del instructor (definida por el admin), usada para
+    // calcular la comisión de la liquidación: con factura = 70/30, sin factura = 60/40.
+    tiene_factura: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
+
     // CAMPOS PARA RECUPERACIÓN
     resetPasswordToken: {
         type: DataTypes.STRING,

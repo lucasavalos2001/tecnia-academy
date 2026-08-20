@@ -16,8 +16,9 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [courses, setCourses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
-  const [pendingCourses, setPendingCourses] = useState([]); 
-  const [payouts, setPayouts] = useState([]); 
+  const [pendingCourses, setPendingCourses] = useState([]);
+  const [payouts, setPayouts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   
   // Mantenimiento
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -77,6 +78,13 @@ function AdminDashboard() {
     } catch (error) { console.error("Error payouts", error); }
   };
 
+  const loadTransactions = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/admin/transactions`, { headers: { Authorization: `Bearer ${token}` } });
+        setTransactions(res.data);
+    } catch (error) { console.error("Error transactions", error); }
+  };
+
   const loadMaintenanceStatus = async () => {
       try {
           const res = await axios.get(`${API_URL}/admin/maintenance/status`, { headers: { Authorization: `Bearer ${token}` } });
@@ -92,8 +100,9 @@ function AdminDashboard() {
     if (activeTab === 'courses') loadCourses();
     if (activeTab === 'activity') loadActivity();
     if (activeTab === 'requests') loadPendingCourses(); 
-    if (activeTab === 'payouts') loadPayouts(); 
-  }, [activeTab, selectedMonth, selectedYear]); 
+    if (activeTab === 'payouts') loadPayouts();
+    if (activeTab === 'transactions') loadTransactions();
+  }, [activeTab, selectedMonth, selectedYear]);
 
   // --- ACCIONES ADMINISTRATIVAS ---
   
@@ -129,6 +138,57 @@ function AdminDashboard() {
         toast.success("Rol actualizado.");
     } catch (error) {
         toast.error(error.response?.data?.message || "Error al cambiar el rol.");
+    }
+  };
+
+  const handleToggleFactura = async (instructorId, valorActual) => {
+    try {
+        await axios.put(`${API_URL}/admin/users/${instructorId}/factura`, { tiene_factura: !valorActual }, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success(!valorActual ? "Marcado como PRO (con factura, 70%)." : "Marcado como Básico (sin factura, 60%).");
+        loadPayouts();
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al actualizar la condición fiscal.");
+    }
+  };
+
+  const handleMarkAsPaid = async (p) => {
+    const ok = await confirmAction(`¿Confirmás que ya le transferiste ${formatMoney(p.estadisticas.total_a_pagar)} a ${p.instructor.nombre} por este período? Esto queda registrado y no se puede deshacer desde acá.`);
+    if (!ok) return;
+    try {
+        await axios.post(`${API_URL}/admin/payouts/mark-paid`, {
+            instructorId: p.instructor.id,
+            mes: p.periodo.mes,
+            anio: p.periodo.año,
+            monto_bruto: p.estadisticas.total_bruto,
+            monto_pagado: p.estadisticas.total_a_pagar,
+            porcentaje_comision: p.estadisticas.porcentaje_comision
+        }, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success("Liquidación marcada como pagada.");
+        loadPayouts();
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al registrar el pago.");
+    }
+  };
+
+  const handleFixEnrollment = async (tx) => {
+    try {
+        await axios.post(`${API_URL}/admin/transactions/${tx.id}/fix-enrollment`, {}, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success("Inscripción creada.");
+        loadTransactions();
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al crear la inscripción.");
+    }
+  };
+
+  const handleRefund = async (tx) => {
+    const ok = await confirmAction(`¿Reembolsar a ${tx.usuario?.nombre_completo} el pago de "${tx.curso?.titulo}"? Esto le quita el acceso al curso de inmediato.`);
+    if (!ok) return;
+    try {
+        await axios.post(`${API_URL}/admin/transactions/${tx.id}/refund`, {}, { headers: { Authorization: `Bearer ${token}` } });
+        toast.success("Transacción reembolsada.");
+        loadTransactions();
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Error al reembolsar.");
     }
   };
 
@@ -209,6 +269,7 @@ function AdminDashboard() {
                     <li><button onClick={() => setActiveTab('courses')} className={activeTab === 'courses' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-book"></i> Moderar Cursos</button></li>
                     <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad Reciente</button></li>
                     <li><button onClick={() => setActiveTab('payouts')} className={activeTab === 'payouts' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-money-bill-wave"></i> Liquidación Pagos</button></li>
+                    <li><button onClick={() => setActiveTab('transactions')} className={activeTab === 'transactions' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-receipt"></i> Transacciones</button></li>
                 </ul>
             </nav>
         </aside>
@@ -308,22 +369,38 @@ function AdminDashboard() {
                         </div>
                     </div>
                     <div style={tableWrapper}>
-                        <table style={{width:'100%', minWidth: '600px', borderCollapse:'collapse'}}>
+                        <table style={{width:'100%', minWidth: '820px', borderCollapse:'collapse'}}>
                             <thead style={{background:'#2c3e50', color:'white'}}>
                                 <tr>
                                     <th style={thStyle}>Instructor / Datos Banco (PY)</th>
+                                    <th style={thStyle}>Condición</th>
                                     <th style={thStyle}>Ventas</th>
                                     <th style={thStyle}>Total Bruto</th>
-                                    <th style={thStyle}>Neto (70%)</th>
+                                    <th style={thStyle}>Neto a pagar</th>
+                                    <th style={thStyle}>Estado</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {payouts.length === 0 ? <tr><td colSpan="4" style={{padding:'20px', textAlign:'center'}}>No hay pagos este mes.</td></tr> : 
+                                {payouts.length === 0 ? <tr><td colSpan="6" style={{padding:'20px', textAlign:'center'}}>No hay pagos este mes.</td></tr> :
                                     payouts.map((p, idx) => (
                                         <tr key={idx} style={{borderBottom:'1px solid #eee'}}>
                                             <td style={tdStyle}>
                                                 <strong>{p.instructor.nombre}</strong><br/>
                                                 <small>{p.instructor.banco} - {p.instructor.cuenta} (CI: {p.instructor.ci})</small>
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <button
+                                                    onClick={() => handleToggleFactura(p.instructor.id, p.instructor.tiene_factura)}
+                                                    title="Click para cambiar"
+                                                    style={{
+                                                        ...roleBadge,
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        background: p.instructor.tiene_factura ? '#27ae60' : '#f39c12'
+                                                    }}
+                                                >
+                                                    {p.instructor.tiene_factura ? 'PRO · 70%' : 'Básico · 60%'}
+                                                </button>
                                             </td>
                                             <td style={tdStyle}>
                                                 <ul style={{margin:0, paddingLeft:'15px', fontSize:'0.8em'}}>
@@ -332,8 +409,78 @@ function AdminDashboard() {
                                             </td>
                                             <td style={tdStyle}>{formatMoney(p.estadisticas.total_bruto)}</td>
                                             <td style={{...tdStyle, fontWeight:'bold', color:'#27ae60'}}>{formatMoney(p.estadisticas.total_a_pagar)}</td>
+                                            <td style={tdStyle}>
+                                                {p.ya_pagado ? (
+                                                    <span style={{...roleBadge, background:'#27ae60'}} title={new Date(p.fecha_pago).toLocaleDateString('es-PY')}>
+                                                        <i className="fas fa-check"></i> Pagado
+                                                    </span>
+                                                ) : (
+                                                    <button onClick={() => handleMarkAsPaid(p)} style={{...btnSmall, background:'#3498db', color:'white'}}>
+                                                        Marcar pagado
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
+
+            {/* TAB: TRANSACCIONES (PAGOS, FALLOS Y REEMBOLSOS) */}
+            {activeTab === 'transactions' && (
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Transacciones (últimas 100)</h2>
+                    <div style={tableWrapper}>
+                        <table style={{width:'100%', minWidth: '700px', borderCollapse:'collapse'}}>
+                            <thead style={{background:'#eee'}}>
+                                <tr>
+                                    <th style={thStyle}>Fecha</th>
+                                    <th style={thStyle}>Alumno</th>
+                                    <th style={thStyle}>Curso</th>
+                                    <th style={thStyle}>Monto</th>
+                                    <th style={thStyle}>Estado</th>
+                                    <th style={thStyle}>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {transactions.length === 0 ? <tr><td colSpan="6" style={{padding:'20px', textAlign:'center'}}>No hay transacciones.</td></tr> :
+                                    transactions.map((tx) => {
+                                        const estadoColor = { pending: '#f39c12', paid: '#27ae60', failed: '#e74c3c', cancelled: '#7f8c8d', refunded: '#8e44ad' }[tx.status] || '#7f8c8d';
+                                        const estadoLabel = { pending: 'Pendiente', paid: 'Pagado', failed: 'Fallido', cancelled: 'Cancelado', refunded: 'Reembolsado' }[tx.status] || tx.status;
+                                        return (
+                                            <tr key={tx.id} style={{borderBottom:'1px solid #eee'}}>
+                                                <td style={tdStyle}>{new Date(tx.createdAt).toLocaleDateString('es-PY')}</td>
+                                                <td style={tdStyle}>{tx.usuario?.nombre_completo || '—'}</td>
+                                                <td style={tdStyle}>{tx.curso?.titulo || '—'}</td>
+                                                <td style={tdStyle}>{formatMoney(tx.amount)}</td>
+                                                <td style={tdStyle}>
+                                                    <span style={{...roleBadge, background: estadoColor}}>{estadoLabel}</span>
+                                                    {tx.sin_inscripcion && (
+                                                        <div style={{color:'#e74c3c', fontSize:'0.75rem', fontWeight:'bold', marginTop:'4px'}}>
+                                                            <i className="fas fa-exclamation-triangle"></i> Sin inscripción
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td style={tdStyle}>
+                                                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                                        {tx.status === 'paid' && (
+                                                            <button onClick={() => handleRefund(tx)} style={{...btnSmall, color:'#e74c3c', border:'1px solid #e74c3c'}}>
+                                                                Reembolsar
+                                                            </button>
+                                                        )}
+                                                        {tx.sin_inscripcion && (
+                                                            <button onClick={() => handleFixEnrollment(tx)} style={{...btnSmall, background:'#3498db', color:'white'}}>
+                                                                Crear inscripción
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 }
                             </tbody>
                         </table>

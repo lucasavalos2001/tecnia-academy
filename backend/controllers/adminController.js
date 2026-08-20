@@ -1,4 +1,4 @@
-const { User, Course, Enrollment, Transaction, SystemSetting } = require('../models');
+const { User, Course, Enrollment, Transaction, SystemSetting, Payout } = require('../models');
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para el reseteo de claves
@@ -69,11 +69,30 @@ const resetUserPassword = async (req, res) => {
 const updateUserRole = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { rol } = req.body; 
+        const { rol } = req.body;
         await User.update({ rol }, { where: { id: userId } });
         res.json({ message: `Rol actualizado a: ${rol}` });
     } catch (error) {
         res.status(500).json({ message: "Error al actualizar rol" });
+    }
+};
+
+// 💰 Marca si un instructor presentó factura legal, para calcular su comisión correcta
+const updateInstructorFactura = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { tiene_factura } = req.body;
+
+        const [affected] = await User.update(
+            { tiene_factura: !!tiene_factura },
+            { where: { id: userId, rol: 'instructor' } }
+        );
+
+        if (!affected) return res.status(404).json({ message: "Instructor no encontrado" });
+
+        res.json({ message: tiene_factura ? "Marcado como instructor PRO (con factura)." : "Marcado como instructor Básico (sin factura)." });
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar la condición fiscal" });
     }
 };
 
@@ -196,6 +215,84 @@ const getRecentEnrollments = async (req, res) => {
     }
 };
 
+// 4.b Transacciones (para ver pagos fallidos y poder reembolsar)
+const getAllTransactions = async (req, res) => {
+    try {
+        const transacciones = await Transaction.findAll({
+            order: [['createdAt', 'DESC']],
+            limit: 100,
+            include: [
+                { model: User, as: 'usuario', attributes: ['nombre_completo', 'email'] },
+                { model: Course, as: 'curso', attributes: ['titulo'] }
+            ]
+        });
+
+        // 🛡️ Red de seguridad: si algún pago quedó marcado "paid" sin que se haya
+        // creado la inscripción correspondiente (ej: por una falla puntual del
+        // webhook), lo marcamos acá para que el admin lo vea y lo pueda arreglar.
+        const resultado = await Promise.all(transacciones.map(async (tx) => {
+            let sin_inscripcion = false;
+            if (tx.status === 'paid') {
+                const inscripcion = await Enrollment.findOne({ where: { userId: tx.userId, courseId: tx.courseId } });
+                sin_inscripcion = !inscripcion;
+            }
+            return { ...tx.toJSON(), sin_inscripcion };
+        }));
+
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener transacciones" });
+    }
+};
+
+// Arregla manualmente el caso donde un pago quedó confirmado pero, por algún
+// fallo puntual, nunca se creó la inscripción del alumno al curso.
+const fixMissingEnrollment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const transaccion = await Transaction.findByPk(id);
+
+        if (!transaccion) return res.status(404).json({ message: "Transacción no encontrada" });
+        if (transaccion.status !== 'paid') {
+            return res.status(400).json({ message: "Esta transacción no está marcada como pagada." });
+        }
+
+        const [inscripcion, creada] = await Enrollment.findOrCreate({
+            where: { userId: transaccion.userId, courseId: transaccion.courseId },
+            defaults: { progreso_porcentaje: 0, fecha_inscripcion: new Date(), lecciones_completadas: [] }
+        });
+
+        res.json({ message: creada ? "Inscripción creada correctamente." : "El alumno ya estaba inscrito." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al crear la inscripción" });
+    }
+};
+
+// Reembolsa una transacción pagada: la marca como 'refunded' y le quita el
+// acceso al curso al alumno (borra su inscripción).
+const refundTransaction = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const transaccion = await Transaction.findByPk(id);
+
+        if (!transaccion) return res.status(404).json({ message: "Transacción no encontrada" });
+        if (transaccion.status !== 'paid') {
+            return res.status(400).json({ message: "Solo se pueden reembolsar transacciones que estén pagadas." });
+        }
+
+        transaccion.status = 'refunded';
+        await transaccion.save();
+
+        await Enrollment.destroy({ where: { userId: transaccion.userId, courseId: transaccion.courseId } });
+
+        res.json({ message: "Transacción reembolsada. Se le quitó el acceso al curso al alumno." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al procesar el reembolso" });
+    }
+};
+
 // 5. Calcular Pagos (Liquidación a Instructores en Paraguay)
 const getInstructorEarnings = async (req, res) => {
     try {
@@ -208,8 +305,13 @@ const getInstructorEarnings = async (req, res) => {
 
         const instructors = await User.findAll({
             where: { rol: 'instructor' },
-            attributes: ['id', 'nombre_completo', 'email', 'banco_nombre', 'numero_cuenta', 'titular_cuenta', 'cedula_identidad', 'alias_bancario']
+            attributes: ['id', 'nombre_completo', 'email', 'banco_nombre', 'numero_cuenta', 'titular_cuenta', 'cedula_identidad', 'alias_bancario', 'tiene_factura']
         });
+
+        // Liquidaciones ya marcadas como pagadas para este período específico
+        const pagosDelPeriodo = await Payout.findAll({ where: { mes: month + 1, anio: year } });
+        const pagosPorInstructor = {};
+        pagosDelPeriodo.forEach(p => { pagosPorInstructor[p.instructorId] = p; });
 
         const report = [];
 
@@ -239,8 +341,12 @@ const getInstructorEarnings = async (req, res) => {
                 }
             }
 
-            const comisionPlataforma = 0.30; 
+            // 💰 Comisión según condición fiscal (definida en TermsInstructors.jsx):
+            // con factura legal = 30% para la plataforma (70% para el instructor)
+            // sin factura = 40% para la plataforma (60% para el instructor)
+            const comisionPlataforma = instructor.tiene_factura ? 0.30 : 0.40;
             const totalPagar = totalBrutoInstructor * (1 - comisionPlataforma);
+            const pagoRegistrado = pagosPorInstructor[instructor.id] || null;
 
             report.push({
                 instructor: {
@@ -250,20 +356,59 @@ const getInstructorEarnings = async (req, res) => {
                     cuenta: instructor.numero_cuenta,
                     titular: instructor.titular_cuenta,
                     ci: instructor.cedula_identidad,
-                    alias: instructor.alias_bancario
+                    alias: instructor.alias_bancario,
+                    tiene_factura: instructor.tiene_factura
                 },
                 periodo: { mes: month + 1, año: year },
                 estadisticas: {
                     total_bruto: totalBrutoInstructor,
+                    porcentaje_comision: comisionPlataforma * 100,
                     comision_retenida: totalBrutoInstructor * comisionPlataforma,
                     total_a_pagar: totalPagar
                 },
-                detalle: detalleVentas
+                detalle: detalleVentas,
+                ya_pagado: !!pagoRegistrado,
+                fecha_pago: pagoRegistrado ? pagoRegistrado.createdAt : null
             });
         }
         res.json(report);
     } catch (error) {
         res.status(500).json({ message: "Error al calcular pagos" });
+    }
+};
+
+// Marca la liquidación de un instructor para un período (mes/año) como ya pagada.
+// Queda registrado el monto y el porcentaje usados en ese momento, para que
+// quede un historial fijo aunque después cambien las ventas o la comisión.
+const markPayoutAsPaid = async (req, res) => {
+    try {
+        const { instructorId, mes, anio, monto_bruto, monto_pagado, porcentaje_comision } = req.body;
+
+        if (!instructorId || !mes || !anio || monto_pagado === undefined) {
+            return res.status(400).json({ message: "Faltan datos para registrar el pago." });
+        }
+
+        const yaExiste = await Payout.findOne({ where: { instructorId, mes, anio } });
+        if (yaExiste) {
+            return res.status(400).json({
+                message: `Este período ya estaba marcado como pagado el ${new Date(yaExiste.createdAt).toLocaleDateString('es-PY')}.`
+            });
+        }
+
+        await Payout.create({
+            instructorId,
+            mes,
+            anio,
+            monto_bruto,
+            monto_pagado,
+            porcentaje_comision,
+            pagado_por: req.usuario.id
+        });
+
+        res.status(201).json({ message: "Liquidación marcada como pagada." });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al registrar el pago." });
     }
 };
 
@@ -299,18 +444,23 @@ const toggleMaintenance = async (req, res) => {
     }
 };
 
-module.exports = { 
-    getGlobalStats, 
-    getAllUsers, 
-    updateUserRole, 
-    deleteUser, 
+module.exports = {
+    getGlobalStats,
+    getAllUsers,
+    updateUserRole,
+    updateInstructorFactura,
+    deleteUser,
     resetUserPassword, // 🟢 NUEVA EXPORTACIÓN
-    getAllCoursesAdmin, 
+    getAllCoursesAdmin,
     deleteCourseAdmin,
-    getPendingCourses, 
-    reviewCourse, 
+    getPendingCourses,
+    reviewCourse,
     getRecentEnrollments,
+    getAllTransactions,
+    refundTransaction,
+    fixMissingEnrollment,
     getInstructorEarnings,
+    markPayoutAsPaid,
     getMaintenanceStatus,
     toggleMaintenance 
 };

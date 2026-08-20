@@ -143,27 +143,44 @@ const confirmPaymentWebhook = async (req, res) => {
             return res.status(401).send("No autorizado");
         }
 
-        // RESPUESTA INMEDIATA A PAGOPAR
-        res.json(resultado); 
+        const transaccion = await Transaction.findOne({ where: { external_reference: hashPedido } });
+        if (!transaccion) {
+            console.error(`⚠️ WEBHOOK: no se encontró ninguna transacción con referencia ${hashPedido}`);
+            return res.json(resultado);
+        }
 
         if (datosPago.pagado === true) {
-            const transaccion = await Transaction.findOne({ where: { external_reference: hashPedido } });
-            
-            if (transaccion && transaccion.status !== 'paid') {
-                transaccion.status = 'paid';
-                await transaccion.save();
+            if (transaccion.status !== 'paid') {
+                try {
+                    // 🛡️ Hacemos el trabajo crítico (guardar el pago + inscribir al alumno)
+                    // ANTES de responderle a Pagopar. Así, si algo falla acá, la transacción
+                    // no queda marcada como "paid" a medias y Pagopar puede reintentar el webhook,
+                    // en vez de que el alumno pague y quede sin acceso sin que nadie se entere.
+                    transaccion.status = 'paid';
+                    await transaccion.save();
 
-                await Enrollment.findOrCreate({
-                    where: { userId: transaccion.userId, courseId: transaccion.courseId },
-                    defaults: { 
-                        progreso_porcentaje: 0, 
-                        fecha_inscripcion: new Date(),
-                        lecciones_completadas: []
-                    }
-                });
-                console.log(`🎓 Alumno ${transaccion.userId} inscrito con éxito.`);
+                    await Enrollment.findOrCreate({
+                        where: { userId: transaccion.userId, courseId: transaccion.courseId },
+                        defaults: {
+                            progreso_porcentaje: 0,
+                            fecha_inscripcion: new Date(),
+                            lecciones_completadas: []
+                        }
+                    });
+                    console.log(`🎓 Alumno ${transaccion.userId} inscrito con éxito.`);
+                } catch (dbError) {
+                    console.error(`🚨 FALLO CRÍTICO: Pagopar confirmó el pago (ref ${hashPedido}) pero no se pudo inscribir al usuario ${transaccion.userId} en el curso ${transaccion.courseId}. Revisar manualmente en el panel de admin > Transacciones.`, dbError.message);
+                    return res.status(500).json({ error: "Error interno al procesar la inscripción" });
+                }
             }
+        } else if (transaccion.status === 'pending') {
+            // Pagopar reportó que el pago no se completó (cancelado, rechazado, expirado, etc.)
+            transaccion.status = 'failed';
+            await transaccion.save();
+            console.log(`❌ Transacción ${transaccion.id} marcada como fallida (Pagopar reportó pagado: false).`);
         }
+
+        res.json(resultado);
     } catch (error) {
         console.error("❌ ERROR WEBHOOK:", error.message);
         if (!res.headersSent) res.status(500).send("Error");

@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    getGlobalStats, 
-    getAllUsers, 
-    updateUserRole, 
+const {
+    getGlobalStats,
+    getAllUsers,
+    updateUserRole,
+    updateInstructorFactura,
     deleteUser,
     resetUserPassword, // 🟢 NUEVA FUNCIÓN AGREGADA
     getAllCoursesAdmin,
@@ -11,7 +12,11 @@ const {
     getRecentEnrollments,
     getPendingCourses,
     reviewCourse,
+    getAllTransactions,
+    refundTransaction,
+    fixMissingEnrollment,
     getInstructorEarnings,
+    markPayoutAsPaid,
     getMaintenanceStatus,
     toggleMaintenance
 } = require('../controllers/adminController');
@@ -31,12 +36,16 @@ router.use(verifyToken, isAdmin);
 // ==========================================
 router.get('/stats', getGlobalStats);
 router.get('/activity', getRecentEnrollments);
+router.get('/transactions', getAllTransactions);
+router.post('/transactions/:id/refund', refundTransaction);
+router.post('/transactions/:id/fix-enrollment', fixMissingEnrollment);
 
 // ==========================================
 // 👥 GESTIÓN DE USUARIOS
 // ==========================================
 router.get('/users', getAllUsers);
 router.put('/users/:userId/role', updateUserRole);
+router.put('/users/:userId/factura', updateInstructorFactura);
 router.delete('/users/:userId', deleteUser);
 
 // 🟢 RUTA DE SOPORTE: Reseteo manual de contraseña
@@ -59,6 +68,7 @@ router.post('/review/:id', reviewCourse);
 // 💰 GESTIÓN DE PAGOS (LIQUIDACIONES EN PY)
 // ==========================================
 router.get('/payouts', getInstructorEarnings);
+router.post('/payouts/mark-paid', markPayoutAsPaid);
 
 // ==========================================
 // 🛡️ MODO MANTENIMIENTO
