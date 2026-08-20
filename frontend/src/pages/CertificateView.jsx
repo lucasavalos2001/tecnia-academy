@@ -65,6 +65,11 @@ function CertificateView() {
         scale: 2,
         backgroundColor: '#ffffff',
         useCORS: true,
+        // 🟢 Forzamos que se capture como si fuera una pantalla de escritorio ancha,
+        // así el PDF sale igual (diseño completo y buena resolución) sin importar
+        // si se pide desde el celular o la notebook (evita el CSS de "modo móvil").
+        windowWidth: 1400,
+        windowHeight: 1000,
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
