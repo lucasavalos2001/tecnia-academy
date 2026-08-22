@@ -27,6 +27,14 @@ function CourseDetailPublic() {
   // 🟢 ESTADO PARA EL MODAL DE VIDEO (SOLUCIÓN BUNNY CDN)
   const [videoModal, setVideoModal] = useState(null); // Guarda la URL del video a ver
 
+  // ⭐ RESEÑAS Y CALIFICACIONES
+  const [resenas, setResenas] = useState([]);
+  const [puedeResenar, setPuedeResenar] = useState(false);
+  const [miResena, setMiResena] = useState(null);
+  const [calificacionForm, setCalificacionForm] = useState(0);
+  const [comentarioForm, setComentarioForm] = useState('');
+  const [enviandoResena, setEnviandoResena] = useState(false);
+
   // Verificamos si es admin
   const isAdmin = user?.rol === 'admin';
   
@@ -49,6 +57,91 @@ function CourseDetailPublic() {
     };
     fetchDetails();
   }, [id, API_URL]);
+
+  // ⭐ Cargar reseñas públicas del curso
+  useEffect(() => {
+    const fetchResenas = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/cursos/${id}/resenas`);
+        setResenas(res.data.resenas);
+      } catch (error) {
+        console.error("Error al cargar reseñas:", error);
+      }
+    };
+    fetchResenas();
+  }, [id, API_URL]);
+
+  // ⭐ Verificar si el usuario logueado está inscrito y si ya dejó una reseña
+  useEffect(() => {
+    const fetchMiResena = async () => {
+      if (!isLoggedIn) return;
+      try {
+        const res = await axios.get(`${API_URL}/cursos/${id}/mi-resena`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setPuedeResenar(res.data.inscrito);
+        if (res.data.miResena) {
+          setMiResena(res.data.miResena);
+          setCalificacionForm(res.data.miResena.calificacion);
+          setComentarioForm(res.data.miResena.comentario || '');
+        }
+      } catch (error) {
+        console.error("Error al verificar tu reseña:", error);
+      }
+    };
+    fetchMiResena();
+  }, [id, API_URL, isLoggedIn, token]);
+
+  const handleEnviarResena = async () => {
+    if (calificacionForm < 1 || calificacionForm > 5) {
+      toast.info("Elegí una calificación de 1 a 5 estrellas.");
+      return;
+    }
+    setEnviandoResena(true);
+    try {
+      const res = await axios.post(`${API_URL}/cursos/${id}/resenas`,
+        { calificacion: calificacionForm, comentario: comentarioForm },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(miResena ? "Reseña actualizada." : "¡Gracias por tu reseña!");
+      const resenaGuardada = res.data.resena;
+      setMiResena(resenaGuardada);
+
+      setResenas(prev => {
+        const sinLaMia = prev.filter(r => r.userId !== user.id);
+        return [{ ...resenaGuardada, usuario: { nombre_completo: user.nombre_completo } }, ...sinLaMia];
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Error al guardar tu reseña.");
+    } finally {
+      setEnviandoResena(false);
+    }
+  };
+
+  const handleEliminarResena = async () => {
+    const ok = await confirmAction("¿Eliminar tu reseña de este curso?");
+    if (!ok) return;
+    try {
+      await axios.delete(`${API_URL}/cursos/resenas/${miResena.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Reseña eliminada.");
+      setResenas(prev => prev.filter(r => r.id !== miResena.id));
+      setMiResena(null);
+      setCalificacionForm(0);
+      setComentarioForm('');
+    } catch (error) {
+      toast.error("Error al eliminar la reseña.");
+    }
+  };
+
+  const renderEstrellas = (valor, tamaño = '1rem') => (
+    <span style={{ color: '#f1c40f', fontSize: tamaño }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <i key={n} className={n <= Math.round(valor) ? 'fas fa-star' : 'far fa-star'} style={{ marginRight: '2px' }}></i>
+      ))}
+    </span>
+  );
 
   // 🟢 VISTA PREVIA GRATUITA: cualquiera puede ver estas lecciones sin pagar
   const handlePreviewClick = async (lessonId) => {
@@ -154,6 +247,10 @@ function CourseDetailPublic() {
 
   const esGratis = !curso.precio || parseFloat(curso.precio) === 0;
   const totalLecciones = curso.modulos?.reduce((acc, m) => acc + m.lecciones.length, 0) || 0;
+  const totalResenas = resenas.length;
+  const promedioResenas = totalResenas > 0
+    ? resenas.reduce((acc, r) => acc + r.calificacion, 0) / totalResenas
+    : 0;
 
   return (
     <>
@@ -256,6 +353,13 @@ function CourseDetailPublic() {
                   
                   <div style={{marginTop: '20px', fontSize: '0.9rem', display:'flex', gap:'20px', alignItems:'center', flexWrap: 'wrap'}}>
                       <span style={{background:'#f1c40f', color:'black', padding:'2px 6px', fontWeight:'bold', fontSize:'0.8rem'}}>BESTSELLER</span>
+                      {totalResenas > 0 && (
+                          <span style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                              <strong style={{color:'#f1c40f'}}>{promedioResenas.toFixed(1)}</strong>
+                              {renderEstrellas(promedioResenas)}
+                              <span style={{color:'#cec0fc'}}>({totalResenas} reseña{totalResenas !== 1 ? 's' : ''})</span>
+                          </span>
+                      )}
                       <span>Creado por <span style={{color: '#cec0fc', textDecoration:'underline'}}>{curso.instructor?.nombre_completo || 'Instructor Tecnia'}</span></span>
                       <span><i className="fas fa-signal"></i> {curso.nivel ? curso.nivel.charAt(0).toUpperCase() + curso.nivel.slice(1) : 'Principiante'}</span>
                       <span><i className="fas fa-globe"></i> Español</span>
@@ -398,6 +502,74 @@ function CourseDetailPublic() {
                           </div>
                       </div>
                   </div>
+              </div>
+
+              {/* SECCIÓN: RESEÑAS Y CALIFICACIONES */}
+              <div style={{marginTop: '40px', borderTop:'1px solid #eee', paddingTop:'30px', marginBottom: '50px'}}>
+                  <h3 style={{fontSize: '1.5rem', marginBottom:'20px'}}>
+                      Reseñas del curso
+                      {totalResenas > 0 && (
+                          <span style={{fontSize:'1rem', fontWeight:'normal', color:'#666', marginLeft:'10px'}}>
+                              {renderEstrellas(promedioResenas)} {promedioResenas.toFixed(1)} de 5 ({totalResenas})
+                          </span>
+                      )}
+                  </h3>
+
+                  {puedeResenar && (
+                      <div style={{background:'#f7f9fa', border:'1px solid #d1d7dc', padding:'20px', marginBottom:'25px'}}>
+                          <h4 style={{marginTop:0, fontSize:'1rem'}}>{miResena ? 'Editá tu reseña' : 'Dejá tu reseña'}</h4>
+                          <div style={{fontSize:'1.6rem', marginBottom:'10px', cursor:'pointer'}}>
+                              {[1, 2, 3, 4, 5].map(n => (
+                                  <i
+                                      key={n}
+                                      className={n <= calificacionForm ? 'fas fa-star' : 'far fa-star'}
+                                      style={{color:'#f1c40f', marginRight:'6px'}}
+                                      onClick={() => setCalificacionForm(n)}
+                                  ></i>
+                              ))}
+                          </div>
+                          <textarea
+                              value={comentarioForm}
+                              onChange={(e) => setComentarioForm(e.target.value)}
+                              placeholder="Contanos qué te pareció el curso (opcional)"
+                              rows={3}
+                              style={{width:'100%', padding:'10px', border:'1px solid #d1d7dc', fontFamily:'inherit', fontSize:'0.9rem', resize:'vertical'}}
+                          ></textarea>
+                          <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
+                              <button
+                                  onClick={handleEnviarResena}
+                                  disabled={enviandoResena}
+                                  style={{padding:'10px 20px', background:'#a435f0', color:'white', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}
+                              >
+                                  {enviandoResena ? 'Guardando...' : (miResena ? 'Actualizar reseña' : 'Publicar reseña')}
+                              </button>
+                              {miResena && (
+                                  <button
+                                      onClick={handleEliminarResena}
+                                      style={{padding:'10px 20px', background:'transparent', color:'#e74c3c', border:'1px solid #e74c3c', borderRadius:'4px', cursor:'pointer'}}
+                                  >
+                                      Eliminar mi reseña
+                                  </button>
+                              )}
+                          </div>
+                      </div>
+                  )}
+
+                  {resenas.length === 0 ? (
+                      <p style={{color:'#666'}}>Este curso todavía no tiene reseñas.</p>
+                  ) : (
+                      <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
+                          {resenas.map(r => (
+                              <div key={r.id} style={{borderBottom:'1px solid #eee', paddingBottom:'15px'}}>
+                                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                      <strong>{r.usuario?.nombre_completo || 'Alumno'}</strong>
+                                      {renderEstrellas(r.calificacion)}
+                                  </div>
+                                  {r.comentario && <p style={{margin:'8px 0 0 0', color:'#333', fontSize:'0.95rem', lineHeight:'1.5'}}>{r.comentario}</p>}
+                              </div>
+                          ))}
+                      </div>
+                  )}
               </div>
           </div>
 

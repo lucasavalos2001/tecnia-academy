@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Course, Module, Lesson, User, Enrollment, Payout, Wishlist } = require('../models');
+const { sequelize, Course, Module, Lesson, User, Enrollment, Payout, Wishlist, Review } = require('../models');
 const { uploadToBunny } = require('../utils/bunny');
 const { isValidPrice } = require('../utils/validators');
 const { calcularLiquidacionInstructor } = require('../utils/liquidacion');
@@ -401,6 +401,12 @@ const getAllCourses = async (req, res) => {
         const cursos = await Course.findAll({
             where: whereCondition,
             include: [{ model: User, as: 'instructor', attributes: ['nombre_completo'] }],
+            attributes: {
+                include: [
+                    [sequelize.literal('(SELECT AVG("calificacion") FROM reviews WHERE reviews."courseId" = "Course"."id")'), 'calificacion_promedio'],
+                    [sequelize.literal('(SELECT COUNT(*) FROM reviews WHERE reviews."courseId" = "Course"."id")'), 'total_resenas']
+                ]
+            },
             order: [['createdAt', 'DESC']]
         });
         res.json({ cursos });
@@ -414,9 +420,9 @@ const getCourseDetail = async (req, res) => {
         const curso = await Course.findByPk(id, {
             include: [
                 { model: User, as: 'instructor', attributes: ['nombre_completo', 'biografia', 'foto_perfil'] },
-                { 
-                    model: Module, 
-                    as: 'modulos', 
+                {
+                    model: Module,
+                    as: 'modulos',
                     include: [{
                         model: Lesson,
                         as: 'lecciones',
@@ -424,6 +430,12 @@ const getCourseDetail = async (req, res) => {
                     }]
                 }
             ],
+            attributes: {
+                include: [
+                    [sequelize.literal('(SELECT AVG("calificacion") FROM reviews WHERE reviews."courseId" = "Course"."id")'), 'calificacion_promedio'],
+                    [sequelize.literal('(SELECT COUNT(*) FROM reviews WHERE reviews."courseId" = "Course"."id")'), 'total_resenas']
+                ]
+            },
             order: [['modulos', 'orden', 'ASC'], ['modulos', 'lecciones', 'orden', 'ASC']]
         });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
@@ -548,9 +560,101 @@ const markLessonAsComplete = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al actualizar progreso" }); }
 };
 
+// ⭐ RESEÑAS Y CALIFICACIONES
+const getCourseReviews = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const resenas = await Review.findAll({
+            where: { courseId: id },
+            include: [{ model: User, as: 'usuario', attributes: ['nombre_completo', 'foto_perfil'] }],
+            order: [['createdAt', 'DESC']]
+        });
+
+        const total = resenas.length;
+        const promedio = total > 0
+            ? resenas.reduce((acc, r) => acc + r.calificacion, 0) / total
+            : 0;
+
+        res.json({ resenas, promedio, total });
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener reseñas" });
+    }
+};
+
+// Le dice al frontend si el usuario logueado puede opinar (está inscrito) y si ya dejó una reseña.
+const getMyReview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+
+        const inscripcion = await Enrollment.findOne({ where: { userId, courseId: id } });
+        const miResena = await Review.findOne({ where: { userId, courseId: id } });
+
+        res.json({ inscrito: !!inscripcion, miResena });
+    } catch (error) {
+        res.status(500).json({ message: "Error al verificar tu reseña" });
+    }
+};
+
+const upsertReview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const { calificacion, comentario } = req.body;
+
+        const calificacionNum = parseInt(calificacion);
+        if (!calificacionNum || calificacionNum < 1 || calificacionNum > 5) {
+            return res.status(400).json({ message: "La calificación debe ser de 1 a 5 estrellas." });
+        }
+
+        const inscripcion = await Enrollment.findOne({ where: { userId, courseId: id } });
+        if (!inscripcion) {
+            return res.status(403).json({ message: "Necesitás estar inscrito en el curso para dejar una reseña." });
+        }
+
+        const existente = await Review.findOne({ where: { userId, courseId: id } });
+        if (existente) {
+            await existente.update({ calificacion: calificacionNum, comentario: comentario?.trim() || null });
+            return res.json({ message: "Reseña actualizada", resena: existente });
+        }
+
+        const nuevaResena = await Review.create({
+            userId, courseId: id,
+            calificacion: calificacionNum,
+            comentario: comentario?.trim() || null
+        });
+        res.status(201).json({ message: "¡Gracias por tu reseña!", resena: nuevaResena });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al guardar tu reseña" });
+    }
+};
+
+const deleteReview = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const rol = req.usuario.rol;
+
+        const resena = await Review.findByPk(id);
+        if (!resena) return res.status(404).json({ message: "Reseña no encontrada" });
+
+        const esDueño = resena.userId === userId;
+        const esAdmin = rol === 'admin' || rol === 'superadmin';
+        if (!esDueño && !esAdmin) {
+            return res.status(403).json({ message: "No podés eliminar la reseña de otro usuario." });
+        }
+
+        await resena.destroy();
+        res.json({ message: "Reseña eliminada" });
+    } catch (error) {
+        res.status(500).json({ message: "Error al eliminar la reseña" });
+    }
+};
+
 module.exports = {
     createCourse, getInstructorCourses, getInstructorStats, getMyEarnings, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
     getAllCourses, getCourseDetail, getPreviewLesson, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getMyWishlist, toggleWishlist
+    getMyWishlist, toggleWishlist, getCourseReviews, getMyReview, upsertReview, deleteReview
 };

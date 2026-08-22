@@ -9,6 +9,7 @@ const SystemSetting = require('./SystemSetting.js'); // 🟢 1. IMPORTAR NUEVO M
 const Payout = require('./Payout.js');
 const ErrorLog = require('./ErrorLog.js');
 const Wishlist = require('./Wishlist.js');
+const Review = require('./Review.js');
 
 // --- Relaciones de Instructor (Creación) ---
 User.hasMany(Course, { foreignKey: 'instructorId', as: 'cursos_creados' });
@@ -47,6 +48,12 @@ Wishlist.belongsTo(Course, { foreignKey: 'courseId', as: 'curso' });
 User.hasMany(Wishlist, { foreignKey: 'userId' });
 Course.hasMany(Wishlist, { foreignKey: 'courseId' });
 
+// --- ⭐ Relaciones de Reseñas y Calificaciones ---
+Review.belongsTo(User, { foreignKey: 'userId', as: 'usuario' });
+Review.belongsTo(Course, { foreignKey: 'courseId', as: 'curso' });
+User.hasMany(Review, { foreignKey: 'userId' });
+Course.hasMany(Review, { foreignKey: 'courseId', as: 'resenas' });
+
 const syncDB = async () => {
     try {
         // 🛡️ La estructura de las tablas ya NO se ajusta sola en cada arranque
@@ -73,4 +80,4 @@ const syncDB = async () => {
 }
 
 // 🟢 3. EXPORTAR SystemSetting
-module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout, ErrorLog, Wishlist };
+module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout, ErrorLog, Wishlist, Review };

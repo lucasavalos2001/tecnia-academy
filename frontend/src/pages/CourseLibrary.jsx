@@ -189,6 +189,18 @@ function CourseLibrary() {
                                 </p>
                             )}
 
+                            {curso.total_resenas > 0 && (
+                                <p style={{fontSize:'0.8em', margin: '0 0 8px 0', display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <strong style={{color:'#f1c40f'}}>{parseFloat(curso.calificacion_promedio).toFixed(1)}</strong>
+                                    <span style={{color:'#f1c40f'}}>
+                                        {[1,2,3,4,5].map(n => (
+                                            <i key={n} className={n <= Math.round(curso.calificacion_promedio) ? 'fas fa-star' : 'far fa-star'}></i>
+                                        ))}
+                                    </span>
+                                    <span style={{color:'#888'}}>({curso.total_resenas})</span>
+                                </p>
+                            )}
+
                             {/* ✅ CORRECCIÓN DE PRECIO A GUARANÍES */}
                             <p style={{fontWeight: 'bold', color: (!curso.precio || parseFloat(curso.precio) === 0) ? '#27ae60' : '#0b3d91', fontSize: '1.1rem'}}>
                                 {(!curso.precio || parseFloat(curso.precio) === 0) ? 'GRATIS' : formatCurrency(curso.precio)}

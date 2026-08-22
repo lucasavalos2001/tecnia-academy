@@ -5,7 +5,8 @@ const {
     createCourse, getInstructorCourses, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
     getAllCourses, getCourseDetail, getPreviewLesson, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getInstructorStats, getMyEarnings, getMyWishlist, toggleWishlist
+    getInstructorStats, getMyEarnings, getMyWishlist, toggleWishlist,
+    getCourseReviews, getMyReview, upsertReview, deleteReview
 } = require('../controllers/courseController');
 
 // Importamos middleware
@@ -19,6 +20,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 router.get('/', getAllCourses);
 router.get('/:id/detalle', getCourseDetail);
 router.get('/lecciones/:lessonId/preview', getPreviewLesson);
+router.get('/:id/resenas', getCourseReviews);
 
 // ==========================================
 //  2. RUTAS PROTEGIDAS (ALUMNOS/INSTRUCTORES)
@@ -30,6 +32,9 @@ router.get('/favoritos', verifyToken, getMyWishlist);
 router.post('/:courseId/favorito', verifyToken, toggleWishlist);
 router.post('/:courseId/inscribirse', verifyToken, enrollInCourse);
 router.post('/:courseId/lecciones/:lessonId/completar', verifyToken, markLessonAsComplete);
+router.get('/:id/mi-resena', verifyToken, getMyReview);
+router.post('/:id/resenas', verifyToken, upsertReview);
+router.delete('/resenas/:id', verifyToken, deleteReview);
 
 // --- Instructor ---
 router.post('/', verifyToken, isInstructor, upload.single('imagen'), createCourse);
