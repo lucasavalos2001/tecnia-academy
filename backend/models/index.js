@@ -8,6 +8,7 @@ const Transaction = require('./Transaction.js');
 const SystemSetting = require('./SystemSetting.js'); // 🟢 1. IMPORTAR NUEVO MODELO
 const Payout = require('./Payout.js');
 const ErrorLog = require('./ErrorLog.js');
+const Wishlist = require('./Wishlist.js');
 
 // --- Relaciones de Instructor (Creación) ---
 User.hasMany(Course, { foreignKey: 'instructorId', as: 'cursos_creados' });
@@ -40,6 +41,12 @@ User.hasMany(Payout, { foreignKey: 'instructorId' });
 
 Payout.belongsTo(User, { foreignKey: 'pagado_por', as: 'pagadoPor' });
 
+// --- ❤️ Relaciones de Favoritos (Wishlist) ---
+Wishlist.belongsTo(User, { foreignKey: 'userId' });
+Wishlist.belongsTo(Course, { foreignKey: 'courseId', as: 'curso' });
+User.hasMany(Wishlist, { foreignKey: 'userId' });
+Course.hasMany(Wishlist, { foreignKey: 'courseId' });
+
 const syncDB = async () => {
     try {
         // 🛡️ La estructura de las tablas ya NO se ajusta sola en cada arranque
@@ -66,4 +73,4 @@ const syncDB = async () => {
 }
 
 // 🟢 3. EXPORTAR SystemSetting
-module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout, ErrorLog };
+module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout, ErrorLog, Wishlist };

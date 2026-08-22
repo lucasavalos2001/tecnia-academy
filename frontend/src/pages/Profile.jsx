@@ -5,6 +5,7 @@ import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function Profile() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ function Profile() {
   const [activeTab, setActiveTab] = useState('profile-overview');
   
   const [certificados, setCertificados] = useState([]);
+  const [favoritos, setFavoritos] = useState([]);
   const [formData, setFormData] = useState({ 
     nombre: '', 
     biografia: '', 
@@ -38,6 +40,9 @@ function Profile() {
             const resCert = await axios.get(`${API_URL}/usuario/certificados`, { headers: { Authorization: `Bearer ${token}` } });
             setCertificados(resCert.data.certificados);
 
+            const resFav = await axios.get(`${API_URL}/cursos/favoritos`, { headers: { Authorization: `Bearer ${token}` } });
+            setFavoritos(resFav.data.favoritos);
+
             const resPerfil = await axios.get(`${API_URL}/usuario/perfil`, { headers: { Authorization: `Bearer ${token}` } });
             setFormData({
                 nombre: resPerfil.data.nombre_completo,
@@ -49,6 +54,16 @@ function Profile() {
     };
     if (token) fetchData();
   }, [token]);
+
+  const handleRemoveFavorite = async (courseId) => {
+    try {
+        await axios.post(`${API_URL}/cursos/${courseId}/favorito`, {}, { headers: { Authorization: `Bearer ${token}` } });
+        setFavoritos(favoritos.filter(f => f.curso?.id !== courseId));
+        toast.success("Quitado de favoritos.");
+    } catch (error) {
+        toast.error("Error al quitar de favoritos.");
+    }
+  };
 
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
@@ -134,6 +149,31 @@ function Profile() {
                             <p style={{fontSize: '0.85rem', color: '#666'}}>Completado: {new Date(cert.updatedAt).toLocaleDateString()}</p>
                         </div>
                         <button className="btn-save-settings" onClick={() => navigate(`/certificado/${cert.id}`)} style={{padding: '8px 20px', fontSize: '0.9rem'}}>Ver</button>
+                    </div>
+                ))
+            )}
+          </div>
+        );
+
+      case 'profile-wishlist':
+        return (
+          <div className="certificates-list">
+            <h2 style={{marginBottom: '20px'}}><i className="fas fa-heart"></i> Mis Favoritos</h2>
+            {favoritos.length === 0 ? (
+                <p style={{textAlign: 'center', padding: '40px', color: '#777'}}>Todavía no guardaste ningún curso. Explorá la biblioteca y tocá el corazón en el que te interese.</p>
+            ) : (
+                favoritos.filter(f => f.curso).map((fav) => (
+                    <div className="certificate-card" key={fav.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '15px', border: '1px solid #eee'}}>
+                        <div>
+                            <h4 style={{color: '#0b3d91', margin: '0 0 5px 0'}}>{fav.curso.titulo}</h4>
+                            <p style={{fontSize: '0.85rem', color: '#666'}}>Por {fav.curso.instructor?.nombre_completo} · {(!fav.curso.precio || parseFloat(fav.curso.precio) === 0) ? 'Gratis' : formatCurrency(fav.curso.precio)}</p>
+                        </div>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <button className="btn-save-settings" onClick={() => navigate(`/curso/${fav.curso.id}`)} style={{padding: '8px 20px', fontSize: '0.9rem'}}>Ver Curso</button>
+                            <button onClick={() => handleRemoveFavorite(fav.curso.id)} style={{background:'transparent', border:'1px solid #e74c3c', color:'#e74c3c', borderRadius:'8px', padding:'8px 14px', cursor:'pointer'}} title="Quitar de favoritos">
+                                <i className="fas fa-heart-broken"></i>
+                            </button>
+                        </div>
                     </div>
                 ))
             )}
@@ -252,6 +292,7 @@ function Profile() {
                 <nav className="profile-tabs">
                     <button className={`profile-tab-button ${activeTab==='profile-overview'?'active':''}`} onClick={()=>setActiveTab('profile-overview')}><i className="fas fa-user-shield"></i> Resumen</button>
                     <button className={`profile-tab-button ${activeTab==='profile-certificates'?'active':''}`} onClick={()=>setActiveTab('profile-certificates')}><i className="fas fa-certificate"></i> Logros</button>
+                    <button className={`profile-tab-button ${activeTab==='profile-wishlist'?'active':''}`} onClick={()=>setActiveTab('profile-wishlist')}><i className="fas fa-heart"></i> Favoritos</button>
                     <button className={`profile-tab-button ${activeTab==='profile-settings'?'active':''}`} onClick={()=>setActiveTab('profile-settings')}><i className="fas fa-user-cog"></i> Ajustes</button>
                 </nav>
             </aside>

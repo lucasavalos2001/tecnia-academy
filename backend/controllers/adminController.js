@@ -10,16 +10,43 @@ const getGlobalStats = async (req, res) => {
         const totalUsers = await User.count();
         const totalCourses = await Course.count();
         const totalEnrollments = await Enrollment.count();
-        
+        const totalInstructors = await User.count({ where: { rol: 'instructor' } });
+
         const [results] = await sequelize.query(`
             SELECT SUM(c.precio) as total_ingresos
             FROM enrollments e
             JOIN courses c ON e."courseId" = c.id
         `);
-        
+
         const totalRevenue = results[0]?.total_ingresos || 0;
 
-        res.json({ totalUsers, totalCourses, totalEnrollments, totalRevenue });
+        // 🟢 Top 5 cursos más vendidos
+        const [cursosMasVendidos] = await sequelize.query(`
+            SELECT c.id, c.titulo, COUNT(e.id) as ventas, SUM(c.precio) as ingresos
+            FROM courses c
+            JOIN enrollments e ON e."courseId" = c.id
+            GROUP BY c.id, c.titulo
+            ORDER BY ventas DESC
+            LIMIT 5
+        `);
+
+        // 🟢 Ingresos de los últimos 6 meses
+        const [ingresosPorMes] = await sequelize.query(`
+            SELECT
+                TO_CHAR(e."createdAt", 'YYYY-MM') as mes,
+                COUNT(e.id) as ventas,
+                SUM(c.precio) as ingresos
+            FROM enrollments e
+            JOIN courses c ON e."courseId" = c.id
+            WHERE e."createdAt" >= NOW() - INTERVAL '6 months'
+            GROUP BY mes
+            ORDER BY mes ASC
+        `);
+
+        res.json({
+            totalUsers, totalCourses, totalEnrollments, totalRevenue, totalInstructors,
+            cursosMasVendidos, ingresosPorMes
+        });
     } catch (error) {
         res.status(500).json({ message: "Error al obtener estadísticas" });
     }

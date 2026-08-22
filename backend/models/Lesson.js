@@ -45,6 +45,13 @@ const Lesson = sequelize.define('Lesson', {
     orden: {
         type: DataTypes.INTEGER,
         defaultValue: 0,
+    },
+    // Si es true, cualquiera puede ver esta lección sin haberse inscrito
+    // (vista previa gratuita para convencer antes de comprar).
+    es_preview: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
     }
 }, {
     tableName: 'lessons',

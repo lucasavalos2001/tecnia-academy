@@ -341,11 +341,66 @@ function AdminDashboard() {
             {activeTab === 'stats' && (
                 <section>
                     <h2 style={{marginBottom:'20px'}}>Dashboard de Control</h2>
-                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px'}}>
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '30px'}}>
                         <StatCard title="Usuarios Totales" value={stats.totalUsers} icon="fa-users" color="#3498db" />
                         <StatCard title="Cursos Creados" value={stats.totalCourses} icon="fa-graduation-cap" color="#9b59b6" />
                         <StatCard title="Inscripciones" value={stats.totalEnrollments} icon="fa-clipboard-list" color="#f1c40f" />
                         <StatCard title="Ingresos Totales" value={formatMoney(stats.totalRevenue)} icon="fa-coins" color="#27ae60" />
+                        <StatCard title="Instructores Activos" value={stats.totalInstructors || 0} icon="fa-chalkboard-teacher" color="#e67e22" />
+                    </div>
+
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px'}}>
+                        {/* CURSOS MÁS VENDIDOS */}
+                        <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                            <h3 style={{marginTop:0}}>Cursos Más Vendidos</h3>
+                            {(!stats.cursosMasVendidos || stats.cursosMasVendidos.length === 0) ? (
+                                <p style={{color:'#999'}}>Todavía no hay ventas.</p>
+                            ) : (
+                                <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                                    {stats.cursosMasVendidos.map((c, i) => {
+                                        const max = parseInt(stats.cursosMasVendidos[0].ventas) || 1;
+                                        const pct = Math.max(8, (parseInt(c.ventas) / max) * 100);
+                                        return (
+                                            <div key={c.id}>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'4px'}}>
+                                                    <span>{i+1}. {c.titulo}</span>
+                                                    <span style={{fontWeight:'bold'}}>{c.ventas} ventas</span>
+                                                </div>
+                                                <div style={{height:'8px', background:'#eee', borderRadius:'4px', overflow:'hidden'}}>
+                                                    <div style={{height:'100%', width:`${pct}%`, background:'#9b59b6'}}></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* INGRESOS ÚLTIMOS 6 MESES */}
+                        <div style={{background:'white', padding:'20px', borderRadius:'8px', boxShadow:'0 2px 5px rgba(0,0,0,0.05)'}}>
+                            <h3 style={{marginTop:0}}>Ingresos - Últimos 6 Meses</h3>
+                            {(!stats.ingresosPorMes || stats.ingresosPorMes.length === 0) ? (
+                                <p style={{color:'#999'}}>Sin datos en este período.</p>
+                            ) : (
+                                <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+                                    {stats.ingresosPorMes.map((m) => {
+                                        const max = Math.max(...stats.ingresosPorMes.map(x => parseFloat(x.ingresos) || 0)) || 1;
+                                        const pct = Math.max(8, (parseFloat(m.ingresos) / max) * 100);
+                                        return (
+                                            <div key={m.mes}>
+                                                <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'4px'}}>
+                                                    <span>{m.mes}</span>
+                                                    <span style={{fontWeight:'bold'}}>{formatMoney(m.ingresos)}</span>
+                                                </div>
+                                                <div style={{height:'8px', background:'#eee', borderRadius:'4px', overflow:'hidden'}}>
+                                                    <div style={{height:'100%', width:`${pct}%`, background:'#27ae60'}}></div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </section>
             )}

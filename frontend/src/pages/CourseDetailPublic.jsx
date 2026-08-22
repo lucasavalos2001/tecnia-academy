@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'; // 👈 Agregam
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEO from '../components/SEO';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -48,6 +49,20 @@ function CourseDetailPublic() {
     };
     fetchDetails();
   }, [id, API_URL]);
+
+  // 🟢 VISTA PREVIA GRATUITA: cualquiera puede ver estas lecciones sin pagar
+  const handlePreviewClick = async (lessonId) => {
+    try {
+        const res = await axios.get(`${API_URL}/cursos/lecciones/${lessonId}/preview`);
+        if (res.data.url_video) {
+            setVideoModal(res.data.url_video);
+        } else {
+            toast.info('Esta lección de vista previa no tiene video.');
+        }
+    } catch (error) {
+        toast.error('No se pudo cargar la vista previa.');
+    }
+  };
 
   // 🟢 FUNCIÓN DE ADMIN: APROBAR/RECHAZAR
   const handleAdminReview = async (decision) => {
@@ -142,6 +157,11 @@ function CourseDetailPublic() {
 
   return (
     <>
+      <SEO
+        title={curso.titulo}
+        description={curso.descripcion_larga ? curso.descripcion_larga.substring(0, 155) : undefined}
+        image={curso.imagen_url}
+      />
       <Navbar />
 
       {/* 🟢 MODAL REPRODUCTOR DE VIDEO (MINI PANTALLA) */}
@@ -237,6 +257,7 @@ function CourseDetailPublic() {
                   <div style={{marginTop: '20px', fontSize: '0.9rem', display:'flex', gap:'20px', alignItems:'center', flexWrap: 'wrap'}}>
                       <span style={{background:'#f1c40f', color:'black', padding:'2px 6px', fontWeight:'bold', fontSize:'0.8rem'}}>BESTSELLER</span>
                       <span>Creado por <span style={{color: '#cec0fc', textDecoration:'underline'}}>{curso.instructor?.nombre_completo || 'Instructor Tecnia'}</span></span>
+                      <span><i className="fas fa-signal"></i> {curso.nivel ? curso.nivel.charAt(0).toUpperCase() + curso.nivel.slice(1) : 'Principiante'}</span>
                       <span><i className="fas fa-globe"></i> Español</span>
                       <span><i className="fas fa-calendar-alt"></i> Última act. {new Date(curso.updatedAt).toLocaleDateString()}</span>
                   </div>
@@ -311,6 +332,28 @@ function CourseDetailPublic() {
                                                           onMouseOut={e => e.target.style.color = '#2c3e50'}
                                                       >
                                                           👁️
+                                                      </button>
+                                                  )}
+
+                                                  {/* 🟢 VISTA PREVIA GRATUITA: visible para cualquiera, inscrito o no */}
+                                                  {lec.es_preview && (
+                                                      <button
+                                                          onClick={() => handlePreviewClick(lec.id)}
+                                                          style={{
+                                                              fontSize:'0.75rem',
+                                                              color:'#0b3d91',
+                                                              background:'#e7edfb',
+                                                              border:'none',
+                                                              borderRadius:'12px',
+                                                              padding:'4px 12px',
+                                                              cursor:'pointer',
+                                                              fontWeight:'bold',
+                                                              display:'flex',
+                                                              alignItems:'center',
+                                                              gap:'5px'
+                                                          }}
+                                                      >
+                                                          <i className="fas fa-play"></i> Vista previa
                                                       </button>
                                                   )}
                                               </div>

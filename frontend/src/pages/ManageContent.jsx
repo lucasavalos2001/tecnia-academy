@@ -30,8 +30,10 @@ function ManageContent() {
   const [lessonDuration, setLessonDuration] = useState(''); 
   
   // 🟢 NUEVO ESTADO: RECURSOS
-  const [lessonResource, setLessonResource] = useState(''); 
-  
+  const [lessonResource, setLessonResource] = useState('');
+  const [lessonPreview, setLessonPreview] = useState(false);
+
+
   const [videoFile, setVideoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -187,7 +189,8 @@ function ManageContent() {
     setLessonDuration(leccion.duracion || ''); 
     // 🟢 CARGAMOS EL RECURSO SI EXISTE
     setLessonResource(leccion.enlace_recurso || '');
-    
+    setLessonPreview(!!leccion.es_preview);
+
     setSelectedModuleId(moduleId);
     
     if (leccion.contenido_quiz && leccion.contenido_quiz.length > 0) {
@@ -209,6 +212,7 @@ function ManageContent() {
     setLessonDescription('');
     setLessonDuration(''); 
     setLessonResource(''); // Limpiamos recurso
+    setLessonPreview(false);
     setVideoFile(null);
     setQuizQuestions([]);
     setShowQuizBuilder(false);
@@ -288,8 +292,9 @@ function ManageContent() {
             contenido_texto: lessonDescription,
             duracion: lessonDuration,
             // 🟢 ENVIAMOS EL RECURSO AL BACKEND
-            enlace_recurso: lessonResource, 
-            contenido_quiz: quizQuestions.length > 0 ? quizQuestions : null 
+            enlace_recurso: lessonResource,
+            es_preview: lessonPreview,
+            contenido_quiz: quizQuestions.length > 0 ? quizQuestions : null
         };
         
         if (finalEmbedUrl) {
@@ -372,8 +377,9 @@ function ManageContent() {
                                             <i className="fas fa-film" style={{color: '#00d4d4'}} title="Video"></i>
                                         )}
                                         
-                                        {lec.titulo} 
+                                        {lec.titulo}
                                         {lec.duracion && <span style={{fontSize:'0.8rem', color:'#999', marginLeft:'5px'}}>({lec.duracion})</span>}
+                                        {lec.es_preview && <span style={{fontSize:'0.7rem', color:'#0b3d91', background:'#e7edfb', padding:'2px 8px', borderRadius:'10px', marginLeft:'8px'}}><i className="fas fa-eye"></i> Vista previa</span>}
                                     </div>
                                     <div>
                                         <button onClick={() => startEditingLesson(lec, mod.id)} style={iconBtnStyle} title="Editar Lección"><i className="fas fa-pencil-alt"></i></button>
@@ -451,7 +457,19 @@ function ManageContent() {
                             />
                             <small style={{color:'#888', display:'block', marginTop:'5px'}}>* Opcional: Agrega un link para que los alumnos descarguen material.</small>
                         </div>
-                        
+
+                        {/* 🟢 VISTA PREVIA GRATUITA */}
+                        <div className="form-group" style={{background: '#f9f9f9', padding: '12px 15px', borderRadius: '8px', border: '1px dashed #ccc'}}>
+                            <label style={{display:'flex', alignItems:'center', gap:'8px', cursor:'pointer', fontWeight:'normal', margin: 0}}>
+                                <input
+                                    type="checkbox"
+                                    checked={lessonPreview}
+                                    onChange={e => setLessonPreview(e.target.checked)}
+                                />
+                                <i className="fas fa-eye" style={{color:'#0b3d91'}}></i> Vista previa gratuita (cualquiera puede verla sin pagar)
+                            </label>
+                        </div>
+
                         {/* SECCIÓN DE VIDEO */}
                         <div className="form-group" style={{marginTop:'20px'}}>
                             <label style={labelStyle}><i className="fas fa-video"></i> Contenido de Video (Opcional si hay Quiz/Recurso):</label>

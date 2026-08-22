@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import SEO from '../components/SEO';
 import { formatCurrency } from '../utils/formatCurrency';
 
 function Home() {
@@ -76,6 +77,7 @@ function Home() {
 
   return (
     <>
+      <SEO />
       <Navbar />
       <main>
         <section className="hero">

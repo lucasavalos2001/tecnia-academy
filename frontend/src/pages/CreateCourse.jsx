@@ -15,6 +15,7 @@ function CreateCourse() {
     titulo: '',
     descripcion_larga: '',
     categoria: 'diseno',
+    nivel: 'principiante',
     precio: '',
     duracion: '', // 🟢 NUEVO
     nombre_instructor_certificado: ''
@@ -65,6 +66,7 @@ function CreateCourse() {
       data.append('titulo', formData.titulo);
       data.append('descripcion_larga', formData.descripcion_larga);
       data.append('categoria', formData.categoria);
+      data.append('nivel', formData.nivel);
       data.append('precio', formData.precio);
       data.append('duracion', formData.duracion); // 🟢 ENVIAR DURACIÓN
       data.append('nombre_instructor_certificado', formData.nombre_instructor_certificado);
@@ -153,6 +155,15 @@ function CreateCourse() {
                   <option value="salud">Salud & Fitness</option>
                   <option value="desarrollo_personal">Desarrollo Personal</option>
                   <option value="otros">Otros / General</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Nivel</label>
+              <select name="nivel" value={formData.nivel} onChange={handleChange} style={{padding: '10px', borderRadius: '5px', border: '1px solid #ccc', width: '100%'}}>
+                  <option value="principiante">Principiante</option>
+                  <option value="intermedio">Intermedio</option>
+                  <option value="avanzado">Avanzado</option>
               </select>
             </div>
 

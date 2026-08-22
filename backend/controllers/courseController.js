@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Course, Module, Lesson, User, Enrollment, Payout } = require('../models');
+const { Course, Module, Lesson, User, Enrollment, Payout, Wishlist } = require('../models');
 const { uploadToBunny } = require('../utils/bunny');
 const { isValidPrice } = require('../utils/validators');
 const { calcularLiquidacionInstructor } = require('../utils/liquidacion');
@@ -58,7 +58,7 @@ const createCourse = async (req, res) => {
     try {
         const instructorId = req.usuario.id;
         // 🟢 AHORA RECIBIMOS 'nombre_instructor_certificado'
-        const { titulo, descripcion_larga, categoria, precio, duracion, nombre_instructor_certificado } = req.body;
+        const { titulo, descripcion_larga, categoria, precio, duracion, nombre_instructor_certificado, nivel } = req.body;
 
         if (!titulo?.trim()) {
             return res.status(400).json({ message: "El curso necesita un título." });
@@ -76,12 +76,13 @@ const createCourse = async (req, res) => {
         }
 
         const nuevoCurso = await Course.create({
-            titulo, descripcion_larga, categoria, precio, 
-            duracion: duracion || "0h", 
-            estado: 'borrador', 
-            instructorId, 
+            titulo, descripcion_larga, categoria, precio,
+            duracion: duracion || "0h",
+            estado: 'borrador',
+            instructorId,
             imagen_url,
-            nombre_instructor_certificado // Guardamos el nombre personalizado
+            nombre_instructor_certificado, // Guardamos el nombre personalizado
+            nivel: ['principiante', 'intermedio', 'avanzado'].includes(nivel) ? nivel : 'principiante'
         });
 
         res.status(201).json({ message: 'Curso creado (Borrador)', curso: nuevoCurso });
@@ -96,7 +97,7 @@ const updateCourse = async (req, res) => {
         const { id } = req.params;
         const instructorId = req.usuario.id;
         // 🟢 AHORA RECIBIMOS 'nombre_instructor_certificado'
-        const { titulo, descripcion_larga, categoria, precio, duracion, estado, nombre_instructor_certificado } = req.body;
+        const { titulo, descripcion_larga, categoria, precio, duracion, estado, nombre_instructor_certificado, nivel } = req.body;
 
         const curso = await Course.findOne({ where: { id, instructorId } });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
@@ -115,6 +116,10 @@ const updateCourse = async (req, res) => {
             duracion, imagen_url: nueva_imagen_url,
             nombre_instructor_certificado // Actualizamos el nombre personalizado
         };
+
+        if (['principiante', 'intermedio', 'avanzado'].includes(nivel)) {
+            updateData.nivel = nivel;
+        }
 
         if (estado && (estado === 'pendiente' || estado === 'borrador')) {
             updateData.estado = estado;
@@ -294,16 +299,17 @@ const updateModule = async (req, res) => {
 const addLesson = async (req, res) => {
     try {
         const { moduleId } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
-        
-        const nuevaLeccion = await Lesson.create({ 
-            titulo, 
-            url_video, 
-            contenido_texto, 
-            contenido_quiz, 
-            duracion, 
-            enlace_recurso, 
-            moduleId 
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso, es_preview } = req.body;
+
+        const nuevaLeccion = await Lesson.create({
+            titulo,
+            url_video,
+            contenido_texto,
+            contenido_quiz,
+            duracion,
+            enlace_recurso,
+            es_preview: !!es_preview,
+            moduleId
         });
 
         const modulo = await Module.findByPk(moduleId);
@@ -334,18 +340,19 @@ const deleteLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
     try {
         const { id } = req.params;
-        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso } = req.body;
-        
+        const { titulo, url_video, contenido_texto, contenido_quiz, duracion, enlace_recurso, es_preview } = req.body;
+
         const leccion = await Lesson.findByPk(id, { include: [{ model: Module, as: 'modulo' }] });
         if (!leccion) return res.status(404).json({ message: "Lección no encontrada" });
 
-        await leccion.update({ 
-            titulo, 
-            url_video, 
-            contenido_texto, 
-            contenido_quiz, 
+        await leccion.update({
+            titulo,
+            url_video,
+            contenido_texto,
+            contenido_quiz,
             duracion,
-            enlace_recurso 
+            enlace_recurso,
+            es_preview: !!es_preview
         });
         
         if (leccion.modulo) await recalculateCourseDuration(leccion.modulo.courseId);
@@ -363,7 +370,7 @@ const updateLesson = async (req, res) => {
 
 const getAllCourses = async (req, res) => {
     try {
-        const { search } = req.query;
+        const { search, categoria, nivel, precio_max, gratis } = req.query;
         let whereCondition = { estado: 'publicado' };
 
         if (search) {
@@ -375,6 +382,20 @@ const getAllCourses = async (req, res) => {
                     { descripcion_larga: { [Op.iLike]: `%${search}%` } }
                 ]
             };
+        }
+
+        if (categoria) {
+            whereCondition.categoria = categoria;
+        }
+
+        if (nivel && ['principiante', 'intermedio', 'avanzado'].includes(nivel)) {
+            whereCondition.nivel = nivel;
+        }
+
+        if (gratis === 'true') {
+            whereCondition.precio = 0;
+        } else if (precio_max && !isNaN(parseFloat(precio_max))) {
+            whereCondition.precio = { [Op.lte]: parseFloat(precio_max) };
         }
 
         const cursos = await Course.findAll({
@@ -396,11 +417,11 @@ const getCourseDetail = async (req, res) => {
                 { 
                     model: Module, 
                     as: 'modulos', 
-                    include: [{ 
-                        model: Lesson, 
+                    include: [{
+                        model: Lesson,
                         as: 'lecciones',
-                        attributes: ['id', 'titulo', 'duracion', 'orden', 'contenido_texto'] 
-                    }] 
+                        attributes: ['id', 'titulo', 'duracion', 'orden', 'contenido_texto', 'es_preview']
+                    }]
                 }
             ],
             order: [['modulos', 'orden', 'ASC'], ['modulos', 'lecciones', 'orden', 'ASC']]
@@ -409,6 +430,27 @@ const getCourseDetail = async (req, res) => {
         res.json(curso);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener detalle" });
+    }
+};
+
+// 🟢 [PÚBLICO] Devuelve el video de una lección marcada como vista previa
+// gratuita, sin necesitar estar inscrito. Solo funciona para lecciones con
+// es_preview = true; para el resto, sigue haciendo falta pagar el curso.
+const getPreviewLesson = async (req, res) => {
+    try {
+        const { lessonId } = req.params;
+        const leccion = await Lesson.findOne({
+            where: { id: lessonId, es_preview: true },
+            attributes: ['id', 'titulo', 'url_video', 'contenido_texto']
+        });
+
+        if (!leccion) {
+            return res.status(404).json({ message: "Esta lección no está disponible como vista previa." });
+        }
+
+        res.json(leccion);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener la vista previa" });
     }
 };
 
@@ -447,6 +489,39 @@ const getMyCourses = async (req, res) => {
     } catch (error) { res.status(500).json({ message: "Error al obtener mis cursos" }); }
 };
 
+// ❤️ FAVORITOS (WISHLIST)
+const getMyWishlist = async (req, res) => {
+    try {
+        const userId = req.usuario.id;
+        const favoritos = await Wishlist.findAll({
+            where: { userId },
+            include: [{
+                model: Course, as: 'curso',
+                include: [{ model: User, as: 'instructor', attributes: ['nombre_completo'] }]
+            }],
+            order: [['createdAt', 'DESC']]
+        });
+        res.json({ favoritos });
+    } catch (error) { res.status(500).json({ message: "Error al obtener favoritos" }); }
+};
+
+const toggleWishlist = async (req, res) => {
+    try {
+        const userId = req.usuario.id;
+        const { courseId } = req.params;
+
+        const existente = await Wishlist.findOne({ where: { userId, courseId } });
+
+        if (existente) {
+            await existente.destroy();
+            return res.json({ message: "Quitado de favoritos.", enFavoritos: false });
+        }
+
+        await Wishlist.create({ userId, courseId });
+        res.status(201).json({ message: "Agregado a favoritos.", enFavoritos: true });
+    } catch (error) { res.status(500).json({ message: "Error al actualizar favoritos" }); }
+};
+
 const markLessonAsComplete = async (req, res) => {
     try {
         const { courseId, lessonId } = req.params;
@@ -476,5 +551,6 @@ const markLessonAsComplete = async (req, res) => {
 module.exports = {
     createCourse, getInstructorCourses, getInstructorStats, getMyEarnings, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
-    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete
+    getAllCourses, getCourseDetail, getPreviewLesson, enrollInCourse, getMyCourses, markLessonAsComplete,
+    getMyWishlist, toggleWishlist
 };

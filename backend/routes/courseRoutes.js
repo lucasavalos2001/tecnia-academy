@@ -4,8 +4,8 @@ const multer = require('multer');
 const { 
     createCourse, getInstructorCourses, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
-    getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete,
-    getInstructorStats, getMyEarnings
+    getAllCourses, getCourseDetail, getPreviewLesson, enrollInCourse, getMyCourses, markLessonAsComplete,
+    getInstructorStats, getMyEarnings, getMyWishlist, toggleWishlist
 } = require('../controllers/courseController');
 
 // Importamos middleware
@@ -18,6 +18,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ==========================================
 router.get('/', getAllCourses);
 router.get('/:id/detalle', getCourseDetail);
+router.get('/lecciones/:lessonId/preview', getPreviewLesson);
 
 // ==========================================
 //  2. RUTAS PROTEGIDAS (ALUMNOS/INSTRUCTORES)
@@ -25,6 +26,8 @@ router.get('/:id/detalle', getCourseDetail);
 
 // --- Estudiante ---
 router.get('/mis-cursos', verifyToken, getMyCourses);
+router.get('/favoritos', verifyToken, getMyWishlist);
+router.post('/:courseId/favorito', verifyToken, toggleWishlist);
 router.post('/:courseId/inscribirse', verifyToken, enrollInCourse);
 router.post('/:courseId/lecciones/:lessonId/completar', verifyToken, markLessonAsComplete);
 

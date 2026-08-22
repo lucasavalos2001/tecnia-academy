@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin-dashboard
+Disallow: /panel-instructor
+Disallow: /perfil
+Disallow: /mis-cursos
+Disallow: /certificado/
+Disallow: /aula-virtual/
+Disallow: /crear-curso
+Disallow: /editar-curso/
+Disallow: /gestionar-contenido/
+
+Sitemap: https://tecniaacademy.com/sitemap.xml

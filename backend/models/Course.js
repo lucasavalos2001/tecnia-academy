@@ -46,7 +46,13 @@ const Course = sequelize.define('Course', {
     // Estados para el flujo de aprobación
     estado: {
         type: DataTypes.ENUM('borrador', 'pendiente', 'publicado', 'rechazado'),
-        defaultValue: 'borrador', 
+        defaultValue: 'borrador',
+    },
+
+    nivel: {
+        type: DataTypes.ENUM('principiante', 'intermedio', 'avanzado'),
+        allowNull: false,
+        defaultValue: 'principiante',
     }
 }, {
     tableName: 'courses', 
