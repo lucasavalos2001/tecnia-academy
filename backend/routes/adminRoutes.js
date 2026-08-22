@@ -15,6 +15,8 @@ const {
     getAllTransactions,
     refundTransaction,
     fixMissingEnrollment,
+    getErrorLogs,
+    markErrorResolved,
     getInstructorEarnings,
     markPayoutAsPaid,
     getMaintenanceStatus,
@@ -39,6 +41,8 @@ router.get('/activity', getRecentEnrollments);
 router.get('/transactions', getAllTransactions);
 router.post('/transactions/:id/refund', refundTransaction);
 router.post('/transactions/:id/fix-enrollment', fixMissingEnrollment);
+router.get('/errors', getErrorLogs);
+router.post('/errors/:id/resolve', markErrorResolved);
 
 // ==========================================
 // 👥 GESTIÓN DE USUARIOS

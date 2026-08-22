@@ -31,6 +31,12 @@ const Enrollment = sequelize.define('Enrollment', {
     }
 }, {
     tableName: 'enrollments',
+    indexes: [
+        // Un alumno no puede tener dos inscripciones al mismo curso (evita
+        // duplicados por condiciones de carrera). El constraint real vive en
+        // la migración unique-enrollment-per-course.
+        { unique: true, fields: ['userId', 'courseId'] }
+    ]
 });
 
 module.exports = Enrollment;

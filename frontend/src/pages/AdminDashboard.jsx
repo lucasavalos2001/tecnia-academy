@@ -19,6 +19,7 @@ function AdminDashboard() {
   const [pendingCourses, setPendingCourses] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [errorLogs, setErrorLogs] = useState([]);
   
   // Mantenimiento
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -85,6 +86,13 @@ function AdminDashboard() {
     } catch (error) { console.error("Error transactions", error); }
   };
 
+  const loadErrorLogs = async () => {
+    try {
+        const res = await axios.get(`${API_URL}/admin/errors`, { headers: { Authorization: `Bearer ${token}` } });
+        setErrorLogs(res.data);
+    } catch (error) { console.error("Error cargando errores", error); }
+  };
+
   const loadMaintenanceStatus = async () => {
       try {
           const res = await axios.get(`${API_URL}/admin/maintenance/status`, { headers: { Authorization: `Bearer ${token}` } });
@@ -102,6 +110,7 @@ function AdminDashboard() {
     if (activeTab === 'requests') loadPendingCourses(); 
     if (activeTab === 'payouts') loadPayouts();
     if (activeTab === 'transactions') loadTransactions();
+    if (activeTab === 'errors') loadErrorLogs();
   }, [activeTab, selectedMonth, selectedYear]);
 
   // --- ACCIONES ADMINISTRATIVAS ---
@@ -168,6 +177,51 @@ function AdminDashboard() {
     } catch (error) {
         toast.error(error.response?.data?.message || "Error al registrar el pago.");
     }
+  };
+
+  const handleResolveError = async (errorId) => {
+    try {
+        await axios.post(`${API_URL}/admin/errors/${errorId}/resolve`, {}, { headers: { Authorization: `Bearer ${token}` } });
+        setErrorLogs(errorLogs.filter(e => e.id !== errorId));
+    } catch (error) {
+        toast.error("Error al marcar como resuelto.");
+    }
+  };
+
+  // 📄 Exportar la liquidación del mes a CSV, para uso contable/impositivo
+  const handleExportPayoutsCSV = () => {
+    if (payouts.length === 0) {
+        toast.info("No hay datos para exportar en este período.");
+        return;
+    }
+
+    const escapeCsv = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const encabezados = ['Instructor', 'Email/CI', 'Banco', 'Cuenta', 'Condición', 'Ventas Totales', 'Total Bruto', 'Comisión %', 'Comisión Retenida', 'Neto a Pagar', 'Estado'];
+
+    const filas = payouts.map(p => [
+        p.instructor.nombre,
+        p.instructor.ci || '',
+        p.instructor.banco || '',
+        p.instructor.cuenta || '',
+        p.instructor.tiene_factura ? 'PRO (con factura)' : 'Básico (sin factura)',
+        p.detalle.reduce((acc, d) => acc + d.cantidad, 0),
+        p.estadisticas.total_bruto,
+        `${p.estadisticas.porcentaje_comision}%`,
+        p.estadisticas.comision_retenida,
+        p.estadisticas.total_a_pagar,
+        p.ya_pagado ? 'Pagado' : 'Pendiente'
+    ]);
+
+    const contenido = [encabezados, ...filas].map(fila => fila.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([`﻿${contenido}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `liquidacion_${selectedYear}-${String(selectedMonth).padStart(2, '0')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleFixEnrollment = async (tx) => {
@@ -270,6 +324,11 @@ function AdminDashboard() {
                     <li><button onClick={() => setActiveTab('activity')} className={activeTab === 'activity' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-history"></i> Actividad Reciente</button></li>
                     <li><button onClick={() => setActiveTab('payouts')} className={activeTab === 'payouts' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-money-bill-wave"></i> Liquidación Pagos</button></li>
                     <li><button onClick={() => setActiveTab('transactions')} className={activeTab === 'transactions' ? 'active' : ''} style={navBtnStyle}><i className="fas fa-receipt"></i> Transacciones</button></li>
+                    <li>
+                        <button onClick={() => setActiveTab('errors')} className={activeTab === 'errors' ? 'active' : ''} style={navBtnStyle}>
+                            <i className="fas fa-bug"></i> Errores {errorLogs.length > 0 && <span style={badgeStyle}>{errorLogs.length}</span>}
+                        </button>
+                    </li>
                 </ul>
             </nav>
         </aside>
@@ -366,6 +425,9 @@ function AdminDashboard() {
                             <select value={selectedYear} onChange={(e)=>setSelectedYear(e.target.value)} style={selectStyle}>
                                 {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                             </select>
+                            <button onClick={handleExportPayoutsCSV} style={{...btnSmall, background:'#27ae60', color:'white', padding:'8px 15px'}}>
+                                <i className="fas fa-file-csv"></i> Exportar CSV
+                            </button>
                         </div>
                     </div>
                     <div style={tableWrapper}>
@@ -485,6 +547,38 @@ function AdminDashboard() {
                             </tbody>
                         </table>
                     </div>
+                </section>
+            )}
+
+            {/* TAB: ERRORES DEL SERVIDOR */}
+            {activeTab === 'errors' && (
+                <section>
+                    <h2 style={{marginBottom:'20px'}}>Errores del Servidor</h2>
+                    {errorLogs.length === 0 ? (
+                        <p style={{textAlign:'center', padding:'40px', color:'#27ae60'}}>
+                            <i className="fas fa-check-circle"></i> No hay errores pendientes de revisar.
+                        </p>
+                    ) : (
+                        <div style={{display:'grid', gap:'15px'}}>
+                            {errorLogs.map(err => (
+                                <div key={err.id} style={{...itemBoxStyle, alignItems:'flex-start', flexDirection:'column', borderLeft:'4px solid #e74c3c'}}>
+                                    <div style={{display:'flex', justifyContent:'space-between', width:'100%', alignItems:'flex-start'}}>
+                                        <div>
+                                            <span style={{...roleBadge, background:'#e74c3c'}}>{err.origen}</span>
+                                            <p style={{margin:'8px 0 4px 0', fontWeight:'bold'}}>{err.mensaje}</p>
+                                            <small style={{color:'#999'}}>{new Date(err.createdAt).toLocaleString('es-PY')}</small>
+                                        </div>
+                                        <button onClick={() => handleResolveError(err.id)} style={{...btnSmall, background:'#27ae60', color:'white', flexShrink:0}}>
+                                            Marcar resuelto
+                                        </button>
+                                    </div>
+                                    {err.detalle && (
+                                        <pre style={{marginTop:'10px', padding:'10px', background:'#f7f7f7', borderRadius:'5px', fontSize:'0.75em', overflowX:'auto', width:'100%', boxSizing:'border-box'}}>{err.detalle}</pre>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </section>
             )}
 

@@ -39,12 +39,24 @@ const verifyToken = (req, res, next) => {
 const isAdmin = (req, res, next) => {
     // Permitimos tanto 'admin' como 'superadmin' para no bloquear gestiones críticas
     if (req.usuario && (req.usuario.rol === 'admin' || req.usuario.rol === 'superadmin')) {
-        next(); 
+        next();
     } else {
-        return res.status(403).json({ 
-            message: "Acceso denegado. Se requieren permisos de administrador." 
+        return res.status(403).json({
+            message: "Acceso denegado. Se requieren permisos de administrador."
         });
     }
 };
 
-module.exports = { verifyToken, isAdmin };
+const isInstructor = (req, res, next) => {
+    // Instructor, admin o superadmin pueden gestionar cursos. Un alumno (student) no.
+    const rol = req.usuario?.rol;
+    if (rol === 'instructor' || rol === 'admin' || rol === 'superadmin') {
+        next();
+    } else {
+        return res.status(403).json({
+            message: "Acceso denegado. Necesitás ser instructor para hacer esto."
+        });
+    }
+};
+
+module.exports = { verifyToken, isAdmin, isInstructor };

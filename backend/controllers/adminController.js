@@ -1,7 +1,8 @@
-const { User, Course, Enrollment, Transaction, SystemSetting, Payout } = require('../models');
+const { User, Course, Enrollment, Transaction, SystemSetting, Payout, ErrorLog } = require('../models');
 const { sequelize } = require('../config/db');
 const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para el reseteo de claves
+const { isValidRole, isStrongPassword } = require('../utils/validators');
 
 // 1. Dashboard: Estadísticas Globales
 const getGlobalStats = async (req, res) => {
@@ -43,8 +44,8 @@ const resetUserPassword = async (req, res) => {
         const { userId } = req.params;
         const { newPassword } = req.body; // El admin envía la clave provisoria
 
-        if (!newPassword || newPassword.length < 6) {
-            return res.status(400).json({ message: "La contraseña provisoria debe tener al menos 6 caracteres." });
+        if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({ message: "La contraseña provisoria debe tener al menos 8 caracteres, con letras y números." });
         }
 
         const user = await User.findByPk(userId);
@@ -70,6 +71,11 @@ const updateUserRole = async (req, res) => {
     try {
         const { userId } = req.params;
         const { rol } = req.body;
+
+        if (!isValidRole(rol)) {
+            return res.status(400).json({ message: "Rol no válido." });
+        }
+
         await User.update({ rol }, { where: { id: userId } });
         res.json({ message: `Rol actualizado a: ${rol}` });
     } catch (error) {
@@ -242,6 +248,30 @@ const getAllTransactions = async (req, res) => {
         res.json(resultado);
     } catch (error) {
         res.status(500).json({ message: "Error al obtener transacciones" });
+    }
+};
+
+// 4.c Errores del servidor (para no depender de mirar la consola a mano)
+const getErrorLogs = async (req, res) => {
+    try {
+        const errores = await ErrorLog.findAll({
+            where: { resuelto: false },
+            order: [['createdAt', 'DESC']],
+            limit: 100
+        });
+        res.json(errores);
+    } catch (error) {
+        res.status(500).json({ message: "Error al obtener el registro de errores" });
+    }
+};
+
+const markErrorResolved = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await ErrorLog.update({ resuelto: true }, { where: { id } });
+        res.json({ message: "Error marcado como resuelto." });
+    } catch (error) {
+        res.status(500).json({ message: "Error al actualizar" });
     }
 };
 
@@ -459,6 +489,8 @@ module.exports = {
     getAllTransactions,
     refundTransaction,
     fixMissingEnrollment,
+    getErrorLogs,
+    markErrorResolved,
     getInstructorEarnings,
     markPayoutAsPaid,
     getMaintenanceStatus,

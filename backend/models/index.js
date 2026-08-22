@@ -7,6 +7,7 @@ const Enrollment = require('./Enrollment.js');
 const Transaction = require('./Transaction.js');
 const SystemSetting = require('./SystemSetting.js'); // 🟢 1. IMPORTAR NUEVO MODELO
 const Payout = require('./Payout.js');
+const ErrorLog = require('./ErrorLog.js');
 
 // --- Relaciones de Instructor (Creación) ---
 User.hasMany(Course, { foreignKey: 'instructorId', as: 'cursos_creados' });
@@ -65,4 +66,4 @@ const syncDB = async () => {
 }
 
 // 🟢 3. EXPORTAR SystemSetting
-module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout };
+module.exports = { sequelize, syncDB, User, Course, Module, Lesson, Enrollment, Transaction, SystemSetting, Payout, ErrorLog };

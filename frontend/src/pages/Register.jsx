@@ -17,10 +17,16 @@ function Register() {
 
   // 🟢 Lógica de validación: ¿Coinciden las contraseñas?
   const passwordsMatch = password === confirmPassword;
-  const canSubmit = acceptedTerms && passwordsMatch && password.length >= 6;
+  const isPasswordStrong = password.length >= 8 && /[a-zA-Z]/.test(password) && /[0-9]/.test(password);
+  const canSubmit = acceptedTerms && passwordsMatch && isPasswordStrong;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isPasswordStrong) {
+      toast.error("La contraseña debe tener al menos 8 caracteres, con letras y números.");
+      return;
+    }
 
     if (!passwordsMatch) {
       toast.error("Las contraseñas no coinciden.");
@@ -93,9 +99,14 @@ function Register() {
                             id="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Mínimo 6 caracteres"
+                            placeholder="Mínimo 8 caracteres, con letras y números"
                             required
                         />
+                        {password && !isPasswordStrong && (
+                            <span style={{color: '#ff4d4d', fontSize: '0.8rem', marginTop: '5px'}}>
+                                ⚠️ Debe tener al menos 8 caracteres, con letras y números
+                            </span>
+                        )}
                     </div>
 
                     {/* 🟢 NUEVO: Campo de Confirmar Contraseña */}

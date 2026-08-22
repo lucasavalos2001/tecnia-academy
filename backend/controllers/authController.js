@@ -1,20 +1,7 @@
 const { User } = require('../models');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const { Op } = require('sequelize');
-
-// ➡️ CONFIGURACIÓN FINAL CON SENDGRID (PUERTO DESBLOQUEADO) 🚀
-const transporter = nodemailer.createTransport({
-    host: "smtp.sendgrid.net",
-    port: 2525,                   // ⬅️ ¡CAMBIO CLAVE! El puerto 2525 no lo bloquea Digital Ocean
-    secure: false,                // false es correcto para el puerto 2525 (Usa STARTTLS)
-    auth: {
-        user: 'apikey',           // Usuario fijo de SendGrid
-        pass: process.env.SENDGRID_API_KEY 
-    }
-});
+const { isValidEmail, isStrongPassword } = require('../utils/validators');
 
 // --- REGISTRO (CORRECCIÓN: Robustez de Contraseña) ---
 const registerUser = async (req, res) => {
@@ -26,8 +13,16 @@ const registerUser = async (req, res) => {
 
     try {
         // Validación básica
-        if (!passwordFinal || !email) {
-            return res.status(400).json({ message: 'Faltan datos obligatorios (email o contraseña)' });
+        if (!passwordFinal || !email || !nombre_completo?.trim()) {
+            return res.status(400).json({ message: 'Faltan datos obligatorios (nombre, email o contraseña)' });
+        }
+
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: 'El email no tiene un formato válido.' });
+        }
+
+        if (!isStrongPassword(passwordFinal)) {
+            return res.status(400).json({ message: 'La contraseña debe tener al menos 8 caracteres, con letras y números.' });
         }
 
         const existeUsuario = await User.findOne({ where: { email } });
@@ -115,67 +110,8 @@ const loginUser = async (req, res) => {
     }
 };
 
-// --- RECUPERACIÓN DE CONTRASEÑA (CORRECCIÓN: Manejo de errores específico) ---
-const forgotPassword = async (req, res) => {
-    const { email } = req.body;
-    try {
-        const user = await User.findOne({ where: { email } });
-        if (!user) return res.status(404).json({ message: "No existe un usuario con ese correo." });
+// La recuperación de contraseña por email se reemplazó por un contacto directo
+// vía WhatsApp (ver frontend/src/pages/ForgotPassword.jsx) más el reseteo manual
+// que ya tenía el admin en el panel (adminController.js -> resetUserPassword).
 
-        const token = crypto.randomBytes(20).toString('hex');
-        user.resetPasswordToken = token;
-        user.resetPasswordExpires = Date.now() + 3600000; 
-        await user.save();
-
-        const resetUrl = `https://tecniaacademy.com/reset-password/${token}`;
-
-        const mailOptions = {
-            from: '"Soporte Tecnia Academy" <tecniaacademy@gmail.com>',
-            to: user.email,
-            subject: 'Restablecer tu contraseña',
-            text: `Hola,\n\nHaz clic aquí para cambiar tu contraseña:\n${resetUrl}\n\nSi no fuiste tú, ignora este correo.`
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ message: "Correo enviado. Revisa tu bandeja de entrada." });
-
-    } catch (error) {
-        console.error("❌ Error enviando correo:", error);
-        // Devolver un error específico para diagnosticar el fallo en el servidor
-        if (error.code === 'EAUTH') {
-             res.status(500).json({ message: "Error: Credenciales de correo inválidas. Verifica EMAIL_PASS y Contraseña de Aplicación." });
-        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNREFUSED') {
-             res.status(500).json({ message: "Error: No se pudo conectar al servidor de correo. Verifica la conexión a internet/VPN." });
-        } else {
-             res.status(500).json({ message: "Error al enviar correo." });
-        }
-    }
-};
-
-const resetPassword = async (req, res) => {
-    const { token } = req.params;
-    const { password } = req.body;
-    
-    try {
-        const user = await User.findOne({
-            where: {
-                resetPasswordToken: token,
-                resetPasswordExpires: { [Op.gt]: Date.now() }
-            }
-        });
-        if (!user) return res.status(400).json({ message: "Enlace inválido o expirado." });
-
-        const salt = await bcrypt.genSalt(10);
-        user.contraseña_hash = await bcrypt.hash(password, salt);
-        user.resetPasswordToken = null;
-        user.resetPasswordExpires = null;
-        await user.save();
-
-        res.json({ message: "Contraseña actualizada." });
-    } catch (error) {
-        console.error("Error reset password:", error);
-        res.status(500).json({ message: "Error al restablecer." });
-    }
-};
-
-module.exports = { registerUser, loginUser, forgotPassword, resetPassword };
+module.exports = { registerUser, loginUser };

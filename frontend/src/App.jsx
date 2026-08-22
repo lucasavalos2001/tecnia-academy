@@ -20,7 +20,6 @@ import AdminDashboard from './pages/AdminDashboard';
 import EditCourse from './pages/EditCourse'; 
 import CourseDetailPublic from './pages/CourseDetailPublic';
 import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
 import VerifyCertificate from './pages/VerifyCertificate';
 import Maintenance from './pages/Maintenance';
 
@@ -58,7 +57,6 @@ function App() {
       <Route path="/biblioteca" element={<CourseLibrary />} />
       <Route path="/curso/:id" element={<CourseDetailPublic />} />
       <Route path="/olvide-password" element={<ForgotPassword />} />
-      <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/verify" element={<VerifyCertificate />} />
 
       {/* 🟢 2. AGREGAR LA NUEVA RUTA AQUÍ (Esto también faltaba) */}

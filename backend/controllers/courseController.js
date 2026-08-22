@@ -1,6 +1,8 @@
 const { Op } = require('sequelize');
-const { Course, Module, Lesson, User, Enrollment } = require('../models');
+const { Course, Module, Lesson, User, Enrollment, Payout } = require('../models');
 const { uploadToBunny } = require('../utils/bunny');
+const { isValidPrice } = require('../utils/validators');
+const { calcularLiquidacionInstructor } = require('../utils/liquidacion');
 
 // ==========================================
 // 🟢 FUNCIÓN AUXILIAR: RECALCULAR DURACIÓN TOTAL
@@ -57,6 +59,14 @@ const createCourse = async (req, res) => {
         const instructorId = req.usuario.id;
         // 🟢 AHORA RECIBIMOS 'nombre_instructor_certificado'
         const { titulo, descripcion_larga, categoria, precio, duracion, nombre_instructor_certificado } = req.body;
+
+        if (!titulo?.trim()) {
+            return res.status(400).json({ message: "El curso necesita un título." });
+        }
+        if (!isValidPrice(precio)) {
+            return res.status(400).json({ message: "El precio no es válido (debe ser 0 o un número positivo)." });
+        }
+
         let imagen_url = null;
 
         if (req.file) {
@@ -90,6 +100,10 @@ const updateCourse = async (req, res) => {
 
         const curso = await Course.findOne({ where: { id, instructorId } });
         if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+        if (precio !== undefined && !isValidPrice(precio)) {
+            return res.status(400).json({ message: "El precio no es válido (debe ser 0 o un número positivo)." });
+        }
 
         let nueva_imagen_url = curso.imagen_url;
         if (req.file) {
@@ -147,6 +161,27 @@ const getInstructorStats = async (req, res) => {
 
         res.json({ totalCursos: cursos.length, totalEstudiantes, totalIngresos: totalIngresos.toFixed(2), desglose });
     } catch (error) { res.status(500).json({ message: "Error al obtener estadísticas" }); }
+};
+
+// 🟢 Liquidación real del instructor (neto, con la comisión ya descontada),
+// para que no dependa de preguntarle al admin cuánto le toca cobrar.
+const getMyEarnings = async (req, res) => {
+    try {
+        const currentDate = new Date();
+        const mes = req.query.month ? parseInt(req.query.month) : currentDate.getMonth() + 1;
+        const anio = req.query.year ? parseInt(req.query.year) : currentDate.getFullYear();
+
+        const instructor = await User.findByPk(req.usuario.id, {
+            attributes: ['id', 'tiene_factura']
+        });
+        if (!instructor) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        const liquidacion = await calcularLiquidacionInstructor({ instructor, mes, anio, Course, Enrollment, Payout });
+        res.json(liquidacion);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error al calcular tu liquidación" });
+    }
 };
 
 const deleteCourse = async (req, res) => {
@@ -439,7 +474,7 @@ const markLessonAsComplete = async (req, res) => {
 };
 
 module.exports = {
-    createCourse, getInstructorCourses, getInstructorStats, updateCourse, deleteCourse,
+    createCourse, getInstructorCourses, getInstructorStats, getMyEarnings, updateCourse, deleteCourse,
     getCourseCurriculum, addModule, deleteModule, updateModule, addLesson, deleteLesson, updateLesson,
     getAllCourses, getCourseDetail, enrollInCourse, getMyCourses, markLessonAsComplete
 };

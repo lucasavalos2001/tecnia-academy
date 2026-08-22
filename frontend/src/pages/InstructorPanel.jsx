@@ -16,6 +16,10 @@ function InstructorPanel() {
   const [cursos, setCursos] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [earnings, setEarnings] = useState(null);
+  const [loadingEarnings, setLoadingEarnings] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   
   // Estado para datos frescos del usuario
   const [instructorData, setInstructorData] = useState(user);
@@ -63,6 +67,26 @@ function InstructorPanel() {
     
     if (token) fetchData();
   }, [token, API_URL]);
+
+  // Cargar liquidación del mes seleccionado
+  useEffect(() => {
+    const fetchEarnings = async () => {
+      if (activeTab !== 'liquidacion' || !token) return;
+      setLoadingEarnings(true);
+      try {
+        const res = await axios.get(`${API_URL}/cursos/instructor/liquidacion`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { month: selectedMonth, year: selectedYear }
+        });
+        setEarnings(res.data);
+      } catch (error) {
+        console.error("Error cargando liquidación:", error);
+      } finally {
+        setLoadingEarnings(false);
+      }
+    };
+    fetchEarnings();
+  }, [activeTab, selectedMonth, selectedYear, token, API_URL]);
 
   const handleDelete = async (cursoId) => {
       const ok = await confirmAction("¿Estás seguro de que quieres eliminar este curso?");
@@ -117,6 +141,7 @@ function InstructorPanel() {
                 <ul>
                     <li><button onClick={() => setActiveTab('cursos')} className={activeTab==='cursos'?'active':''} style={navBtnStyle}><i className="fas fa-chalkboard-teacher"></i> Mis Cursos</button></li>
                     <li><button onClick={() => setActiveTab('analiticas')} className={activeTab==='analiticas'?'active':''} style={navBtnStyle}><i className="fas fa-chart-bar"></i> Analíticas</button></li>
+                    <li><button onClick={() => setActiveTab('liquidacion')} className={activeTab==='liquidacion'?'active':''} style={navBtnStyle}><i className="fas fa-hand-holding-usd"></i> Mi Liquidación</button></li>
                     {/* 🟢 NUEVO BOTÓN */}
                     <li><button onClick={() => setActiveTab('pagos')} className={activeTab==='pagos'?'active':''} style={navBtnStyle}><i className="fas fa-money-check-alt"></i> Datos Bancarios</button></li>
                     
@@ -189,6 +214,67 @@ function InstructorPanel() {
                             </table>
                         </div>
                     </div>
+                </>
+            )}
+
+            {/* 🟢 VISTA DE MI LIQUIDACIÓN (NETO REAL, NO SOLO BRUTO) */}
+            {activeTab === 'liquidacion' && (
+                <>
+                    <header className="content-header" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <h2>Mi Liquidación</h2>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <select value={selectedMonth} onChange={(e)=>setSelectedMonth(e.target.value)} style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}>
+                                {[...Array(12).keys()].map(m => <option key={m+1} value={m+1}>{new Date(0, m).toLocaleString('es', {month:'long'})}</option>)}
+                            </select>
+                            <select value={selectedYear} onChange={(e)=>setSelectedYear(e.target.value)} style={{padding:'8px', borderRadius:'5px', border:'1px solid #ccc'}}>
+                                {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+                    </header>
+
+                    {loadingEarnings ? <p>Calculando...</p> : earnings && (
+                        <>
+                            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px'}}>
+                                <StatBox title="Total Bruto" value={formatCurrency(earnings.estadisticas.total_bruto)} icon="fa-coins" color="#3498db" />
+                                <StatBox title={`Comisión (${earnings.estadisticas.porcentaje_comision}%)`} value={formatCurrency(earnings.estadisticas.comision_retenida)} icon="fa-percentage" color="#e67e22" />
+                                <StatBox title="Neto a Cobrar" value={formatCurrency(earnings.estadisticas.total_a_pagar)} icon="fa-hand-holding-usd" color="#27ae60" />
+                            </div>
+
+                            {earnings.ya_pagado && (
+                                <div style={{background:'#e8f8f0', color:'#1c6b45', padding:'15px', borderRadius:'8px', marginBottom:'20px', fontWeight:'bold'}}>
+                                    <i className="fas fa-check-circle"></i> Este período ya fue pagado el {new Date(earnings.fecha_pago).toLocaleDateString('es-PY')}.
+                                </div>
+                            )}
+
+                            <div style={{background:'white', padding:'20px', borderRadius:'8px'}}>
+                                <h3>Detalle por Curso</h3>
+                                {earnings.detalle.length === 0 ? (
+                                    <p style={{color:'#777'}}>No hubo ventas en este período.</p>
+                                ) : (
+                                    <div style={{overflowX: 'auto', WebkitOverflowScrolling: 'touch', marginTop:'15px'}}>
+                                        <table style={{width:'100%', minWidth: '400px', borderCollapse:'collapse'}}>
+                                            <thead>
+                                                <tr style={{textAlign:'left', borderBottom:'2px solid #eee'}}>
+                                                    <th style={{padding:'10px', whiteSpace:'nowrap'}}>Curso</th>
+                                                    <th style={{padding:'10px', whiteSpace:'nowrap'}}>Ventas</th>
+                                                    <th style={{padding:'10px', whiteSpace:'nowrap'}}>Ingreso Bruto</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {earnings.detalle.map((d, i) => (
+                                                    <tr key={i} style={{borderBottom:'1px solid #eee'}}>
+                                                        <td style={{padding:'10px'}}>{d.titulo}</td>
+                                                        <td style={{padding:'10px'}}>{d.cantidad}</td>
+                                                        <td style={{padding:'10px'}}>{formatCurrency(d.ingreso)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </>
             )}
 

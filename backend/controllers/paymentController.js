@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const axios = require('axios');
 const { Course, User, Transaction, Enrollment } = require('../models');
+const { logError } = require('../utils/errorLog');
 
 // =========================================================
 // 1. INICIAR PAGO (CORREGIDO PARA API 2.0)
@@ -104,16 +105,16 @@ const initiatePayment = async (req, res) => {
                 redirectUrl: `https://www.pagopar.com/pagos/${hashReal}`
             });
         } else {
-            console.error("❌ ERROR API PAGOPAR:", JSON.stringify(response.data.resultado));
+            await logError('pagopar_iniciar', new Error('Pagopar rechazó la orden'), response.data.resultado);
             await nuevaTransaccion.destroy();
-            res.status(400).json({ 
-                message: "Error en la pasarela", 
-                details: response.data.resultado 
+            res.status(400).json({
+                message: "Error en la pasarela",
+                details: response.data.resultado
             });
         }
 
     } catch (error) {
-        console.error("❌ ERROR GENERAL CONTROLADOR:", error.message);
+        await logError('pagopar_iniciar', error);
         res.status(500).json({ message: "Error interno del servidor al procesar pago." });
     }
 };
@@ -169,7 +170,11 @@ const confirmPaymentWebhook = async (req, res) => {
                     });
                     console.log(`🎓 Alumno ${transaccion.userId} inscrito con éxito.`);
                 } catch (dbError) {
-                    console.error(`🚨 FALLO CRÍTICO: Pagopar confirmó el pago (ref ${hashPedido}) pero no se pudo inscribir al usuario ${transaccion.userId} en el curso ${transaccion.courseId}. Revisar manualmente en el panel de admin > Transacciones.`, dbError.message);
+                    await logError(
+                        'pagopar_webhook_inscripcion',
+                        dbError,
+                        { hashPedido, userId: transaccion.userId, courseId: transaccion.courseId, mensaje: 'Pagopar confirmó el pago pero no se pudo inscribir al alumno. Revisar en Admin > Transacciones.' }
+                    );
                     return res.status(500).json({ error: "Error interno al procesar la inscripción" });
                 }
             }
@@ -182,7 +187,7 @@ const confirmPaymentWebhook = async (req, res) => {
 
         res.json(resultado);
     } catch (error) {
-        console.error("❌ ERROR WEBHOOK:", error.message);
+        await logError('pagopar_webhook', error);
         if (!res.headersSent) res.status(500).send("Error");
     }
 };

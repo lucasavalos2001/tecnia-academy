@@ -16,6 +16,7 @@ const paymentRoutes = require('./routes/paymentRoutes');
 
 // Middleware de mantenimiento
 const maintenanceMiddleware = require('./middleware/maintenanceMiddleware');
+const { logError } = require('./utils/errorLog');
 
 const app = express();
 
@@ -85,6 +86,16 @@ app.get('/', (req, res) => {
 
 app.use((req, res) => {
     res.status(404).json({ message: "Ruta no encontrada" });
+});
+
+// 🛡️ Red de seguridad final: cualquier error no manejado en una ruta cae acá
+// en vez de perderse. Queda registrado en la sección "Errores" del admin.
+// eslint-disable-next-line no-unused-vars
+app.use((error, req, res, next) => {
+    logError('global_handler', error, { ruta: req.originalUrl, metodo: req.method });
+    if (!res.headersSent) {
+        res.status(500).json({ message: "Error interno del servidor" });
+    }
 });
 
 const PORT = process.env.PORT || 3000;

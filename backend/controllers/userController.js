@@ -2,6 +2,7 @@ const { Enrollment, Course, User } = require('../models');
 const bcrypt = require('bcryptjs'); // 🟢 IMPORTANTE: Para validar y cifrar contraseñas
 const jwt = require('jsonwebtoken');
 const { uploadToBunny } = require('../utils/bunny');
+const { isStrongPassword } = require('../utils/validators');
 
 const getUserProfile = async (req, res) => {
     try {
@@ -26,9 +27,9 @@ const updatePassword = async (req, res) => {
             return res.status(401).json({ message: "La contraseña actual es incorrecta." });
         }
 
-        // 3. Validar longitud de la nueva clave
-        if (newPassword.length < 6) {
-            return res.status(400).json({ message: "La nueva contraseña debe tener al menos 6 caracteres." });
+        // 3. Validar que la nueva clave sea segura
+        if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({ message: "La nueva contraseña debe tener al menos 8 caracteres, con letras y números." });
         }
 
         // 4. Cifrar la nueva contraseña
